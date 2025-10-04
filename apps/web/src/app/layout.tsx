@@ -12,7 +12,6 @@ import NextAuthProviders from '@/utils/providers/NextAuthProviders/index'
 import NextTopLoader from 'nextjs-toploader'
 import Script from 'next/script'
 import { validateEnv } from '#/env'
-import MainNavigation from '@/components/navigation/MainNavigation'
 import { DynamicTanstackDevTools } from '@/components/devtools/DynamicTanstackDevTools'
 
 const fontSans = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -65,7 +64,6 @@ export default async function RootLayout({
                             disableTransitionOnChange
                         >
                             <NextTopLoader />
-                            <MainNavigation />
                             <ReactQueryProviders>
                                 <Suspense
                                     fallback={

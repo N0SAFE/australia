@@ -222,7 +222,7 @@
         "@n0safe/trycli": "^1.0.4",
         "@types/bun": "latest",
         "concurrently": "catalog:dev",
-        "nyc": "^15.1.0",
+        "nyc": "^17.1.0",
         "prompts": "catalog:utils",
         "rimraf": "catalog:build",
         "turbo": "^2.5.6",

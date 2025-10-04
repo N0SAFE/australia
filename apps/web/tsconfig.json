@@ -1,0 +1,30 @@
+{
+    "extends": "@repo/tsconfig/nextjs.json",
+    "compilerOptions": {
+        "useDefineForClassFields": true,
+        "baseUrl": ".",
+        "incremental": true,
+        "plugins": [
+            {
+                "name": "next"
+            }
+        ],
+        "paths": {
+            "@/*": ["./src/*"],
+            "#/*": ["./*"],
+            "@repo/nextjs-devtool": ["../../packages/nextjs-devtool/src"],
+            "@repo/*": ["../../packages/*"],
+            "@api/*": ["../api/src/*"]
+        },
+        "target": "ES2017"
+    },
+    "include": [
+        "next-env.d.ts",
+        "**/*.ts",
+        "**/*.tsx",
+        ".next/types/**/*.ts",
+        "next.config.js",
+        "next-sitemap.config.js"
+    ],
+    "exclude": ["node_modules"]
+}

@@ -28,7 +28,7 @@
     "@rekog/mcp-nest": "^1.8.1",
     "reflect-metadata": "catalog:api:nest",
     "rxjs": "catalog:api:nest",
-    "zod": "3.23.8"
+    "zod": "4.1.11"
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",

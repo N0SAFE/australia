@@ -1,0 +1,361 @@
+import { Inject, Logger, Module } from "@nestjs/common";
+import type { DynamicModule, ModuleMetadata, OnModuleInit, Provider, Type } from "@nestjs/common";
+import { APP_FILTER, DiscoveryModule, DiscoveryService, HttpAdapterHost, MetadataScanner } from "@nestjs/core";
+import { createAuthMiddleware } from "better-auth/plugins";
+import { APIErrorExceptionFilter } from "./filters/api-error-exception-filter";
+import { AuthService } from "./services/auth.service";
+import { AFTER_HOOK_KEY, AUTH_INSTANCE_KEY, AUTH_MODULE_OPTIONS_KEY, BEFORE_HOOK_KEY, HOOK_KEY } from "./types/symbols";
+import { AuthController } from "./controllers/auth.controller";
+import { AuthGuard } from "./guards/auth.guard";
+import type { Auth } from "@/core/modules/auth/types/auth";
+import type { InstanceWrapper } from "@nestjs/core/injector/instance-wrapper";
+import type { AuthContext, MiddlewareContext, MiddlewareOptions } from "better-auth";
+
+/**
+ * Configuration options for the AuthModule
+ */
+interface AuthModuleOptions {
+    disableExceptionFilter?: boolean;
+    disableTrustedOriginsCors?: boolean;
+    disableBodyParser?: boolean;
+}
+
+/**
+ * Factory for creating Auth instance and module options asynchronously
+ */
+export interface AuthModuleAsyncOptions extends Pick<ModuleMetadata, "imports"> {
+    /**
+     * Factory function that returns an object with auth instance and optional module options
+     */
+    useFactory?: (...args: unknown[]) =>
+        | Promise<{
+              auth: Auth;
+              options?: AuthModuleOptions;
+          }>
+        | {
+              auth: Auth;
+              options?: AuthModuleOptions;
+          };
+    /**
+     * Providers to inject into the factory function
+     */
+    inject?: (string | symbol | Type<unknown>)[];
+    /**
+     * Use an existing provider class
+     */
+    useClass?: Type<{
+        createAuthOptions():
+            | Promise<{
+                  auth: Auth;
+                  options?: AuthModuleOptions;
+              }>
+            | {
+                  auth: Auth;
+                  options?: AuthModuleOptions;
+              };
+    }>;
+    /**
+     * Use an existing provider
+     */
+    useExisting?: Type<{
+        createAuthOptions():
+            | Promise<{
+                  auth: Auth;
+                  options?: AuthModuleOptions;
+              }>
+            | {
+                  auth: Auth;
+                  options?: AuthModuleOptions;
+              };
+    }>;
+}
+
+const HOOKS = [
+    { metadataKey: BEFORE_HOOK_KEY, hookType: "before" as const },
+    { metadataKey: AFTER_HOOK_KEY, hookType: "after" as const },
+];
+
+/**
+ * NestJS module that integrates the Auth library with NestJS applications.
+ * Provides authentication middleware, hooks, and exception handling.
+ */
+@Module({
+    imports: [DiscoveryModule],
+    providers: [AuthGuard, AuthService],
+    controllers: [AuthController],
+})
+export class AuthModule implements  OnModuleInit {
+    private readonly logger = new Logger(AuthModule.name);
+    constructor(
+        @Inject(AUTH_INSTANCE_KEY) private readonly auth: Auth,
+        @Inject(DiscoveryService)
+        private readonly discoveryService: DiscoveryService,
+        @Inject(MetadataScanner)
+        private readonly metadataScanner: MetadataScanner,
+        @Inject(HttpAdapterHost)
+        private readonly adapter: HttpAdapterHost,
+        @Inject(AUTH_MODULE_OPTIONS_KEY)
+        private readonly options: AuthModuleOptions
+    ) {}
+
+    onModuleInit(): void {
+        // Setup hooks
+        if (!("hooks" in this.auth.options)) return;
+
+        const providers = this.discoveryService
+            .getProviders()
+            .filter(
+                (o: { metatype }): o is InstanceWrapper<(new (...args: unknown[]) => unknown) & Record<string, (...args: unknown[]) => unknown>> =>
+                    Reflect.getMetadata(HOOK_KEY, o.metatype as object) as boolean
+            );
+
+        for (const provider of providers) {
+            console.log('AuthModule: Found provider with hooks metadata');
+            const providerPrototype = Object.getPrototypeOf(provider.instance) as typeof provider.instance;
+            const methods = this.metadataScanner.getAllMethodNames(providerPrototype);
+
+            console.log('AuthModule: Scanning methods for hooks:', methods);
+            for (const method of methods) {
+                const providerMethod = providerPrototype[method];
+                this.setupHooks(providerMethod, provider.instance);
+            }
+        }
+    }
+
+    private setupHooks(providerMethod: (...args: unknown[]) => unknown, providerClass: new (...args: unknown[]) => unknown) {
+        if (!("hooks" in this.auth.options) || typeof this.auth.options.hooks !== "object" || this.auth.options.hooks === null) return;
+
+        for (const { metadataKey, hookType } of HOOKS) {
+            const hookPath = Reflect.getMetadata(metadataKey, providerMethod) as string | undefined;
+            if (!hookPath) continue;
+
+            const originalHook = this.auth.options.hooks[hookType] as
+                | ((
+                      ctx: MiddlewareContext<
+                          MiddlewareOptions,
+                          AuthContext & {
+                              returned?: unknown;
+                              responseHeaders?: Headers;
+                          }
+                      >
+                  ) => Promise<void>)
+                | undefined;
+            this.auth.options.hooks[hookType] = createAuthMiddleware(async (ctx) => {
+                if (originalHook) {
+                    await originalHook(ctx);
+                }
+
+                if (hookPath === ctx.path) {
+                    await providerMethod.apply(providerClass, [ctx]);
+                }
+            });
+        }
+    }
+
+    /**
+     * Static factory method to create and configure the AuthModule.
+     * @param auth - The Auth instance to use
+     * @param options - Configuration options for the module
+     */
+    static forRoot(auth: Auth, options: AuthModuleOptions = {}): DynamicModule {
+        // Initialize hooks with an empty object if undefined
+        // Without this initialization, the setupHook method won't be able to properly override hooks
+        // It won't throw an error, but any hook functions we try to add won't be called
+        if ("hooks" in auth.options && typeof auth.options.hooks === "object") {
+            auth.options.hooks = {
+                ...auth.options.hooks,
+            };
+        }
+
+        const providers: Provider[] = [
+            {
+                provide: AUTH_INSTANCE_KEY,
+                useValue: auth,
+            },
+            {
+                provide: AUTH_MODULE_OPTIONS_KEY,
+                useValue: options,
+            },
+            AuthService,
+            AuthGuard,
+        ];
+
+        if (!options.disableExceptionFilter) {
+            providers.push({
+                provide: APP_FILTER,
+                useClass: APIErrorExceptionFilter,
+            });
+        }
+
+        return {
+            global: true,
+            module: AuthModule,
+            providers: providers,
+            controllers: [AuthController],
+            exports: [
+                {
+                    provide: AUTH_INSTANCE_KEY,
+                    useValue: auth,
+                },
+                {
+                    provide: AUTH_MODULE_OPTIONS_KEY,
+                    useValue: options,
+                },
+                AuthService,
+                AuthGuard,
+            ],
+        };
+    }
+
+    /**
+     * Static factory method to create and configure the AuthModule asynchronously.
+     * @param options - Async configuration options for the module
+     */
+    static forRootAsync(options: AuthModuleAsyncOptions): {
+        global: boolean;
+        module: typeof AuthModule;
+        imports?: ModuleMetadata["imports"];
+        providers: Provider[];
+        exports: (Provider | typeof AuthService)[];
+        controllers: (typeof AuthController)[];
+    } {
+        const asyncProviders = AuthModule.createAsyncProviders(options);
+
+        return {
+            global: true,
+            module: AuthModule,
+            imports: options.imports ?? [],
+            providers: [...asyncProviders, AuthService, AuthGuard],
+            controllers: [AuthController],
+            exports: [
+                {
+                    provide: AUTH_INSTANCE_KEY,
+                    useExisting: AUTH_INSTANCE_KEY,
+                },
+                {
+                    provide: AUTH_MODULE_OPTIONS_KEY,
+                    useExisting: AUTH_MODULE_OPTIONS_KEY,
+                },
+                AuthService,
+                AuthGuard,
+            ],
+        };
+    }
+
+    private static createAsyncProviders(options: AuthModuleAsyncOptions): Provider[] {
+        if (options.useFactory) {
+            return [
+                {
+                    provide: AUTH_INSTANCE_KEY,
+                    useFactory: async (...args: unknown[]) => {
+                        if (!options.useFactory) {
+                            throw new Error("[IllogicalState] useFactory is not defined even with the check if (options.useFactory) {...}");
+                        }
+                        const result = await options.useFactory(...args);
+                        const auth = result.auth;
+
+                        // Initialize hooks with an empty object if undefined
+                        if ("hooks" in auth.options && typeof auth.options.hooks === "object") {
+                            auth.options.hooks = {
+                                ...auth.options.hooks,
+                            };
+                        }
+
+                        return auth;
+                    },
+                    inject: options.inject ?? [],
+                },
+                {
+                    provide: AUTH_MODULE_OPTIONS_KEY,
+                    useFactory: async (...args: unknown[]) => {
+                        if (!options.useFactory) {
+                            throw new Error("[IllogicalState] useFactory is not defined even with the check if (options.useFactory) {...}");
+                        }
+                        const result = await options.useFactory(...args);
+                        return result.options ?? {};
+                    },
+                    inject: options.inject ?? [],
+                },
+                AuthModule.createExceptionFilterProvider(),
+            ];
+        }
+
+        if (options.useClass) {
+            return [
+                {
+                    provide: options.useClass,
+                    useClass: options.useClass,
+                },
+                {
+                    provide: AUTH_INSTANCE_KEY,
+                    useFactory: async (configService: { createAuthOptions(): Promise<{ auth: Auth; options?: AuthModuleOptions }> | { auth: Auth; options?: AuthModuleOptions } }) => {
+                        const result = await configService.createAuthOptions();
+                        const auth = result.auth;
+
+                        // Initialize hooks with an empty object if undefined
+                        if ("hooks" in auth.options && typeof auth.options.hooks === "object") {
+                            auth.options.hooks = {
+                                ...auth.options.hooks,
+                            };
+                        }
+
+                        return auth;
+                    },
+                    inject: [options.useClass],
+                },
+                {
+                    provide: AUTH_MODULE_OPTIONS_KEY,
+                    useFactory: async (configService: { createAuthOptions(): Promise<{ auth: Auth; options?: AuthModuleOptions }> | { auth: Auth; options?: AuthModuleOptions } }) => {
+                        const result = await configService.createAuthOptions();
+                        return result.options ?? {};
+                    },
+                    inject: [options.useClass],
+                },
+                AuthModule.createExceptionFilterProvider(),
+            ];
+        }
+
+        if (options.useExisting) {
+            return [
+                {
+                    provide: AUTH_INSTANCE_KEY,
+                    useFactory: async (configService: { createAuthOptions(): Promise<{ auth: Auth; options?: AuthModuleOptions }> | { auth: Auth; options?: AuthModuleOptions } }) => {
+                        const result = await configService.createAuthOptions();
+                        const auth = result.auth;
+
+                        // Initialize hooks with an empty object if undefined
+                        if ("hooks" in auth.options && typeof auth.options.hooks === "object") {
+                            auth.options.hooks = {
+                                ...auth.options.hooks,
+                            };
+                        }
+
+                        return auth;
+                    },
+                    inject: [options.useExisting],
+                },
+                {
+                    provide: AUTH_MODULE_OPTIONS_KEY,
+                    useFactory: async (configService: { createAuthOptions(): Promise<{ auth: Auth; options?: AuthModuleOptions }> | { auth: Auth; options?: AuthModuleOptions } }) => {
+                        const result = await configService.createAuthOptions();
+                        return result.options ?? {};
+                    },
+                    inject: [options.useExisting],
+                },
+                AuthModule.createExceptionFilterProvider(),
+            ];
+        }
+
+        throw new Error("Invalid async configuration. Must provide useFactory, useClass, or useExisting.");
+    }
+
+    private static createExceptionFilterProvider(): Provider {
+        return {
+            provide: APP_FILTER,
+            useFactory: (options: AuthModuleOptions) => {
+                return options.disableExceptionFilter ? null : new APIErrorExceptionFilter();
+            },
+            inject: [AUTH_MODULE_OPTIONS_KEY],
+        };
+    }
+}

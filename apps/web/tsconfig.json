@@ -1,0 +1,30 @@
+{
+    "extends": "@repo-configs/typescript/config/nextjs.json",
+    "compilerOptions": {
+        "useDefineForClassFields": true,
+        "baseUrl": ".",
+        "incremental": true,
+        "plugins": [
+            {
+                "name": "next"
+            }
+        ],
+        "paths": {
+            "@/*": ["./src/*"],
+            "#/*": ["./*"],
+            "@api/*": ["../api/src/*"],
+        },
+        "target": "ES2017"
+    },
+    "include": [
+        "tailwind.config.mts",
+        "eslint.config.ts",
+        "next-env.d.ts",
+        "**/*.ts",
+        "**/*.tsx",
+        ".next/types/**/*.ts",
+        "next.config.js",
+        "next-sitemap.config.js"
+    ],
+    "exclude": ["node_modules"]
+}

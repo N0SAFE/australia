@@ -1,0 +1,111 @@
+{
+    "$schema": "https://turbo.build/schema.json",
+    "ui": "tui",
+    "remoteCache": {
+        "enabled": true
+    },
+    "globalDependencies": ["**/.env.*local", "**/.env", ".env.local"],
+    "globalPassThroughEnv": [".env.local", "TURBO_TOKEN", "TURBO_TEAM"],
+    "globalEnv": [
+        "API_URL",
+        "API_PING_PATH",
+        "API_ADMIN_TOKEN",
+        "TEMP_APP_NEXTAUTH_URL",
+        "NEXT_AUTH",
+        "TURBO_TOKEN",
+        "TURBO_TEAM",
+        "DATABASE_URL",
+        "AUTH_SECRET",
+        "JWT_SECRET",
+        "NODE_ENV",
+        "PHASE",
+        "NEXT_PUBLIC_WEB_URL",
+        "API_PORT",
+        "DEV_AUTH_KEY",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "REDIS_URL",
+        "CORS_ORIGIN",
+        "LOG_LEVEL",
+        "CHOKIDAR_USEPOLLING",
+        "TRAEFIK_DOMAIN",
+        "TRAEFIK_ACME_EMAIL",
+        "PASSKEY_RPID",
+        "PASSKEY_RPNAME",
+        "PASSKEY_ORIGIN"
+    ],
+    "tasks": {
+        "dev": {
+            "cache": false,
+            "persistent": true
+        },
+        "build": {
+            "dependsOn": ["^build"],
+            "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+            "inputs": ["src/**", "public/**", "*.config.*", "package.json"]
+        },
+        "compile": {
+            "dependsOn": ["^compile"],
+            "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+            "inputs": ["src/**", "public/**", "*.config.*", "package.json"]
+        },
+        "start": {
+            "cache": false,
+            "persistent": true,
+            "dependsOn": ["build"]
+        },
+        "docker:build": {
+            "cache": false,
+            "dependsOn": ["build"]
+        },
+        "docker:dev": {
+            "cache": false,
+            "persistent": true
+        },
+        "init": {
+            "dependsOn": ["^init", "clean"],
+            "outputs": ["dist/**"],
+            "cache": false
+        },
+        "generate:directus:types": {
+            "cache": false,
+            "dependsOn": ["^generate:directus:types"]
+        },
+        "generate": {
+            "dependsOn": ["^generate", "generate:directus:types"],
+            "cache": false
+        },
+        "test": {
+            "dependsOn": ["@repo-configs/vitest#build"],
+            "inputs": ["src/**", "test/**", "**/*.test.*", "**/*.spec.*", "*.config.*", "vitest.config.*", "vitest.setup.*"]
+        },
+        "test:watch": {
+            "cache": false,
+            "persistent": true,
+            "dependsOn": ["^build", "@repo-configs/eslint#build", "@repo-configs/prettier#build", "@repo-configs/vitest#build"]
+        },
+        "test:ui": {
+            "cache": false,
+            "persistent": true,
+            "dependsOn": ["^build", "@repo-configs/eslint#build", "@repo-configs/prettier#build", "@repo-configs/vitest#build"]
+        },
+        "test:coverage": {
+            "dependsOn": ["^build", "@repo-configs/eslint#build", "@repo-configs/prettier#build", "@repo-configs/vitest#build"],
+            "outputs": ["coverage/**"],
+            "inputs": ["src/**", "test/**", "**/*.test.*", "**/*.spec.*", "*.config.*", "vitest.config.*", "vitest.setup.*"]
+        },
+        "lint": {
+            "dependsOn": ["@repo-configs/eslint#build"],
+            "inputs": ["src/**", "*.config.*", "package.json"]
+        },
+        "prettify": {
+            "dependsOn": ["^lint", "@repo-configs/prettier#build"]
+        },
+        "clean": {
+            "cache": false
+        },
+        "type-check": {
+            "inputs": ["**/*.ts", "**/*.tsx", "package.json", "tsconfig.json"]
+        }
+    }
+}

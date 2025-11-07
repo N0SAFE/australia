@@ -14,3 +14,9 @@ services:
     depends_on:
       api-dev:
         condition: service_healthy
+
+  # Australia Development Configuration
+  australia-dev:
+    depends_on:
+      api-dev:
+        condition: service_healthy

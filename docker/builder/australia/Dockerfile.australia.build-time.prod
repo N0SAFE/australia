@@ -1,0 +1,79 @@
+# syntax=docker/dockerfile:1.14
+
+# Base stage - Install Bun and setup environment
+FROM oven/bun:1.3.1-alpine AS base
+RUN apk add --no-cache bash git curl openssl && \
+    ln -sf $(which bun) /usr/local/bin/npm && \
+    bun install -g turbo@^2 && \
+    addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+WORKDIR /app
+
+# Pruner stage - Prepare minimal workspace
+FROM base AS pruner
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/turbo \
+    bun x turbo prune australia --docker
+
+# Installer stage - Install dependencies
+FROM base AS installer
+COPY --from=pruner /app/out/json/ .
+COPY --from=pruner /app/out/bun.lock ./bun.lock
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun ci --verbose
+
+# Builder stage - Build the application at Docker build time
+FROM base AS builder
+COPY --from=installer /app/ .
+COPY --from=pruner /app/out/full/ .
+
+# Build arguments for environment variables needed at build time
+ARG NODE_ENV=production
+ARG NEXT_PUBLIC_API_URL
+ARG API_URL
+ARG API_PORT
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_APP_PORT
+ARG AUTH_SECRET
+ARG API_ADMIN_TOKEN
+ARG API_PING_PATH
+
+# Set environment variables for build
+ENV NODE_ENV=${NODE_ENV}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV API_URL=${API_URL}
+ENV API_PORT=${API_PORT}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_APP_PORT=${NEXT_PUBLIC_APP_PORT}
+ENV AUTH_SECRET=${AUTH_SECRET}
+ENV API_ADMIN_TOKEN=${API_ADMIN_TOKEN}
+ENV API_PING_PATH=${API_PING_PATH}
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Build the application
+RUN --mount=type=cache,target=/root/.cache/turbo \
+    bun x turbo run build --filter=australia
+
+# Runner stage - Run the built application
+FROM base AS runner
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Copy built application
+COPY --from=builder --chown=nextjs:nodejs /app/apps/australia/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/australia/.next/static ./apps/australia/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/australia/public ./apps/australia/public
+
+USER nextjs
+EXPOSE 3010
+
+# Set runtime environment variables
+ENV PORT=3010
+ENV HOSTNAME="0.0.0.0"
+
+# Health check with longer start period for production builds
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:3010/ || exit 1
+
+# Start the application using the standalone server
+CMD ["bun", "run", "apps/australia/server.js"]

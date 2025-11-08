@@ -32,8 +32,6 @@
     "cli-cursor": "^5"
   },
   "dependencies": {
-    "eslint": "catalog:linting",
-    "@thallesp/nestjs-better-auth": "catalog:auth",
     "@nestjs/common": "catalog:api:nest",
     "@nestjs/config": "catalog:api:nest",
     "@nestjs/core": "catalog:api:nest",
@@ -47,11 +45,14 @@
     "@orpc/zod": "catalog:orpc",
     "@repo/api-contracts": "*",
     "@scalar/nestjs-api-reference": "catalog:api:nest",
+    "@thallesp/nestjs-better-auth": "catalog:auth",
     "@vitest/coverage-istanbul": "catalog:testing",
     "bcrypt": "catalog:database",
     "better-auth": "catalog:auth",
+    "dayjs": "^1.11.19",
     "drizzle-kit": "catalog:database",
     "drizzle-orm": "catalog:database",
+    "eslint": "catalog:linting",
     "express": "catalog:api:nest",
     "express-list-routes": "catalog:api:nest",
     "nanoid": "catalog:database",

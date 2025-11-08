@@ -6,6 +6,7 @@ import {
 import { DatabaseModule } from "./core/modules/database/database.module";
 import { HealthModule } from "./modules/health/health.module";
 import { UserModule } from "./modules/user/user.module";
+import { CapsuleModule } from "./modules/capsule/capsule.module";
 import { onError, ORPCModule } from "@orpc/nest";
 import { DATABASE_CONNECTION } from "./core/modules/database/database-connection";
 import { AuthModule } from "./core/modules/auth/auth.module";
@@ -30,6 +31,7 @@ import { REQUEST } from '@nestjs/core'
     }),
     HealthModule,
     UserModule,
+    CapsuleModule,
     ORPCModule.forRootAsync({
       useFactory: (request: Request) => ({
         interceptors: [

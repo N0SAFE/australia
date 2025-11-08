@@ -53,7 +53,7 @@ RUN apk add --no-cache \
 
 COPY --from=pruner /app/out/full/ .
 RUN --mount=type=cache,target=/root/.bun --mount=type=cache,target=/root/.cache \
-  bun ci --verbose
+  bun i --verbose
 
 # Stage 4: Production Runner - Copy source and build at runtime
 FROM base AS runner

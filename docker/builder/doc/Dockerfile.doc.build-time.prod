@@ -52,7 +52,7 @@ RUN apk add --no-cache \
 
 COPY --from=pruner /app/out/full/ .
 RUN --mount=type=cache,target=/root/.bun --mount=type=cache,target=/root/.cache \
-  bun ci --verbose
+  bun i --verbose
 
 # Stage 4: Builder - Build the application
 FROM base AS builder

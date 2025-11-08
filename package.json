@@ -196,6 +196,8 @@
     },
     "scripts": {
         "dev": "dotenv -e .env -- docker compose -f ./docker/compose/docker-compose.dev.yml up --watch",
+        "dev:down": "docker compose -f ./docker/compose/docker-compose.dev.yml down",
+        "dev:down:volumes": "docker compose -f ./docker/compose/docker-compose.dev.yml down --volumes",
         "dev:api": "docker compose -f ./docker/compose/api/docker-compose.api.dev.yml up --watch",
         "dev:web": "docker compose -f ./docker/compose/web/docker-compose.web.dev.yml up --watch",
         "dev:api:build": "docker compose -f ./docker/compose/api/docker-compose.api.dev.yml up --build --watch",

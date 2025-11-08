@@ -19,6 +19,9 @@ export const betterAuthFactory = (...args: unknown[]) => {
       database: drizzleAdapter(dbInstance, {
         provider: "pg",
       }),
+      advanced: {
+        disableOriginCheck: true
+      },
       emailAndPassword: {
         enabled: true,
       },

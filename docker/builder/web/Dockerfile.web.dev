@@ -53,7 +53,7 @@ COPY --from=pruner /app/out/full/ .
 COPY --from=pruner /app/out/bun.lock* ./
 RUN --mount=type=cache,target=/root/.bun \
     --mount=type=cache,target=/root/.cache \
-    bun ci --verbose
+    bun i --verbose
 
 # ===================================
 # Stage 3: Runner - Development runtime
@@ -85,7 +85,11 @@ RUN --mount=type=cache,target=/root/.bun \
     echo "✅ Build complete. Checking declarative-routing binary..." && \
     ls -la packages/bin/declarative-routing/dist/ || echo "⚠️  declarative-routing dist/ not found!" && \
     echo "📦 Verifying bun can find declarative-routing binary..." && \
-    bun x declarative-routing --version || echo "⚠️  declarative-routing binary not executable!"
+    cd apps/web && bun x declarative-routing --version || echo "⚠️  declarative-routing binary not executable!" && \
+    echo "🛣️  Generating declarative routes for web app..." && \
+    bun x declarative-routing build && cd /app && \
+    echo "✅ Routes generated. Verifying routes/index.ts exists..." && \
+    ls -la src/routes/index.ts || echo "⚠️  routes/index.ts not found!"
 
 # Start the development web server at container runtime only.
 CMD ["sh", "-c", "echo '🚀 Starting web dev server...' && bun x turbo run dev --filter=web..."]

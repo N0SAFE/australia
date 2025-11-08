@@ -51,7 +51,7 @@ COPY --from=pruner /app/out/full/ .
 COPY --from=pruner /app/out/bun.lock* ./
 RUN --mount=type=cache,target=/root/.bun \
     --mount=type=cache,target=/root/.cache \
-    bun ci --verbose
+    bun i --verbose
 
 # ===================================
 # Stage 3: Runner - Development runtime

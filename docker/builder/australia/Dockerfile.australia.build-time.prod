@@ -1,79 +1,110 @@
-# syntax=docker/dockerfile:1.14
+# syntax=docker/dockerfile:1-labs
+# Production Dockerfile for Web App - BUILD-TIME COMPILATION
+# This version builds the Next.js app during Docker build phase
+# Recommended for: Render, Vercel, and platforms that scan for open ports during build
 
-# Base stage - Install Bun and setup environment
+# Stage 1: Base - Install global dependencies and set environment
 FROM oven/bun:1.3.1-alpine AS base
-RUN apk add --no-cache bash git curl openssl && \
-    ln -sf $(which bun) /usr/local/bin/npm && \
-    bun install -g turbo@^2 && \
-    addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+ENV NODE_ENV=production
+
+# Set build-time environment variables for Next.js
+ARG API_URL=http://localhost:3001
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ARG API_PORT=3001
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
+ARG NEXT_PUBLIC_APP_PORT=3000
+ARG NEXT_PUBLIC_DOC_URL=http://localhost:3020
+ARG NEXT_PUBLIC_DOC_PORT=3020
+ARG API_PING_PATH=/health
+ARG API_ADMIN_TOKEN=secret-admin-token
+ARG AUTH_SECRET=QgafJQw3O/k1gambz7YGKjtj5ZZe0dnL/WlSw4PtMDc=
+
+ENV API_URL=$API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV API_PORT=$API_PORT
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_APP_PORT=$NEXT_PUBLIC_APP_PORT
+ENV NEXT_PUBLIC_DOC_URL=$NEXT_PUBLIC_DOC_URL
+ENV NEXT_PUBLIC_DOC_PORT=$NEXT_PUBLIC_DOC_PORT
+ENV API_PING_PATH=$API_PING_PATH
+ENV API_ADMIN_TOKEN=$API_ADMIN_TOKEN
+ENV AUTH_SECRET=$AUTH_SECRET
+
+# Install system dependencies and Turbo
+RUN apk add --no-cache libc6-compat dumb-init
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install -g turbo@^2
 WORKDIR /app
 
-# Pruner stage - Prepare minimal workspace
+# Stage 2: Pruner - Prune monorepo for australia app dependencies
 FROM base AS pruner
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/turbo \
-    bun x turbo prune australia --docker
+  turbo prune australia --docker
 
-# Installer stage - Install dependencies
+# Stage 3: Installer - Install dependencies from pruned lockfile
 FROM base AS installer
-COPY --from=pruner /app/out/json/ .
-COPY --from=pruner /app/out/bun.lock ./bun.lock
-RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun ci --verbose
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    gcc \
+    musl-dev
 
-# Builder stage - Build the application at Docker build time
-FROM base AS builder
-COPY --from=installer /app/ .
 COPY --from=pruner /app/out/full/ .
+RUN --mount=type=cache,target=/root/.bun --mount=type=cache,target=/root/.cache \
+  bun i --verbose
 
-# Build arguments for environment variables needed at build time
-ARG NODE_ENV=production
-ARG NEXT_PUBLIC_API_URL
-ARG API_URL
-ARG API_PORT
-ARG NEXT_PUBLIC_APP_URL
-ARG NEXT_PUBLIC_APP_PORT
-ARG AUTH_SECRET
-ARG API_ADMIN_TOKEN
-ARG API_PING_PATH
+# Stage 4: Builder - Build the application
+FROM base AS builder
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    gcc \
+    musl-dev
 
-# Set environment variables for build
-ENV NODE_ENV=${NODE_ENV}
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-ENV API_URL=${API_URL}
-ENV API_PORT=${API_PORT}
-ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-ENV NEXT_PUBLIC_APP_PORT=${NEXT_PUBLIC_APP_PORT}
-ENV AUTH_SECRET=${AUTH_SECRET}
-ENV API_ADMIN_TOKEN=${API_ADMIN_TOKEN}
-ENV API_PING_PATH=${API_PING_PATH}
-ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=pruner /app/out/full/package.json /app/out/bun.lock* /app/out/full/turbo.json ./
+COPY --from=pruner /app/out/full/apps*/ /app/apps/
+COPY --from=pruner /app/out/full/packages*/ /app/packages/
+COPY --from=installer --parents /app/node_modules /app/**/node_modules /
+COPY --parents --chmod=a+w .turbo/ **/.turbo/ ./
 
-# Build the application
-RUN --mount=type=cache,target=/root/.cache/turbo \
-    bun x turbo run build --filter=australia
+RUN --mount=type=cache,target=/root/.bun --mount=type=cache,target=/root/.cache \
+  bun turbo run generate --filter=australia...
 
-# Runner stage - Run the built application
+RUN --mount=type=cache,target=/root/.bun --mount=type=cache,target=/root/.cache \
+  bun turbo run build --filter=australia...
+
+# Stage 5: Production Runner - Run the built application
 FROM base AS runner
+
+# Install Node.js and other production runtime dependencies
+RUN apk add --no-cache nodejs
+ENV PATH="/usr/bin:${PATH}"
+RUN ln -sf $(which bun) /usr/local/bin/npm
+
+# Don't run production as root
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy only built application from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app ./
+
+# Switch to nextjs user
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Set environment variables
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=${NEXT_PUBLIC_APP_PORT}
 
-# Copy built application
-COPY --from=builder --chown=nextjs:nodejs /app/apps/australia/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/australia/.next/static ./apps/australia/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/apps/australia/public ./apps/australia/public
-
-USER nextjs
-EXPOSE 3010
-
-# Set runtime environment variables
-ENV PORT=3010
-ENV HOSTNAME="0.0.0.0"
-
-# Health check with longer start period for production builds
+# Health check for deployment platforms
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-    CMD curl -f http://localhost:3010/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider ${NEXT_PUBLIC_APP_URL} || exit 1
 
-# Start the application using the standalone server
-CMD ["bun", "run", "apps/australia/server.js"]
+WORKDIR /app
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["sh", "-c", "bun run --cwd=apps/australia start"]

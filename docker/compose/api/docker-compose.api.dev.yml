@@ -48,6 +48,12 @@ services:
             - docker/compose/api/docker-compose.api.dev.yml
             - docker/compose/docker-compose.dev.override.yaml
             - docker/compose/docker-compose.dev.yml
+        # Sync+Restart when migrations change to automatically apply them
+        - action: sync+restart
+          path: ../../..
+          target: /app
+          include:
+            - apps/api/src/config/drizzle/migrations/**
         # Rebuild when critical dependency or config files change
         - action: rebuild
           path: ../../..

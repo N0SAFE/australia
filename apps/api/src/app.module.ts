@@ -13,7 +13,7 @@ import { DATABASE_CONNECTION } from "./core/modules/database/database-connection
 import { AuthModule } from "./core/modules/auth/auth.module";
 import { LoggerMiddleware } from "./core/middlewares/logger.middleware";
 import { FileUploadMiddleware } from "./core/middlewares/file-upload.middleware";
-import { betterAuthFactory } from "./config/auth/auth";
+import { createBetterAuth } from "./config/auth/auth";
 import { EnvService } from "./config/env/env.service";
 import { EnvModule } from "./config/env/env.module";
 import { APP_GUARD } from "@nestjs/core";
@@ -28,7 +28,7 @@ import { StorageModule } from "./modules/storage/storage.module";
     DatabaseModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, EnvModule],
-      useFactory: betterAuthFactory,
+      useFactory: createBetterAuth,
       inject: [DATABASE_CONNECTION, EnvService],
       disableBodyParser: false,
     }),
@@ -43,8 +43,7 @@ import { StorageModule } from "./modules/storage/storage.module";
           onError((error, ctx) => {
             console.error(
               "oRPC Error:",
-              JSON.stringify(error),
-              JSON.stringify(ctx)
+              error
             );
           })
         ],

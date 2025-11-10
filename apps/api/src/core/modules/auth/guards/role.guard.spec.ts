@@ -5,7 +5,7 @@ import { Reflector } from '@nestjs/core';
 import { type ExecutionContext } from '@nestjs/common';
 import { RoleGuard } from './role.guard';
 import { APIError } from 'better-auth/api';
-import { PermissionChecker } from '@/config/auth/permissions';
+import { PermissionChecker } from '@repo/auth/permissions';
 import { MODULE_OPTIONS_TOKEN } from '../definitions/auth-module-definition';
 
 // Mock the permissions module

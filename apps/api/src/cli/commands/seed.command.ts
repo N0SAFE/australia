@@ -1,6 +1,7 @@
 import { Command, CommandRunner } from 'nest-commander';
 import { Injectable } from '@nestjs/common';
 import * as schema from '../../config/drizzle/schema';
+import { roles } from '@repo/auth/permissions';
 import { eq } from 'drizzle-orm';
 import { AuthService } from '@/core/modules/auth/services/auth.service';
 import { DatabaseService } from '@/core/modules/database/services/database.service';

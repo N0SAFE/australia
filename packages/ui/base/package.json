@@ -130,7 +130,7 @@
         "react-lite-youtube-embed": "^2.5.6",
         "react-player": "3.3.1",
         "react-use": "^17.6.0",
-        "recharts": "3.3.0",
+        "recharts": "3.4.1",
         "rimraf": "catalog:build",
         "sonner": "catalog:ui",
         "tailwind-merge": "catalog:styling",

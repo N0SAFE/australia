@@ -56,6 +56,29 @@ function runMigrations(config: EntrypointConfig): void {
 }
 
 /**
+ * Run database seeding (optional, controlled by environment)
+ */
+function runSeeding(config: EntrypointConfig): void {
+  if (config.skipMigrations) {
+    console.log('⏭️  SKIP_MIGRATIONS set, skipping seeding')
+    return
+  }
+
+  // Only seed if explicitly enabled via ENABLE_SEEDING=true
+  if (process.env.ENABLE_SEEDING !== 'true') {
+    console.log('⏭️  ENABLE_SEEDING not set, skipping seeding (production mode)')
+    return
+  }
+
+  try {
+    console.log('🌱 Running database seeding...')
+    execSync(`bun run ${config.seedScript}`, { stdio: 'inherit' })
+  } catch (error) {
+    console.error('⚠️  db:seed failed (continuing)')
+  }
+}
+
+/**
  * Create default admin user if needed
  */
 function createDefaultAdmin(): void {
@@ -79,7 +102,8 @@ function createDefaultAdmin(): void {
  * Start API in production mode
  */
 function startAPI(): void {
-  console.log('🚀 Starting API in production mode...')
+  const mode = process.env.ENABLE_SEEDING === 'true' ? 'production-like (with mock data)' : 'production'
+  console.log(`🚀 Starting API in ${mode} mode...`)
 
   try {
     execSync('bun run start:prod', { stdio: 'inherit' })
@@ -100,10 +124,12 @@ function main(): void {
     seedScript: 'db:seed',
   }
 
-  console.log('🎯 API Production Entrypoint Started\n')
+  const mode = process.env.ENABLE_SEEDING === 'true' ? 'Production-Like (with mock data)' : 'Production'
+  console.log(`🎯 API ${mode} Entrypoint Started\n`)
 
   runDiagnostics(config)
   runMigrations(config)
+  runSeeding(config)
   createDefaultAdmin()
   startAPI()
 }

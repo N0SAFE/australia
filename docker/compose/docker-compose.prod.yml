@@ -1,7 +1,5 @@
+# Production orchestrator - imports all production service definitions
 include:
-  - path:
-      - api/docker-compose.api.prod.yml
-      - web/docker-compose.web.prod.yml
-      - doc/docker-compose.doc.prod.yml
-      - australia/docker-compose.australia.prod.yml
-      - docker-compose.prod.override.yml
+  - path: ./api/docker-compose.api.prod.yml
+  - path: ./web/docker-compose.web.prod.yml
+  - path: ./australia/docker-compose.australia.prod.yml

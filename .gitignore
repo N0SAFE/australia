@@ -44,5 +44,6 @@ dist/
 _experiment
 
 /.env
+/.env.prod
 !/.env.template
 !/.env.example

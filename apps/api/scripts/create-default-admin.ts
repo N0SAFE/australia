@@ -9,6 +9,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from '../src/config/drizzle/schema';
 import { eq } from 'drizzle-orm';
+import { admin } from 'better-auth/plugins';
 
 interface AdminConfig {
   email: string;
@@ -86,6 +87,7 @@ async function createAdminUser(config: AdminConfig): Promise<void> {
       advanced: {
         disableOriginCheck: true
       },
+      plugins: [admin()],
     });
 
     // Create the admin user

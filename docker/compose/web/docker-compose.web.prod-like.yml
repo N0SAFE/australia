@@ -25,25 +25,32 @@ services:
           path: ../../..
           target: /app
           include:
-            - docker/compose/web/docker-compose.web.prod.yml
+            - docker/compose/web/docker-compose.web.prod-like.yml
             - docker/compose/docker-compose.yml
-            - docker/compose/docker-compose.dev.override.yml
-            - docker/compose/docker-compose.prod.yml
-            - docker/compose/docker-compose.prod.override.yml
-        # Rebuild when any source code or dependency changes
+            - docker/compose/docker-compose.prod-like.yml
+            - docker/compose/docker-compose.prod-like.override.yml
+        # Rebuild when web app source code changes
         - action: rebuild
           path: ../../..
           target: /app
+          include:
+            - apps/web/**/*.ts
+            - apps/web/**/*.tsx
+            - apps/web/**/*.js
+            - apps/web/**/*.jsx
+            - apps/web/**/*.json
+            - apps/web/**/*.css
+            - apps/web/package.json
+            - packages/**/*.ts
+            - packages/**/*.tsx
+            - packages/**/package.json
+            - package.json
+            - turbo.json
           ignore:
-            - .git/
-            - .gitignore
-            - node_modules/
-            - "**/node_modules/"
-            - "**/.turbo/"
-            - "**/.cache/"
-            - "**/coverage/"
-            - "**/*.log"
-            - "**/.DS_Store"
+            - "**/*.test.ts"
+            - "**/*.test.tsx"
+            - "**/*.spec.ts"
+            - "**/__tests__/**"
     depends_on:
       api-prod:
         condition: service_healthy

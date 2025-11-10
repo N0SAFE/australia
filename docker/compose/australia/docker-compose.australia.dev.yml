@@ -114,9 +114,6 @@ services:
       - BETTER_AUTH_URL=${NEXT_PUBLIC_AUSTRALIA_URL:-http://localhost:3010}
       # Development authentication
       - NEXT_PUBLIC_DEV_AUTH_KEY=${NEXT_PUBLIC_DEV_AUTH_KEY:-${DEV_AUTH_KEY:-dev-fallback-key}}
-      # Docs URL (for navbar link)
-      - NEXT_PUBLIC_DOC_PORT=${NEXT_PUBLIC_DOC_PORT:-3020}
-      - NEXT_PUBLIC_DOC_URL=${NEXT_PUBLIC_DOC_URL:-http://localhost:${NEXT_PUBLIC_DOC_PORT:-3020}}
       # Debug configuration
       - NEXT_PUBLIC_DEBUG=${NEXT_PUBLIC_DEBUG}
       # Enable hot reloading

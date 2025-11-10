@@ -108,8 +108,7 @@
     "jsdom": "catalog:testing",
     "vitest": "catalog:testing",
     "@vitest/ui": "catalog:testing",
-    "@vitest/coverage-v8": "catalog:testing",
-    "@types/mdx": "catalog:doc"
+    "@vitest/coverage-v8": "catalog:testing"
   },
   "optionalDependencies": {},
   "overrides": {

@@ -1,0 +1,6 @@
+include:
+  - path:
+      - api/docker-compose.api.prod.yml
+      - web/docker-compose.web.prod.yml
+      - australia/docker-compose.australia.prod.yml
+      - docker-compose.prod.override.yml

@@ -71,6 +71,14 @@ COPY --from=pruner /app/out/full/packages/ /app/packages/
 COPY --from=installer --parents /app/node_modules /app/**/node_modules /
 COPY --parents --chmod=a+w .turbo/ **/.turbo/ ./
 
+# Copy seed assets for fast seeding (images, videos, audio)
+# These files are pre-downloaded and stored in the seed/assets directory
+COPY apps/api/seed/ /app/apps/api/seed/
+
+# Create uploads directory with proper permissions
+RUN mkdir -p /app/apps/api/uploads && \
+    chmod 755 /app/apps/api/uploads
+
 # Run build during image build (runner stage) so compilation happens at build time.
 # Use BuildKit cache for bun to speed up subsequent builds.
 RUN --mount=type=cache,target=/root/.bun \

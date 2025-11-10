@@ -26,10 +26,7 @@ export class EnvService {
       }
       return value as Env[T];
     }
-    const ret = this.configService.get<Env[T]>(key);
-    if (!ret) {
-      throw new Error(`Config key: ${key} is not set`)
-    }
+    const ret = this.configService.get<Env[T]>(key) as unknown as Env[T];
     return ret
   }
 

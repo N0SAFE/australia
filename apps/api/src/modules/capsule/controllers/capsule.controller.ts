@@ -1,4 +1,4 @@
-import { Controller, Logger } from '@nestjs/common';
+import { Controller } from '@nestjs/common';
 import { Implement, implement } from '@orpc/nest';
 import { capsuleContract } from '@repo/api-contracts';
 import { CapsuleService } from '../services/capsule.service';
@@ -13,17 +13,8 @@ export class CapsuleController {
   list() {
     return implement(capsuleContract.list).handler(async ({ input }) => {
       const result = await this.capsuleService.getCapsules(input);
-      return {
-        capsules: result.capsules.map(capsule => ({
-          id: capsule.id,
-          openingDate: capsule.openingDate,
-          content: capsule.content,
-          openingMessage: capsule.openingMessage,
-          createdAt: capsule.createdAt,
-          updatedAt: capsule.updatedAt,
-        })),
-        meta: result.meta,
-      };
+      console.log(result)
+      return result;
     });
   }
 
@@ -34,9 +25,35 @@ export class CapsuleController {
   @Implement(capsuleContract.findByMonth)
   findByMonth() {
     return implement(capsuleContract.findByMonth).handler(async ({ input }) => {
-      const validInput = input as { month: string };
-      const result = await this.capsuleService.getCapsulesForMonth(validInput.month);
-      return result;
+      try {
+        const validInput = input as { month: string };
+        const result = await this.capsuleService.getCapsulesForMonth(validInput.month);
+        
+        // Log all capsules to see the data structure
+        console.error('[Controller] ALL CAPSULES DATA:');
+        result.capsules.forEach((cap: any, idx: number) => {
+          console.error(`\n[Controller] === Capsule ${idx} ===`);
+          console.error(JSON.stringify(cap, null, 2));
+        });
+        
+        // Test validation
+        const { capsuleFindByMonthOutput } = await import('@repo/api-contracts/modules/capsule/findByMonth');
+        try {
+          capsuleFindByMonthOutput.parse(result);
+          console.error('[Controller] ✅ Validation SUCCESS');
+        } catch (err: any) {
+          console.error('[Controller] ❌ Validation FAILED');
+          console.error('[Controller] Error:', err.message);
+          if (err.issues) {
+            console.error('[Controller] Issues:', JSON.stringify(err.issues, null, 2));
+          }
+        }
+        
+        return result;
+      } catch (error) {
+        console.error('[Controller] EXCEPTION:', error);
+        throw error;
+      }
     });
   }
 
@@ -65,14 +82,7 @@ export class CapsuleController {
       if (!capsule) {
         throw new Error('Failed to create capsule');
       }
-      return {
-        id: capsule.id,
-        openingDate: capsule.openingDate,
-        content: capsule.content,
-        openingMessage: capsule.openingMessage,
-        createdAt: capsule.createdAt,
-        updatedAt: capsule.updatedAt,
-      };
+      return capsule;
     });
   }
 
@@ -84,14 +94,7 @@ export class CapsuleController {
       if (!capsule) {
         throw new Error('Capsule not found');
       }
-      return {
-        id: capsule.id,
-        openingDate: capsule.openingDate,
-        content: capsule.content,
-        openingMessage: capsule.openingMessage,
-        createdAt: capsule.createdAt,
-        updatedAt: capsule.updatedAt,
-      };
+      return capsule;
     });
   }
 
@@ -104,6 +107,28 @@ export class CapsuleController {
         return { success: false };
       }
       return { success: true };
+    });
+  }
+
+  @AllowAnonymous()
+  @Implement(capsuleContract.unlock)
+  unlock() {
+    return implement(capsuleContract.unlock).handler(async ({ input }) => {
+      const validInput = input as {
+        id: string;
+        code?: string;
+        voiceTranscript?: string;
+        deviceAction?: 'shake' | 'tilt' | 'tap';
+        apiResponse?: unknown;
+      };
+      const result = await this.capsuleService.unlockCapsule(validInput);
+      
+      // Convert null to undefined for contract compatibility
+      return {
+        success: result.success,
+        message: result.message,
+        capsule: result.capsule === null ? undefined : result.capsule,
+      };
     });
   }
 }

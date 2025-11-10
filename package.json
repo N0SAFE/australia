@@ -191,6 +191,11 @@
                 "fumadocs-core": "^16.0.8",
                 "fumadocs-mdx": "^13.0.0",
                 "@types/mdx": "^2.0.13"
+            },
+            "platejs": {
+                "platejs": "^51.0.0",
+                "@platejs/basic-nodes": "^51.0.0",
+                "@platejs/media": "^51.0.0"
             }
         }
     },

@@ -1,0 +1,173 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { ArrowRight } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Logo } from '@/components/svg/logo'
+
+export default function UnlockPage() {
+  const router = useRouter()
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragPosition, setDragPosition] = useState(0)
+  const [isUnlocked, setIsUnlocked] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const startXRef = useRef(0)
+
+  const handleUnlock = async () => {
+    // Set cookie with current timestamp
+    const now = Date.now()
+    document.cookie = `lastUnlock=${now}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`
+    
+    // Small delay to ensure cookie is set
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Redirect to home
+    router.push('/home')
+    router.refresh()
+  }
+
+  const handleStart = (clientX: number) => {
+    setIsDragging(true)
+    startXRef.current = clientX - dragPosition
+  }
+
+  const handleMove = (clientX: number) => {
+    if (!isDragging || !containerRef.current) return
+
+    const containerWidth = containerRef.current.offsetWidth
+    const buttonWidth = 56 // Width of the draggable button (w-14 = 56px)
+    const padding = 4 // p-1 = 4px padding
+    const maxDrag = containerWidth - buttonWidth - (padding * 2)
+
+    let newPosition = clientX - startXRef.current
+    newPosition = Math.max(0, Math.min(newPosition, maxDrag))
+
+    setDragPosition(newPosition)
+
+    // Check if swiped far enough (80% of the way)
+    if (newPosition >= maxDrag * 0.8) {
+      setIsUnlocked(true)
+      setIsDragging(false)
+      handleUnlock()
+    }
+  }
+
+  const handleEnd = () => {
+    if (!isUnlocked) {
+      // Snap back with animation
+      setDragPosition(0)
+    }
+    setIsDragging(false)
+  }
+
+  // Mouse events
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    handleStart(e.clientX)
+  }
+
+  const handleMouseMove = (e: MouseEvent) => {
+    handleMove(e.clientX)
+  }
+
+  const handleMouseUp = () => {
+    handleEnd()
+  }
+
+  // Touch events
+  const handleTouchStart = (e: React.TouchEvent) => {
+    handleStart(e.touches[0].clientX)
+  }
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (e.touches.length > 0) {
+      handleMove(e.touches[0].clientX)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    handleEnd()
+  }
+
+  // Add/remove global event listeners
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+      window.addEventListener('touchmove', handleTouchMove)
+      window.addEventListener('touchend', handleTouchEnd)
+
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+        window.removeEventListener('touchmove', handleTouchMove)
+        window.removeEventListener('touchend', handleTouchEnd)
+      }
+    }
+  }, [isDragging])
+
+  const dragProgress = containerRef.current 
+    ? dragPosition / (containerRef.current.offsetWidth - 56 - 8)
+    : 0
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-between p-8 bg-linear-to-b from-pink-200 via-pink-300 to-pink-400">
+      {/* Logo */}
+      <Logo className="text-pink-dark mx-auto h-20 w-fit" ></Logo>
+
+      {/* Center Content */}
+      <div className="flex-1 flex items-center justify-center">
+        <h1 className="text-6xl md:text-7xl lg:text-8xl font-script text-pink-600">
+          Bonjour !
+        </h1>
+      </div>
+
+      {/* Bottom Swipe to Unlock */}
+      <div className="pb-12 w-full max-w-md">
+        <div
+          ref={containerRef}
+          className="relative w-full bg-white/90 rounded-full p-1 shadow-lg overflow-hidden select-none h-16"
+          style={{
+            backgroundColor: `rgba(255, 255, 255, ${0.9 - dragProgress * 0.3})`,
+          }}
+        >
+          {/* Background track */}
+          <div className="absolute inset-0 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-pink-500/20 transition-all duration-200"
+              style={{
+                width: `${dragProgress * 100}%`,
+              }}
+            />
+          </div>
+
+          {/* Text */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span
+              className="text-sm md:text-base font-medium uppercase tracking-wider text-pink-600 transition-opacity duration-200"
+              style={{
+                opacity: 1 - dragProgress,
+              }}
+            >
+              Swipe pour déverrouiller
+            </span>
+          </div>
+
+          {/* Draggable button */}
+          <div
+            className="absolute top-1 left-1 w-14 h-14 bg-pink-500 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg z-10"
+            style={{
+              transform: `translateX(${dragPosition}px)`,
+              transition: isDragging ? 'none' : 'transform 0.3s ease-out',
+              scale: isDragging ? '1.05' : '1',
+            }}
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
+          >
+            <ArrowRight className="text-white" size={24} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

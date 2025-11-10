@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { UserRepository, type CreateUserInput, type UpdateUserInput, type GetUsersInput } from '../repositories/user.repository';
+import { AuthService } from '@/core/modules/auth/services/auth.service';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly userRepository: UserRepository) {}
+  constructor(
+    private readonly userRepository: UserRepository,
+    private readonly authService: AuthService,
+  ) {}
 
   /**
    * Create a new user
@@ -67,7 +71,21 @@ export class UserService {
       }
     }
 
-    return await this.userRepository.update(id, input);
+    // Handle password update separately using Better Auth API
+    if (input.password) {
+      await this.authService.api.adminUpdateUser({
+        body: {
+          userId: id,
+          data: {
+            password: input.password,
+          },
+        },
+      });
+    }
+
+    // Update user info (excluding password as it's handled by Better Auth)
+    const { password, ...userDataWithoutPassword } = input;
+    return await this.userRepository.update(id, userDataWithoutPassword);
   }
 
   /**

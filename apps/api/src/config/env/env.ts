@@ -21,6 +21,9 @@ export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   
   NEXT_PUBLIC_WEB_URL: z.url(),
+  
+  // Uploads
+  UPLOADS_DIR: z.string().default('/app/apps/api/uploads'),
 });
 
 export type Env = z.infer<typeof envSchema>;

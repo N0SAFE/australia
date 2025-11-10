@@ -1,0 +1,19 @@
+import { CapsuleDatePage } from '@/components/pages/capsule-date';
+import { Capsule } from '@/types/capsule';
+import { randomUUID } from 'node:crypto';
+import { getCapsulesByDay } from '@/hooks/useCapsules';
+
+export default async function Date({
+  params
+}: {
+  params: Promise<{
+    date: string;
+  }>
+}) {
+  const { date } = await params;
+
+  const resData = await getCapsulesByDay(date);
+  const capsules: Capsule[] = resData.capsules;
+
+  return <CapsuleDatePage data={capsules} />;
+}

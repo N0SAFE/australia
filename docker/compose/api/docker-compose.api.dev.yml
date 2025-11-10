@@ -118,6 +118,8 @@ services:
       # Persistent caches (shared with web/doc for faster cold starts)
       - bun_cache_dev:/root/.bun/install/cache
       - turbo_cache_dev:/root/.cache/turbo
+      # Persistent uploads directory for media files
+      - api_uploads_dev:/app/apps/api/uploads
     environment:
       NODE_ENV: development
       API_PORT: ${API_PORT:-3005}
@@ -139,6 +141,8 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-better-auth-fallback-secret}
       # Development authentication
       DEV_AUTH_KEY: ${DEV_AUTH_KEY:-dev-fallback-key}
+      # Uploads directory path (absolute path in container)
+      UPLOADS_DIR: ${UPLOADS_DIR:-/app/apps/api/uploads}
       # Traefik Configuration
       TRAEFIK_DOMAIN: ${TRAEFIK_DOMAIN:-localhost}
       TRAEFIK_ACME_EMAIL: ${TRAEFIK_ACME_EMAIL:-admin@localhost}
@@ -168,3 +172,5 @@ volumes:
     name: ${COMPOSE_PROJECT_NAME:-nextjs-nestjs}_bun_cache_dev
   turbo_cache_dev:
     name: ${COMPOSE_PROJECT_NAME:-nextjs-nestjs}_turbo_cache_dev
+  api_uploads_dev:
+    name: ${COMPOSE_PROJECT_NAME:-nextjs-nestjs}_api_uploads_dev

@@ -1,10 +1,12 @@
 import { oc } from "@orpc/contract";
 import { userSchema } from "@repo/api-contracts/common/user";
+import { z } from "zod";
 
 export const userUpdateInput = userSchema.partial().omit({
   image: true,
 }).extend({
   id: userSchema.shape.id,
+  password: z.string().min(6).optional(),
 })
 
 export const userUpdateOutput = userSchema;

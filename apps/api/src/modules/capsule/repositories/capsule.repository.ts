@@ -18,54 +18,106 @@ export class CapsuleRepository {
     constructor(private readonly databaseService: DatabaseService) {}
 
     /**
-     * Transform capsule object for API response (serialize dates)
+     * Transform capsule object for API response (serialize dates and narrow types)
      */
-    private transformCapsule<
-        T extends {
-            createdAt: Date;
-            updatedAt: Date;
-        } | null
-    >(capsule: T) {
+    private async transformCapsule(capsule: {
+        id: string;
+        openingDate: string;
+        content: string;
+        openingMessage: string | null;
+        isLocked: boolean;
+        lockType: string | null;
+        lockConfig: unknown;
+        unlockedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    } | null): Promise<{
+        id: string;
+        openingDate: string;
+        content: string;
+        openingMessage: string | null;
+        isLocked: boolean;
+        lockType: 'code' | 'voice' | 'device_shake' | 'device_tilt' | 'device_tap' | 'api' | 'time_based' | null;
+        lockConfig: 
+            | { type: 'code'; code: string; attempts?: number }
+            | { type: 'voice'; phrase: string; language?: string }
+            | { type: 'device_shake' | 'device_tilt' | 'device_tap'; threshold?: number; pattern?: number[] }
+            | { type: 'api'; endpoint: string; method?: 'GET' | 'POST'; headers?: Record<string, string>; expectedResponse?: unknown }
+            | { type: 'time_based'; delayMinutes: number }
+            | null;
+        unlockedAt: string | null;
+        createdAt: string;
+        updatedAt: string;
+    } | null> {
         if (!capsule) {
             return null;
         }
-        return {
-            ...capsule,
+        
+        // Return content field directly - it's already Plate.js JSON
+        const result = {
+            id: capsule.id,
+            openingDate: capsule.openingDate,
+            content: capsule.content,
+            openingMessage: capsule.openingMessage,
+            isLocked: capsule.isLocked,
+            lockType: capsule.lockType as 'code' | 'voice' | 'device_shake' | 'device_tilt' | 'device_tap' | 'api' | 'time_based' | null,
+            lockConfig: capsule.lockConfig === null ? null : capsule.lockConfig as 
+                | { type: 'code'; code: string; attempts?: number }
+                | { type: 'voice'; phrase: string; language?: string }
+                | { type: 'device_shake' | 'device_tilt' | 'device_tap'; threshold?: number; pattern?: number[] }
+                | { type: 'api'; endpoint: string; method?: 'GET' | 'POST'; headers?: Record<string, string>; expectedResponse?: unknown }
+                | { type: 'time_based'; delayMinutes: number },
+            unlockedAt: capsule.unlockedAt ? capsule.unlockedAt.toISOString() : null,
             createdAt: capsule.createdAt.toISOString(),
             updatedAt: capsule.updatedAt.toISOString(),
         };
+        
+        return result;
     }
 
     /**
      * Transform multiple capsules for API response
      */
-    private transformCapsules<T extends {
-      createdAt: Date,
-      updatedAt: Date
-    }>(capsules: T[]) {
-        return capsules
-            .map((cap) => this.transformCapsule(cap))
-            .filter((cap): cap is NonNullable<typeof cap> => cap !== null);
+    private async transformCapsules(capsules: {
+        id: string;
+        openingDate: string;
+        content: string;
+        openingMessage: string | null;
+        isLocked: boolean;
+        lockType: string | null;
+        lockConfig: unknown;
+        unlockedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }[]) {
+        const transformed = await Promise.all(
+            capsules.map((cap) => this.transformCapsule(cap))
+        );
+        return transformed.filter((cap): cap is NonNullable<typeof cap> => cap !== null);
     }
 
     /**
-     * Create a new capsule
+     * Create a new capsule with Plate.js content
      */
     async create(input: CreateCapsuleInput) {
-        const validInput = input as { openingDate: string; content: string; openingMessage?: string | null };
+        // Store Plate.js content directly in capsule table
         const newCapsule = await this.databaseService.db
             .insert(capsule)
             .values({
                 id: randomUUID(),
-                openingDate: validInput.openingDate,
-                content: validInput.content,
-                openingMessage: validInput.openingMessage ?? null,
+                openingDate: input.openingDate,
+                content: input.content, // Plate.js JSON string
+                openingMessage: input.openingMessage ?? null,
+                isLocked: input.isLocked ?? false,
+                lockType: input.lockType ?? null,
+                lockConfig: input.lockConfig ?? null,
+                unlockedAt: null,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             })
             .returning();
 
-        return this.transformCapsule(newCapsule[0]);
+        return await this.transformCapsule(newCapsule[0]);
     }
 
     /**
@@ -78,7 +130,7 @@ export class CapsuleRepository {
             .where(eq(capsule.id, id))
             .limit(1);
 
-        return this.transformCapsule(foundCapsule[0] || null);
+        return await this.transformCapsule(foundCapsule[0] || null);
     }
 
     /**
@@ -128,7 +180,7 @@ export class CapsuleRepository {
         const total = totalResult[0]?.count || 0;
 
         return {
-            capsules: this.transformCapsules(capsules),
+            capsules: await this.transformCapsules(capsules),
             meta: {
                 pagination: {
                     total,
@@ -150,7 +202,7 @@ export class CapsuleRepository {
             .where(eq(capsule.openingDate, day))
             .orderBy(asc(capsule.createdAt));
 
-        return this.transformCapsules(capsules);
+        return await this.transformCapsules(capsules);
     }
 
     /**
@@ -182,9 +234,9 @@ export class CapsuleRepository {
             )
             .orderBy(asc(capsule.openingDate));
 
-        this.logger.debug(`[Repository] Found capsules: ${capsules.length}`);
+        this.logger.debug(`[Repository] Found capsules: ${String(capsules.length)}`);
         
-        return this.transformCapsules(capsules);
+        return await this.transformCapsules(capsules);
     }
 
     /**
@@ -213,5 +265,21 @@ export class CapsuleRepository {
             .returning();
 
         return this.transformCapsule(deletedCapsule[0] || null);
+    }
+
+    /**
+     * Unlock a capsule by updating unlockedAt timestamp
+     */
+    async unlock(id: string) {
+        const unlockedCapsule = await this.databaseService.db
+            .update(capsule)
+            .set({
+                unlockedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(capsule.id, id))
+            .returning();
+
+        return this.transformCapsule(unlockedCapsule[0] || null);
     }
 }

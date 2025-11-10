@@ -1,0 +1,1 @@
+ALTER TABLE "invitation" ADD COLUMN "role" text DEFAULT 'user';

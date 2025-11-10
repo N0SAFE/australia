@@ -3,7 +3,7 @@ import * as express from "express";
 
 /**
  * Factory that returns a Nest middleware which skips body parsing for the
- * configured basePath.
+ * configured basePath and for multipart/form-data requests.
  */
 export function SkipBodyParsingMiddleware(basePath = "/api/auth") {
 	// Create the parsers once, outside the middleware function
@@ -17,6 +17,13 @@ export function SkipBodyParsingMiddleware(basePath = "/api/auth") {
 		
 		// Skip body parsing for better-auth routes - they need raw body
 		if (isAuthRoute) {
+			next();
+			return;
+		}
+		
+		// Skip body parsing for multipart/form-data - FileUploadMiddleware will handle it
+		const contentType = req.headers['content-type'] ?? '';
+		if (contentType.includes('multipart/form-data')) {
 			next();
 			return;
 		}

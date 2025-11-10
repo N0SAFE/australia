@@ -10,6 +10,19 @@ export class LoggerMiddleware implements NestMiddleware {
         const hostname = (require("os") as typeof os).hostname();
         const userAgent = req.get("user-agent") ?? "";
         const referer = req.get("referer") ?? "";
+        
+        // Log request details for debugging
+        if (url.includes('/storage/upload')) {
+            console.log('[LoggerMiddleware] Storage upload request:', {
+                method,
+                url,
+                contentType: req.get('content-type'),
+                contentLength: req.get('content-length'),
+                hasBody: !!req.body,
+                bodyKeys: req.body ? Object.keys(req.body) : [],
+            });
+        }
+        
         res.on("close", () => {
             const { statusCode, statusMessage } = res;
             const contentLength = res.get("content-length");

@@ -8,6 +8,7 @@ import { capsuleFindByMonthContract } from './findByMonth';
 import { capsuleCreateContract } from './create';
 import { capsuleUpdateContract } from './update';
 import { capsuleDeleteContract } from './delete';
+import { capsuleUnlockContract } from './unlock';
 
 // Combine into main capsule contract
 export const capsuleContract = oc.tag("Capsule").prefix("/capsule").router({
@@ -18,6 +19,7 @@ export const capsuleContract = oc.tag("Capsule").prefix("/capsule").router({
   create: capsuleCreateContract,
   update: capsuleUpdateContract,
   delete: capsuleDeleteContract,
+  unlock: capsuleUnlockContract,
 });
 
 export type CapsuleContract = typeof capsuleContract;
@@ -30,3 +32,4 @@ export * from './findByMonth';
 export * from './create';
 export * from './update';
 export * from './delete';
+export * from './unlock';

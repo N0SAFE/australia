@@ -34,7 +34,8 @@
         "TRAEFIK_ACME_EMAIL",
         "PASSKEY_RPID",
         "PASSKEY_RPNAME",
-        "PASSKEY_ORIGIN"
+        "PASSKEY_ORIGIN",
+        "UPLOADS_DIR"
     ],
     "tasks": {
         "dev": {

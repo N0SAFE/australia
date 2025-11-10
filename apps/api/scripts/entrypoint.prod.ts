@@ -56,6 +56,26 @@ function runMigrations(config: EntrypointConfig): void {
 }
 
 /**
+ * Create default admin user if needed
+ */
+function createDefaultAdmin(): void {
+  const createAdminScript = 'scripts/create-default-admin.ts'
+
+  if (!existsSync(createAdminScript)) {
+    console.log('⚠️  create-default-admin script not found, skipping')
+    return
+  }
+
+  try {
+    console.log('👤 Creating default admin user if needed...')
+    execSync(`bun --bun ${createAdminScript}`, { stdio: 'inherit' })
+  } catch (error) {
+    console.error('⚠️  Failed to create default admin user:', error)
+    // Don't exit - this is not critical
+  }
+}
+
+/**
  * Start API in production mode
  */
 function startAPI(): void {
@@ -84,6 +104,7 @@ function main(): void {
 
   runDiagnostics(config)
   runMigrations(config)
+  createDefaultAdmin()
   startAPI()
 }
 

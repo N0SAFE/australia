@@ -1,0 +1,5 @@
+# Ignore large video files (can be re-downloaded with download-assets.sh)
+videos/*.mp4
+
+# Keep the directory structure
+!videos/.gitkeep

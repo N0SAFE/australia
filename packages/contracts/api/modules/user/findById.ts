@@ -3,7 +3,7 @@ import { userSchema } from "@repo/api-contracts/common/user";
 import z from "zod/v4";
 
 export const userFindByIdInput = z.object({
-  id: z.uuid(),
+  id: z.string(),
 });
 
 export const userFindByIdOutput = userSchema;

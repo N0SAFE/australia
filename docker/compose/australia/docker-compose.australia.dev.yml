@@ -71,6 +71,9 @@ services:
             - "**/.cache/"
             - "**/.parcel-cache/"
             - "**/.vite/"
+            # Generated files (declarative-routing)
+            - "apps/australia/src/routes/index.ts"
+            - "apps/australia/src/routes/openapi.ts"
             # Logs
             - "**/*.log"
             - "**/logs/"

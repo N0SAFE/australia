@@ -2,7 +2,7 @@ import { oc } from '@orpc/contract';
 import z from 'zod/v4';
 
 export const userDeleteInput = z.object({
-    id: z.uuid(),
+    id: z.string(),
 });
 
 export const userDeleteOutput = z.discriminatedUnion("success", [

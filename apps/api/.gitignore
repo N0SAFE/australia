@@ -2,3 +2,4 @@
 /uploads/*
 !**/.gitkeep
 **/*.db
+seed/assets/!.gitkeep

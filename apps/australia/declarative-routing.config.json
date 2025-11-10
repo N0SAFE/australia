@@ -1,0 +1,9 @@
+{
+    "mode": "nextjs",
+    "src": "./app",
+    "routes": "./routes",
+    "openapi": {
+        "target": "./routes/openapi.ts",
+        "template": "./routes/openapi.template.ts"
+    }
+}

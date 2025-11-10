@@ -43,6 +43,41 @@
       "when": 1762601472461,
       "tag": "0005_brainy_darkstar",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1762610771233,
+      "tag": "0006_pretty_jane_foster",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1762644798498,
+      "tag": "0007_lowly_ultron",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1762726226370,
+      "tag": "0008_peaceful_adam_warlock",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1762738542389,
+      "tag": "0009_married_carlie_cooper",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1762743818673,
+      "tag": "0010_remarkable_true_believers",
+      "breakpoints": true
     }
   ]
 }

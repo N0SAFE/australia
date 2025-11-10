@@ -73,6 +73,8 @@ services:
       CORS_ORIGIN: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       # Development auth key (for development convenience)
       DEV_AUTH_KEY: ${DEV_AUTH_KEY:-dev-auth-key}
+      # Uploads directory path (absolute path in container)
+      UPLOADS_DIR: ${UPLOADS_DIR:-/app/apps/api/uploads}
       # Production optimizations
       LOG_LEVEL: warn
     healthcheck:
@@ -86,6 +88,8 @@ services:
     volumes:
       - bun_cache_prod:/root/.bun/install/cache
       - turbo_cache_prod:/root/.cache/turbo
+      # Persistent uploads directory for media files
+      - api_uploads_prod:/app/apps/api/uploads
 
 networks:
   app_network_prod:
@@ -99,3 +103,5 @@ volumes:
     name: ${COMPOSE_PROJECT_NAME:-nextjs-nestjs}_bun_cache_prod
   turbo_cache_prod:
     name: ${COMPOSE_PROJECT_NAME:-nextjs-nestjs}_turbo_cache_prod
+  api_uploads_prod:
+    name: ${COMPOSE_PROJECT_NAME:-nextjs-nestjs}_api_uploads_prod

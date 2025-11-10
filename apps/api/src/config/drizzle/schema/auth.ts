@@ -86,3 +86,16 @@ export const passkey = pgTable("passkey", {
   createdAt: timestamp("created_at"),
   aaguid: text("aaguid"),
 });
+
+export const invitation = pgTable("invitation", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  token: text("token").notNull().unique(),
+  role: text("role").default("user"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdByUserId: text("created_by_user_id").references(() => user.id, {
+    onDelete: "set null",
+  }),
+});

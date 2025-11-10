@@ -1,10 +1,75 @@
 import z from "zod/v4";
 
+// Lock types for capsule unlock mechanisms
+export const lockTypeSchema = z.enum([
+  "code", // PIN or password
+  "voice", // Voice recognition phrase
+  "device_shake", // Shake the device
+  "device_tilt", // Tilt the device
+  "device_tap", // Tap pattern
+  "api", // External API call
+  "time_based", // Automatically unlocks after a certain time
+]);
+
+// Lock configuration schemas for different lock types
+export const codeLockConfigSchema = z.object({
+  type: z.literal("code"),
+  code: z.string(), // The code to enter
+  attempts: z.number().optional(), // Max attempts allowed
+});
+
+export const voiceLockConfigSchema = z.object({
+  type: z.literal("voice"),
+  phrase: z.string(), // The phrase to speak (e.g., "Alohomora")
+  language: z.string().optional(), // Language code (e.g., "en-US")
+});
+
+export const deviceLockConfigSchema = z.object({
+  type: z.union([
+    z.literal("device_shake"),
+    z.literal("device_tilt"),
+    z.literal("device_tap"),
+  ]),
+  threshold: z.number().optional(), // Sensitivity threshold
+  pattern: z.array(z.number()).optional(), // Tap pattern if applicable
+});
+
+export const apiLockConfigSchema = z.object({
+  type: z.literal("api"),
+  endpoint: z.string(), // API endpoint to call
+  method: z.enum(["GET", "POST"]).optional(),
+  headers: z.record(z.string(), z.string()).optional(), // Custom headers
+  expectedResponse: z.any().optional(), // Expected response to match
+});
+
+export const timeBasedLockConfigSchema = z.object({
+  type: z.literal("time_based"),
+  delayMinutes: z.number(), // Minutes to wait after openingDate
+});
+
+export const lockConfigSchema = z.union([
+  codeLockConfigSchema,
+  voiceLockConfigSchema,
+  deviceLockConfigSchema,
+  apiLockConfigSchema,
+  timeBasedLockConfigSchema,
+]);
+
 export const capsuleSchema = z.object({
   id: z.string(),
   openingDate: z.string(), // YYYY-MM-DD format
-  content: z.string(),
+  
+  // Plate.js content (JSON string that can contain text, images, videos, audio, etc.)
+  content: z.string(), // Stores Plate.js Value as JSON string
+  
   openingMessage: z.string().nullable(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
+  
+  // Lock mechanism
+  isLocked: z.boolean(),
+  lockType: lockTypeSchema.nullable(),
+  lockConfig: lockConfigSchema.nullable(),
+  unlockedAt: z.string().datetime().nullable(),
+  
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });

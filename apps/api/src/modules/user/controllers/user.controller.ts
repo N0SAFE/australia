@@ -35,7 +35,19 @@ export class UserController {
   @Implement(userContract.findById)
   findById() {
     return implement(userContract.findById).handler(async ({ input }) => {
-      return await this.userService.findUserById(input.id);
+      const user = await this.userService.findUserById(input.id);
+      if (!user) {
+        return null;
+      }
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        image: user.image,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      };
     });
   }
 

@@ -6,7 +6,8 @@ import { UserService } from './user.service';
 
 describe('UserService', () => {
   let service: UserService;
-  let mockRepository: any;
+  let mockUserRepository: any;
+  let mockAuthRepository: any;
 
   const mockUser = {
     id: '1',
@@ -20,7 +21,7 @@ describe('UserService', () => {
   };
 
   beforeEach(async () => {
-    mockRepository = {
+    mockUserRepository = {
       create: vi.fn(),
       findById: vi.fn(),
       findByEmail: vi.fn(),
@@ -30,12 +31,16 @@ describe('UserService', () => {
       existsByEmail: vi.fn(),
       getCount: vi.fn(),
     };
+    
+    mockAuthRepository = {
+      api: {adminUpdateUser: vi.fn()},
+    }
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {
           provide: UserService,
-          useFactory: () => new UserService(mockRepository),
+          useFactory: () => new UserService(mockUserRepository, mockAuthRepository),
         },
       ],
     }).compile();
@@ -53,72 +58,72 @@ describe('UserService', () => {
   describe('createUser', () => {
     it('should create a new user when email does not exist', async () => {
       const input = { name: 'John Doe', email: 'john@example.com', image: "" };
-      mockRepository.findByEmail.mockResolvedValue(null);
-      mockRepository.create.mockResolvedValue(mockUser);
+      mockUserRepository.findByEmail.mockResolvedValue(null);
+      mockUserRepository.create.mockResolvedValue(mockUser);
 
       const result = await service.createUser(input);
 
       expect(result).toEqual(mockUser);
-      expect(mockRepository.findByEmail).toHaveBeenCalledWith(input.email);
-      expect(mockRepository.create).toHaveBeenCalledWith(input);
+      expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(input.email);
+      expect(mockUserRepository.create).toHaveBeenCalledWith(input);
     });
 
     it('should throw ConflictException when user with email already exists', async () => {
       const input = { name: 'John Doe', email: 'john@example.com', image: "" };
-      mockRepository.findByEmail.mockResolvedValue(mockUser);
+      mockUserRepository.findByEmail.mockResolvedValue(mockUser);
 
       await expect(service.createUser(input)).rejects.toThrow(ConflictException);
-      expect(mockRepository.findByEmail).toHaveBeenCalledWith(input.email);
-      expect(mockRepository.create).not.toHaveBeenCalled();
+      expect(mockUserRepository.findByEmail).toHaveBeenCalledWith(input.email);
+      expect(mockUserRepository.create).not.toHaveBeenCalled();
     });
   });
 
   describe('getUserById', () => {
     it('should return user when found', async () => {
-      mockRepository.findById.mockResolvedValue(mockUser);
+      mockUserRepository.findById.mockResolvedValue(mockUser);
 
       const result = await service.getUserById('1');
 
       expect(result).toEqual(mockUser);
-      expect(mockRepository.findById).toHaveBeenCalledWith('1');
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('1');
     });
 
     it('should throw NotFoundException when user not found', async () => {
-      mockRepository.findById.mockResolvedValue(null);
+      mockUserRepository.findById.mockResolvedValue(null);
 
       await expect(service.getUserById('1')).rejects.toThrow(NotFoundException);
-      expect(mockRepository.findById).toHaveBeenCalledWith('1');
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('1');
     });
   });
 
   describe('findUserById', () => {
     it('should return user when found', async () => {
-      mockRepository.findById.mockResolvedValue(mockUser);
+      mockUserRepository.findById.mockResolvedValue(mockUser);
 
       const result = await service.findUserById('1');
 
       expect(result).toEqual(mockUser);
-      expect(mockRepository.findById).toHaveBeenCalledWith('1');
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('1');
     });
 
     it('should return null when user not found', async () => {
-      mockRepository.findById.mockResolvedValue(null);
+      mockUserRepository.findById.mockResolvedValue(null);
 
       const result = await service.findUserById('1');
 
       expect(result).toBeNull();
-      expect(mockRepository.findById).toHaveBeenCalledWith('1');
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('1');
     });
   });
 
   describe('getUserByEmail', () => {
     it('should return user when found', async () => {
-      mockRepository.findByEmail.mockResolvedValue(mockUser);
+      mockUserRepository.findByEmail.mockResolvedValue(mockUser);
 
       const result = await service.getUserByEmail('john@example.com');
 
       expect(result).toEqual(mockUser);
-      expect(mockRepository.findByEmail).toHaveBeenCalledWith('john@example.com');
+      expect(mockUserRepository.findByEmail).toHaveBeenCalledWith('john@example.com');
     });
   });
 
@@ -129,12 +134,12 @@ describe('UserService', () => {
         users: [mockUser],
         meta: { pagination: { total: 1, limit: 10, offset: 0, hasMore: false } },
       };
-      mockRepository.findMany.mockResolvedValue(mockResponse);
+      mockUserRepository.findMany.mockResolvedValue(mockResponse);
 
       const result = await service.getUsers(input);
 
       expect(result).toEqual(mockResponse);
-      expect(mockRepository.findMany).toHaveBeenCalledWith(input);
+      expect(mockUserRepository.findMany).toHaveBeenCalledWith(input);
     });
   });
 
@@ -143,119 +148,119 @@ describe('UserService', () => {
       const input = { name: 'Jane Doe' };
       const updatedUser = { ...mockUser, name: 'Jane Doe' };
       
-      mockRepository.findById.mockResolvedValue(mockUser);
-      mockRepository.update.mockResolvedValue(updatedUser);
+      mockUserRepository.findById.mockResolvedValue(mockUser);
+      mockUserRepository.update.mockResolvedValue(updatedUser);
 
       const result = await service.updateUser('1', input);
 
       expect(result).toEqual(updatedUser);
-      expect(mockRepository.findById).toHaveBeenCalledWith('1');
-      expect(mockRepository.update).toHaveBeenCalledWith('1', input);
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('1');
+      expect(mockUserRepository.update).toHaveBeenCalledWith('1', input);
     });
 
     it('should return null when user does not exist', async () => {
       const input = { name: 'Jane Doe' };
-      mockRepository.findById.mockResolvedValue(null);
+      mockUserRepository.findById.mockResolvedValue(null);
 
       const result = await service.updateUser('1', input);
 
       expect(result).toBeNull();
-      expect(mockRepository.findById).toHaveBeenCalledWith('1');
-      expect(mockRepository.update).not.toHaveBeenCalled();
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('1');
+      expect(mockUserRepository.update).not.toHaveBeenCalled();
     });
 
     it('should update user with new email when no conflict', async () => {
       const input = { email: 'jane@example.com' };
       const updatedUser = { ...mockUser, email: 'jane@example.com' };
       
-      mockRepository.findById.mockResolvedValue(mockUser);
-      mockRepository.existsByEmail.mockResolvedValue(false);
-      mockRepository.update.mockResolvedValue(updatedUser);
+      mockUserRepository.findById.mockResolvedValue(mockUser);
+      mockUserRepository.existsByEmail.mockResolvedValue(false);
+      mockUserRepository.update.mockResolvedValue(updatedUser);
 
       const result = await service.updateUser('1', input);
 
       expect(result).toEqual(updatedUser);
-      expect(mockRepository.existsByEmail).toHaveBeenCalledWith('jane@example.com');
-      expect(mockRepository.update).toHaveBeenCalledWith('1', input);
+      expect(mockUserRepository.existsByEmail).toHaveBeenCalledWith('jane@example.com');
+      expect(mockUserRepository.update).toHaveBeenCalledWith('1', input);
     });
 
     it('should throw ConflictException when updating to existing email', async () => {
       const input = { email: 'existing@example.com' };
       
-      mockRepository.findById.mockResolvedValue(mockUser);
-      mockRepository.existsByEmail.mockResolvedValue(true);
+      mockUserRepository.findById.mockResolvedValue(mockUser);
+      mockUserRepository.existsByEmail.mockResolvedValue(true);
 
       await expect(service.updateUser('1', input)).rejects.toThrow(ConflictException);
-      expect(mockRepository.existsByEmail).toHaveBeenCalledWith('existing@example.com');
-      expect(mockRepository.update).not.toHaveBeenCalled();
+      expect(mockUserRepository.existsByEmail).toHaveBeenCalledWith('existing@example.com');
+      expect(mockUserRepository.update).not.toHaveBeenCalled();
     });
 
     it('should not check email conflict when email is same as current', async () => {
       const input = { email: 'john@example.com', name: 'John Updated' };
       const updatedUser = { ...mockUser, name: 'John Updated' };
       
-      mockRepository.findById.mockResolvedValue(mockUser);
-      mockRepository.update.mockResolvedValue(updatedUser);
+      mockUserRepository.findById.mockResolvedValue(mockUser);
+      mockUserRepository.update.mockResolvedValue(updatedUser);
 
       const result = await service.updateUser('1', input);
 
       expect(result).toEqual(updatedUser);
-      expect(mockRepository.existsByEmail).not.toHaveBeenCalled();
-      expect(mockRepository.update).toHaveBeenCalledWith('1', input);
+      expect(mockUserRepository.existsByEmail).not.toHaveBeenCalled();
+      expect(mockUserRepository.update).toHaveBeenCalledWith('1', input);
     });
   });
 
   describe('deleteUser', () => {
     it('should delete user when user exists', async () => {
-      mockRepository.findById.mockResolvedValue(mockUser);
-      mockRepository.delete.mockResolvedValue(mockUser);
+      mockUserRepository.findById.mockResolvedValue(mockUser);
+      mockUserRepository.delete.mockResolvedValue(mockUser);
 
       const result = await service.deleteUser('1');
 
       expect(result).toEqual(mockUser);
-      expect(mockRepository.findById).toHaveBeenCalledWith('1');
-      expect(mockRepository.delete).toHaveBeenCalledWith('1');
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('1');
+      expect(mockUserRepository.delete).toHaveBeenCalledWith('1');
     });
 
     it('should return null when user does not exist', async () => {
-      mockRepository.findById.mockResolvedValue(null);
+      mockUserRepository.findById.mockResolvedValue(null);
 
       const result = await service.deleteUser('1');
 
       expect(result).toBeNull();
-      expect(mockRepository.findById).toHaveBeenCalledWith('1');
-      expect(mockRepository.delete).not.toHaveBeenCalled();
+      expect(mockUserRepository.findById).toHaveBeenCalledWith('1');
+      expect(mockUserRepository.delete).not.toHaveBeenCalled();
     });
   });
 
   describe('checkUserExistsByEmail', () => {
     it('should return exists true when user exists', async () => {
-      mockRepository.existsByEmail.mockResolvedValue(true);
+      mockUserRepository.existsByEmail.mockResolvedValue(true);
 
       const result = await service.checkUserExistsByEmail('john@example.com');
 
       expect(result).toEqual({ exists: true });
-      expect(mockRepository.existsByEmail).toHaveBeenCalledWith('john@example.com');
+      expect(mockUserRepository.existsByEmail).toHaveBeenCalledWith('john@example.com');
     });
 
     it('should return exists false when user does not exist', async () => {
-      mockRepository.existsByEmail.mockResolvedValue(false);
+      mockUserRepository.existsByEmail.mockResolvedValue(false);
 
       const result = await service.checkUserExistsByEmail('nonexistent@example.com');
 
       expect(result).toEqual({ exists: false });
-      expect(mockRepository.existsByEmail).toHaveBeenCalledWith('nonexistent@example.com');
+      expect(mockUserRepository.existsByEmail).toHaveBeenCalledWith('nonexistent@example.com');
     });
   });
 
   describe('getUserCount', () => {
     it('should return user count', async () => {
-      mockRepository.getCount.mockResolvedValue(42);
+      mockUserRepository.getCount.mockResolvedValue(42);
 
       const result = await service.getUserCount();
 
       expect(result).toEqual({ count: 42 });
-      expect(mockRepository.getCount).toHaveBeenCalledOnce();
+      expect(mockUserRepository.getCount).toHaveBeenCalledOnce();
     });
   });
 });

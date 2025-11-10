@@ -29,7 +29,7 @@ services:
             - docker/compose/docker-compose.yml
             - docker/compose/docker-compose.prod-like.yml
             - docker/compose/docker-compose.prod-like.override.yml
-        # Rebuild when web app source code changes
+        # Rebuild when australia app source code changes
         - action: rebuild
           path: ../../..
           target: /app

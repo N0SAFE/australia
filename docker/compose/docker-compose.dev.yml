@@ -2,5 +2,4 @@ include:
   - path:
       - api/docker-compose.api.dev.yml
       - web/docker-compose.web.dev.yml
-      - australia/docker-compose.australia.dev.yml
       - docker-compose.dev.override.yml

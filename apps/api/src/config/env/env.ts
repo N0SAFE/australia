@@ -20,7 +20,7 @@ export const envSchema = z.object({
   // Environment
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   
-  NEXT_PUBLIC_WEB_URL: z.url(),
+  NEXT_PUBLIC_APP_URL: z.url(),
   
   // Uploads
   UPLOADS_DIR: z.string().default('/app/apps/api/uploads'),

@@ -45,7 +45,7 @@ COPY --parents --chmod=a+w .turbo/ **/.turbo/ ./
 COPY apps/api/seed/ /app/apps/api/seed/
 
 RUN --mount=type=cache,target=/root/.bun --mount=type=cache,target=/root/.cache \
-  bun turbo run build --filter=api...
+  bun turbo run build --filter=api... --remote-only
 
 # Stage 5: Production Runner - Run the built application
 FROM base AS runner

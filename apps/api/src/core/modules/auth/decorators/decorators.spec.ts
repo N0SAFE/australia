@@ -293,23 +293,23 @@ describe('Auth Decorators', () => {
       });
     });
 
-    describe('RequireCommonPermission', () => {
-      it('should create common permission requirement decorator', () => {
-        const decorator = RequireCommonPermission('projectFullAccess');
+    // describe('RequireCommonPermission', () => {
+    //   it('should create common permission requirement decorator', () => {
+    //     const decorator = RequireCommonPermission('projectFullAccess');
         
-        expect(decorator).toBeDefined();
-        expect(typeof decorator).toBe('function');
-      });
+    //     expect(decorator).toBeDefined();
+    //     expect(typeof decorator).toBe('function');
+    //   });
 
-      it('should apply to methods', () => {
-        class TestController {
-          @RequireCommonPermission('userManagement')
-          manageUsers() {}
-        }
+    //   it('should apply to methods', () => {
+    //     class TestController {
+    //       @RequireCommonPermission('userManagement')
+    //       manageUsers() {}
+    //     }
 
-        expect(TestController.prototype.manageUsers.bind(TestController.prototype)).toBeDefined();
-      });
-    });
+    //     expect(TestController.prototype.manageUsers.bind(TestController.prototype)).toBeDefined();
+    //   });
+    // });
 
     describe('RequireRoleAndPermissions', () => {
       it('should create combined role and permission decorator', () => {

@@ -2,11 +2,11 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Reflector } from '@nestjs/core';
-import type { ExecutionContext } from '@nestjs/common';
+import { type ExecutionContext } from '@nestjs/common';
 import { RoleGuard } from './role.guard';
-import { AUTH_INSTANCE_KEY } from '../types/symbols';
 import { APIError } from 'better-auth/api';
 import { PermissionChecker } from '@/config/auth/permissions';
+import { MODULE_OPTIONS_TOKEN } from '../definitions/auth-module-definition';
 
 // Mock the permissions module
 vi.mock('@/config/auth/permissions', () => ({
@@ -71,8 +71,10 @@ describe('RoleGuard', () => {
           },
         },
         {
-          provide: AUTH_INSTANCE_KEY,
-          useValue: mockAuth,
+          provide: MODULE_OPTIONS_TOKEN,
+          useValue: {
+            auth: mockAuth,
+          },
         },
       ],
     }).compile();

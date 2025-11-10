@@ -5,32 +5,22 @@ const trimTrailingSlash = (url: string) => (url.endsWith('/') ? url.slice(0, -1)
 
 // Fallback defaults for local / test usage. **Never** rely on defaults in production.
 const LOCAL_APP_FALLBACK = 'http://localhost:3000'
-const LOCAL_API_FALLBACK = 'http://localhost:3001'
+const LOCAL_API_FALLBACK = 'http://localhost:4000'
 
 const guardedUrl = (name: string, fallback: string) =>
     zod
         .url()
-        .superRefine((val, ctx) => {
+        .or(zod.string().min(1))
+        .transform((val) => {
             // If we had to use a fallback in production, surface a hard error.
-            if (process.env.NODE_ENV === 'production') {
-                if (!val) {
-                    ctx.addIssue({ code: 'custom', message: `${name} is required in production but was not provided` })
-                }
-                ctx.value = val;
-                return;
+            if (process.env.NODE_ENV === 'production' && !val) {
+                throw new Error(`${name} is required in production but was not provided`)
             }
-            ctx.value = val || fallback;
+            return val || fallback
         })
         .transform(trimTrailingSlash)
 
 // Debug scope parser - transforms comma-separated scopes into structured format
-// Supports patterns like:
-// - "middleware/auth" (exact match)
-// - "middleware/*" (match all direct children)
-// - "middleware/**" (match all nested children)
-// - "middleware/{auth,router,cors}/*" (match multiple specific sub-scopes)
-// - "*" (match everything)
-// - "middleware/*,auth/test,api/{users,posts}/**" (multiple patterns)
 const parseDebugScopes = (input: string): { patterns: string[], enableAll: boolean } => {
     if (!input || input.trim() === '') {
         return { patterns: [], enableAll: false }
@@ -46,40 +36,23 @@ const parseDebugScopes = (input: string): { patterns: string[], enableAll: boole
 }
 
 export const envSchema = zod.object({
-    REACT_SCAN_GIT_COMMIT_HASH: zod.string().optional(),
-    REACT_SCAN_GIT_BRANCH: zod.string().optional(),
-    REACT_SCAN_TOKEN: zod.string().optional(),
     // Provide dev/test fallback; production guard above will error if missing.
     NEXT_PUBLIC_APP_URL: guardedUrl('NEXT_PUBLIC_APP_URL', LOCAL_APP_FALLBACK),
     NEXT_PUBLIC_SHOW_AUTH_LOGS: zod.coerce.boolean().optional().default(false),
-    // Debug configuration - supports advanced patterns:
-    // - "middleware/auth" (exact match)
-    // - "middleware/*" (direct children only) 
-    // - "middleware/**" (all nested children)
-    // - "middleware/{auth,router,cors}/*" (multiple sub-scopes)
-    // - "*" (everything)
-    // - "middleware/*,auth/test,api/{users,posts}/**" (multiple patterns)
     NEXT_PUBLIC_DEBUG: zod
         .string()
         .optional()
         .default('')
         .transform(parseDebugScopes),
-    // Optional docs site config; when set, used to render a Docs link in the navbar
-    NEXT_PUBLIC_DOC_URL: zod
-        .string()
-        .url()
-        .optional()
-        .transform((url) => (url ? trimTrailingSlash(url) : url)),
-    NEXT_PUBLIC_DOC_PORT: zod.coerce.number().optional(),
+    NEXT_PUBLIC_API_URL: guardedUrl('NEXT_PUBLIC_API_URL', LOCAL_API_FALLBACK),
     API_URL: guardedUrl('API_URL', LOCAL_API_FALLBACK),
     NODE_ENV: zod
-        .enum(['development', 'production', 'test'])
+        .enum(['development', 'production', 'test'] as const)
         .optional()
         .default('development'),
     BETTER_AUTH_SECRET: zod.string().optional(),
     BETTER_AUTH_URL: zod.string().url().optional(),
-    REACT_SCAN: zod.coerce.boolean().optional().default(false),
-    MILLION_LINT: zod.coerce.boolean().optional().default(false),
+    NEXT_PUBLIC_DEV_AUTH_KEY: zod.string().optional(),
 })
 
 export const validateEnvSafe = (object: object) => {
@@ -98,6 +71,9 @@ export const validateEnvPath = <T extends keyof typeof envSchema.shape>(
     input: zod.input<(typeof envSchema.shape)[T]>,
     path: T
 ): zod.infer<(typeof envSchema.shape)[T]> => {
+    if (!envSchema.shape[path]) {
+        throw new Error(`Environment variable ${String(path)} is not defined in the schema`)
+    }
     return envSchema.shape[path].parse(input) as zod.infer<
         (typeof envSchema.shape)[T]
     >

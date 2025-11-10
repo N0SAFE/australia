@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Reflector } from '@nestjs/core';
 import type { ExecutionContext } from '@nestjs/common';
 import { AuthGuard } from './auth.guard';
-import { AUTH_INSTANCE_KEY } from '../types/symbols';
+import { AUTH_MODULE_OPTIONS_KEY } from '../types/symbols';
 import { APIError } from 'better-auth/api';
 
 // Mock better-auth/node
@@ -51,8 +51,10 @@ describe('AuthGuard', () => {
           },
         },
         {
-          provide: AUTH_INSTANCE_KEY,
-          useValue: mockAuth,
+          provide: AUTH_MODULE_OPTIONS_KEY,
+          useValue: {
+            auth: mockAuth,
+          },
         },
       ],
     }).compile();

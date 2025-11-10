@@ -8,13 +8,13 @@ export default defineConfig(
     createNextJsConfig({
         plugins: [react()],
         test: {
-            name: 'web',
+            name: 'australia',
             environment: 'jsdom',
             testTimeout: 10000, // 10 seconds timeout
             include: [
-                'src/**/*.test.{ts,tsx,js,jsx}',
-                'src/**/*.spec.{ts,tsx,js,jsx}',
-                'src/**/__tests__/**/*.{ts,tsx,js,jsx}',
+                '**/*.test.{ts,tsx,js,jsx}',
+                '**/*.spec.{ts,tsx,js,jsx}',
+                '**/__tests__/**/*.{ts,tsx,js,jsx}',
             ],
             exclude: ['node_modules', 'dist', '.next'],
             setupFiles: ['./vitest.setup.ts'],

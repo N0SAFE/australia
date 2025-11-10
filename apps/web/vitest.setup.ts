@@ -99,74 +99,6 @@ global.ResizeObserver = vi.fn().mockImplementation(() => ({
 vi.stubEnv('NODE_ENV', 'test')
 vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost:3001')
 
-// Mock the #/env module (generated at runtime)
-vi.mock('#/env', () => ({
-    envSchema: {
-        parse: vi.fn().mockReturnValue({
-            NODE_ENV: 'test',
-            NEXT_PUBLIC_API_URL: 'http://localhost:3001',
-            NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-            API_URL: 'http://localhost:3001',
-            NEXT_PUBLIC_DEBUG: { patterns: [], enableAll: false },
-        }),
-        safeParse: vi.fn().mockReturnValue({
-            success: true,
-            data: {
-                NODE_ENV: 'test',
-                NEXT_PUBLIC_API_URL: 'http://localhost:3001',
-                NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-                API_URL: 'http://localhost:3001',
-                NEXT_PUBLIC_DEBUG: { patterns: [], enableAll: false },
-            },
-        }),
-        shape: {
-            NODE_ENV: {
-                parse: vi.fn().mockReturnValue('test'),
-            },
-            NEXT_PUBLIC_API_URL: {
-                parse: vi.fn().mockReturnValue('http://localhost:3001'),
-            },
-            NEXT_PUBLIC_APP_URL: {
-                parse: vi.fn().mockReturnValue('http://localhost:3000'),
-            },
-            API_URL: {
-                parse: vi.fn().mockReturnValue('http://localhost:3001'),
-            },
-            NEXT_PUBLIC_DEBUG: {
-                parse: vi.fn().mockReturnValue({ patterns: [], enableAll: false }),
-            },
-        },
-    },
-    validateEnvSafe: vi.fn().mockReturnValue({
-        success: true,
-        data: {
-            NODE_ENV: 'test',
-            NEXT_PUBLIC_API_URL: 'http://localhost:3001',
-            NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-            API_URL: 'http://localhost:3001',
-            NEXT_PUBLIC_DEBUG: { patterns: [], enableAll: false },
-        },
-    }),
-    envIsValid: vi.fn().mockReturnValue(true),
-    validateEnv: vi.fn().mockReturnValue({
-        NODE_ENV: 'test',
-        NEXT_PUBLIC_API_URL: 'http://localhost:3001',
-        NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-        API_URL: 'http://localhost:3001',
-        NEXT_PUBLIC_DEBUG: { patterns: [], enableAll: false },
-    }),
-    validateEnvPath: vi.fn().mockImplementation((input, path) => {
-        const mockEnv: Record<string, string> = {
-            NODE_ENV: 'test',
-            NEXT_PUBLIC_API_URL: 'http://localhost:3001',
-            NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-            API_URL: 'http://localhost:3001',
-            NEXT_PUBLIC_DEBUG: '{ patterns: [], enableAll: false }',
-        }
-        return mockEnv[path] || input
-    }),
-}))
-
 // Mock the @/routes module (declarative routes generated at runtime)
 vi.mock('@/routes', () => {
     // Create a mock function that behaves like the actual route functions
@@ -204,18 +136,8 @@ vi.mock('@/routes', () => {
     }
 
     return {
-        // Route functions that match the actual routes/index.ts exports
-        Middlewareerrorenv: createRouteMock('Middlewareerrorenv'),
-        MiddlewareerrorhealthCheck: createRouteMock('MiddlewareerrorhealthCheck'),
-        Autherror: createRouteMock('Autherror'),
-        Authme: createRouteMock('Authme'),
-        Authsignin: createRouteMock('Authsignin'),
-        Authsignup: createRouteMock('Authsignup'),
-        Dashboard: createRouteMock('Dashboard'),
-        DashboardProjects: createRouteMock('DashboardProjects'),
-        DashboardProjectsId: createRouteMock('DashboardProjectsId'),
-        Profile: createRouteMock('Profile'),
-        Home: createRouteMock('Home'),
+        // Route functions that match the actual routes
+        Home: createRouteMock('/'),
         
         // API route functions
         getApiServerHealth: vi.fn().mockReturnValue('/api/server/health'),
@@ -223,7 +145,7 @@ vi.mock('@/routes', () => {
     }
 })
 
-// Mock @/routes/index for specific imports (in case some modules import from index specifically)
+// Mock @/routes/index for specific imports
 vi.mock('@/routes/index', () => {
     // Create a mock function that behaves like the actual route functions
     const createRouteMock = (defaultPath: string) => {
@@ -259,20 +181,9 @@ vi.mock('@/routes/index', () => {
         return routeFunction
     }
 
-    // Return static pre-defined routes to avoid proxy performance issues
     return {
-        // Common routes that are actually used in the codebase (matching @/routes mock)
-        Middlewareerrorenv: createRouteMock('Middlewareerrorenv'),
-        MiddlewareerrorhealthCheck: createRouteMock('MiddlewareerrorhealthCheck'),
-        Autherror: createRouteMock('Autherror'),
-        Authme: createRouteMock('Authme'),
-        Authsignin: createRouteMock('Authsignin'),
-        Authsignup: createRouteMock('Authsignup'),
-        Dashboard: createRouteMock('Dashboard'),
-        DashboardProjects: createRouteMock('DashboardProjects'),
-        DashboardProjectsId: createRouteMock('DashboardProjectsId'),
-        Profile: createRouteMock('Profile'),
-        Home: createRouteMock('Home'),
+        // Route functions
+        Home: createRouteMock('/'),
         
         // API route functions
         getApiServerHealth: vi.fn().mockReturnValue('/api/server/health'),
@@ -285,31 +196,4 @@ vi.mock('@/routes/hooks', () => ({
     useSearchParams: vi.fn().mockReturnValue(new URLSearchParams()),
     usePush: vi.fn().mockReturnValue(vi.fn()),
     useParams: vi.fn().mockReturnValue({}),
-}))
-
-// Mock @/lib/debug to prevent timeout issues
-vi.mock('@/lib/debug', () => ({
-    createDebug: vi.fn().mockReturnValue(vi.fn()),
-}))
-
-// Mock @/lib/utils to prevent timeout issues
-vi.mock('@/lib/utils', () => ({
-    toAbsoluteUrl: vi.fn().mockImplementation((path) => `http://localhost:3000${path}`),
-    cn: vi.fn().mockImplementation((...args) => args.filter(Boolean).join(' ')),
-}))
-
-// Mock middleware utilities to prevent timeout issues
-vi.mock('../middlewares/utils/utils', () => ({
-    matcherHandler: vi.fn().mockReturnValue({ hit: false }),
-}))
-
-vi.mock('../middlewares/utils/static', () => ({
-    nextjsRegexpPageOnly: [],
-    nextNoApi: [],
-    noPublic: [],
-}))
-
-// Mock the WithEnv middleware specifically to prevent timeout issues
-vi.mock('../middlewares/WithEnv', () => ({
-    default: vi.fn().mockReturnValue(vi.fn().mockResolvedValue(undefined)),
 }))

@@ -97,7 +97,7 @@
     "@testing-library/user-event": "catalog:testing",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/lodash.snakecase": "catalog:utils",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "catalog:testing",

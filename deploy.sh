@@ -228,11 +228,15 @@ else
     print_warning "No package.json found, skipping dependency installation"
 fi
 
-# Configure Nginx
+# Configure Nginx (HTTP-only first, SSL later)
 print_header "🌐 Configuring Nginx"
 
+# Create certbot webroot first
+mkdir -p /var/www/certbot
+chown -R www-data:www-data /var/www/certbot
+
 if [ -f "$PROJECT_DIR/nginx.conf" ]; then
-    print_info "Installing Nginx configuration..."
+    print_info "Creating temporary HTTP-only Nginx configuration..."
     
     # Backup existing config if present
     if [ -f "/etc/nginx/sites-available/gossip-club" ]; then
@@ -240,8 +244,54 @@ if [ -f "$PROJECT_DIR/nginx.conf" ]; then
         print_info "Backed up existing Nginx configuration"
     fi
     
-    # Copy new configuration
-    cp "$PROJECT_DIR/nginx.conf" /etc/nginx/sites-available/gossip-club
+    # Create temporary HTTP-only configuration for certificate generation
+    cat > /etc/nginx/sites-available/gossip-club << 'EOF'
+# Temporary HTTP-only configuration for SSL certificate generation
+server {
+    listen 80;
+    listen [::]:80;
+    server_name the-gossip-club.sebille.net;
+
+    # Let's Encrypt challenge location
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Temporary proxy to app (will redirect to HTTPS after SSL setup)
+    location / {
+        proxy_pass http://localhost:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api-the-gossip-club.sebille.net;
+
+    # Let's Encrypt challenge location
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Temporary proxy to API (will redirect to HTTPS after SSL setup)
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
     
     # Remove default site
     rm -f /etc/nginx/sites-enabled/default
@@ -252,7 +302,8 @@ if [ -f "$PROJECT_DIR/nginx.conf" ]; then
     # Test configuration
     if nginx -t; then
         systemctl reload nginx
-        print_success "Nginx configured successfully"
+        print_success "Temporary HTTP-only Nginx configuration installed"
+        print_info "Full SSL configuration will be installed after obtaining certificates"
     else
         print_error "Nginx configuration test failed!"
         exit 1
@@ -260,10 +311,6 @@ if [ -f "$PROJECT_DIR/nginx.conf" ]; then
 else
     print_warning "nginx.conf not found, skipping Nginx configuration"
 fi
-
-# Create certbot webroot
-mkdir -p /var/www/certbot
-chown -R www-data:www-data /var/www/certbot
 
 # SSL Certificate setup
 print_header "🔒 SSL Certificate Setup"
@@ -309,8 +356,19 @@ if [[ "$OBTAIN_SSL" =~ ^[Yy]$ ]]; then
         systemctl enable certbot.timer
         systemctl start certbot.timer
         
-        # Reload Nginx with SSL
-        systemctl reload nginx
+        # Install full SSL Nginx configuration
+        print_info "Installing full SSL Nginx configuration..."
+        if [ -f "$PROJECT_DIR/nginx.conf" ]; then
+            cp "$PROJECT_DIR/nginx.conf" /etc/nginx/sites-available/gossip-club
+            
+            if nginx -t; then
+                systemctl reload nginx
+                print_success "Full SSL Nginx configuration installed and activated"
+            else
+                print_warning "Full SSL configuration test failed, keeping temporary HTTP configuration"
+                print_info "You may need to manually update the configuration later"
+            fi
+        fi
         
         print_success "SSL certificates configured"
     fi

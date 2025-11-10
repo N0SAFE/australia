@@ -29,10 +29,57 @@ fi
 
 # Create certbot webroot directory
 mkdir -p /var/www/certbot
+chown -R www-data:www-data /var/www/certbot
 
-# Copy nginx config to sites-available
-echo "📝 Installing Nginx configuration..."
-cp nginx.conf /etc/nginx/sites-available/gossip-club
+# Create temporary HTTP-only Nginx configuration for certificate generation
+echo "📝 Installing temporary HTTP-only Nginx configuration..."
+cat > /etc/nginx/sites-available/gossip-club << 'EOF'
+# Temporary HTTP-only configuration for SSL certificate generation
+server {
+    listen 80;
+    listen [::]:80;
+    server_name the-gossip-club.sebille.net;
+
+    # Let's Encrypt challenge location
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Temporary proxy to app
+    location / {
+        proxy_pass http://localhost:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api-the-gossip-club.sebille.net;
+
+    # Let's Encrypt challenge location
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Temporary proxy to API
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
 
 # Remove default site if it exists
 if [ -f /etc/nginx/sites-enabled/default ]; then
@@ -71,10 +118,25 @@ certbot certonly --webroot -w /var/www/certbot \
     --agree-tos \
     --non-interactive
 
-# Reload nginx to apply HTTPS configuration
+# Install full SSL Nginx configuration
 echo ""
-echo "🔄 Reloading Nginx with SSL configuration..."
-systemctl reload nginx
+echo "📝 Installing full SSL Nginx configuration..."
+if [ -f "nginx.conf" ]; then
+    cp nginx.conf /etc/nginx/sites-available/gossip-club
+    
+    # Test the new configuration
+    if nginx -t; then
+        echo "🔄 Reloading Nginx with SSL configuration..."
+        systemctl reload nginx
+        echo "✅ Full SSL configuration activated"
+    else
+        echo "⚠️  SSL configuration test failed, keeping temporary HTTP configuration"
+        echo "Please check nginx.conf and manually update later"
+    fi
+else
+    echo "⚠️  nginx.conf not found, keeping temporary HTTP configuration"
+    echo "Please create nginx.conf with SSL configuration and reload nginx manually"
+fi
 
 # Set up auto-renewal
 echo "⏰ Setting up automatic certificate renewal..."

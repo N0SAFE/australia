@@ -384,11 +384,11 @@ print_info "Building Docker images (this may take a while)..."
 cd "$PROJECT_DIR"
 
 # Run docker-compose as the actual user (with sudo privileges for docker)
-if su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d --build"; then
+if su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && docker-compose -f docker/compose/docker-compose.prod.yml --env-file .env.prod up -d --build"; then
     print_success "Docker containers started successfully"
 else
     print_error "Failed to start Docker containers"
-    print_info "Check logs with: docker-compose -f docker-compose.prod.yml logs"
+    print_info "Check logs with: docker-compose -f docker/compose/docker-compose.prod.yml logs"
     exit 1
 fi
 
@@ -398,7 +398,7 @@ sleep 10
 
 # Check container status
 print_header "📊 Container Status"
-su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && docker-compose -f docker-compose.prod.yml ps"
+su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && docker-compose -f docker/compose/docker-compose.prod.yml ps"
 
 # Configure firewall (if UFW is available)
 print_header "🔥 Configuring Firewall"
@@ -442,10 +442,10 @@ echo "  🔌 API: https://api-the-gossip-club.sebille.net"
 echo ""
 print_info "Useful Commands:"
 echo ""
-echo "  📊 View logs: docker-compose -f docker-compose.prod.yml logs -f"
-echo "  🔄 Restart services: docker-compose -f docker-compose.prod.yml restart"
-echo "  🛑 Stop services: docker-compose -f docker-compose.prod.yml down"
-echo "  📈 Container status: docker-compose -f docker-compose.prod.yml ps"
+echo "  📊 View logs: docker-compose -f docker/compose/docker-compose.prod.yml logs -f"
+echo "  🔄 Restart services: docker-compose -f docker/compose/docker-compose.prod.yml restart"
+echo "  🛑 Stop services: docker-compose -f docker/compose/docker-compose.prod.yml down"
+echo "  📈 Container status: docker-compose -f docker/compose/docker-compose.prod.yml ps"
 echo "  🔒 SSL status: sudo certbot certificates"
 echo ""
 print_warning "Next Steps:"

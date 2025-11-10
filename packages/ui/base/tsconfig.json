@@ -3,6 +3,7 @@
     "compilerOptions": {
         "outDir": "dist",
         "baseUrl": ".",
+        "skipLibCheck": true,
         "plugins": [
             {
                 "name": "next"
@@ -18,12 +19,14 @@
         }
     },
     "include": [
-        "**/*.ts",
-        "**/*.tsx"
+        "src/**/*.ts",
+        "src/**/*.tsx"
     ],
     "exclude": [
         "node_modules",
         "dist",
-        "tsup.config.ts"
+        "tsup.config.ts",
+        "../../packages/**/node_modules",
+        "../../apps/**"
     ]
 }

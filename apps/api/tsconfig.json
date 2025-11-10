@@ -27,5 +27,14 @@
       "@/*": ["./src/*"],
     }
   },
-  "exclude": ["vitest.config.mts"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "vitest.config.mts",
+    "node_modules",
+    "dist",
+    "../../packages/**",
+    "../../apps/web/**"
+  ]
 }

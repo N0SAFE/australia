@@ -43,6 +43,7 @@ export type ContentMetadata = {
   mimeType?: string;
   width?: number;
   height?: number;
+  thumbnail?: string;
 };
 
 export type Capsule = {

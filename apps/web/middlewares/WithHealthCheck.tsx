@@ -9,7 +9,7 @@ import { validateEnvPath } from '#/env'
 import { nextjsRegexpPageOnly, nextNoApi } from './utils/static'
 import { orpc } from '@/lib/orpc'
 import { toAbsoluteUrl } from '@/lib/utils'
-import { MiddlewareerrorhealthCheck } from '@/routes'
+import { MiddlewareErrorHealthCheck } from '@/routes'
 import { createDebug } from '@/lib/debug'
 
 const debugHealthCheck = createDebug('middleware/healthcheck')
@@ -51,7 +51,7 @@ const withHealthCheck: MiddlewareFactory = (next: NextProxy) => {
                             return NextResponse.next()
                         } else {
                             const errorUrl = toAbsoluteUrl(
-                                MiddlewareerrorhealthCheck(
+                                MiddlewareErrorHealthCheck(
                                     {},
                                     {
                                         json: JSON.stringify(data),
@@ -86,7 +86,7 @@ const withHealthCheck: MiddlewareFactory = (next: NextProxy) => {
                         return NextResponse.next()
                     } else {
                         const errorUrl = toAbsoluteUrl(
-                            MiddlewareerrorhealthCheck(
+                            MiddlewareErrorHealthCheck(
                                 {},
                                 {
                                     json: JSON.stringify(errorData),
@@ -113,7 +113,7 @@ const withHealthCheck: MiddlewareFactory = (next: NextProxy) => {
                     return NextResponse.next()
                 } else {
                     const errorUrl = toAbsoluteUrl(
-                        MiddlewareerrorhealthCheck(
+                        MiddlewareErrorHealthCheck(
                             {},
                             {
                                 from: request.url,

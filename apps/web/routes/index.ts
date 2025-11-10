@@ -34,6 +34,7 @@ import * as ApiUsersLoginRoute from "@/app/api/users/login/route.info";
 import * as ApiUsersMeRoute from "@/app/api/users/me/route.info";
 import * as InviteCodeRoute from "@/app/invite/[code]/page.info";
 import * as MiddlewareErrorEnvRoute from "@/app/middleware/error/env/page.info";
+import * as MiddlewareErrorHealthCheckRoute from "@/app/middleware/error/healthCheck/page.info";
 import * as UnlockRoute from "@/app/unlock/page.info";
 
 export const User = makeRoute(
@@ -167,6 +168,13 @@ export const MiddlewareErrorEnv = makeRoute(
   {
     ...defaultInfo,
     ...MiddlewareErrorEnvRoute.Route
+  }
+);
+export const MiddlewareErrorHealthCheck = makeRoute(
+  "/middleware/error/healthCheck",
+  {
+    ...defaultInfo,
+    ...MiddlewareErrorHealthCheckRoute.Route
   }
 );
 export const Unlock = makeRoute(

@@ -22,7 +22,7 @@ export const LoggedLayout = ({
     redirect('/login');
   }
 
-  if (roles && 'roles' in user && Array.isArray(user.roles) && !roles.some(role => user.roles.includes(role))) {
+  if (roles && 'roles' in user && Array.isArray(user.roles) && !roles.some(role => (user.roles as string[]).includes(role))) {
     redirect('/login');
   }
 

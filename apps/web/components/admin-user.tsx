@@ -491,6 +491,7 @@ export function AdminUsersPage() {
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious
+              size="default"
               onClick={() => {
                 if (table.getCanPreviousPage()) {
                   table.previousPage()
@@ -509,6 +510,7 @@ export function AdminUsersPage() {
                 <PaginationEllipsis />
               ) : (
                 <PaginationLink
+                  size="default"
                   onClick={() => setPagination(prev => ({ ...prev, pageIndex: page - 1 }))}
                   isActive={pagination.pageIndex === page - 1}
                   className="cursor-pointer"
@@ -521,6 +523,7 @@ export function AdminUsersPage() {
           
           <PaginationItem>
             <PaginationNext
+              size="default"
               onClick={() => {
                 if (table.getCanNextPage()) {
                   table.nextPage()

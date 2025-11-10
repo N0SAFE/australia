@@ -76,7 +76,7 @@ export function MediaToolbar({
 
       <PopoverContent
         className="w-auto p-1"
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        onOpenAutoFocus={(e: Event) => { e.preventDefault() }}
       >
         {isEditing ? (
           <div className="flex w-[330px] flex-col">

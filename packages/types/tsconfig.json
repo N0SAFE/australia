@@ -3,6 +3,7 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
+    "skipLibCheck": true,
     "paths": {
       "@repo/ui/*": [
         "./*"
@@ -13,10 +14,14 @@
     },
   },
   "include": [
-    "**/*.ts",
+    "src/**/*.ts",
+    "utils.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
+    "__tests__",
+    "../../packages/**/node_modules",
+    "../../apps/**"
   ]
 }

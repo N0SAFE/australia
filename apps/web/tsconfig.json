@@ -4,6 +4,7 @@
         "useDefineForClassFields": true,
         "baseUrl": ".",
         "incremental": true,
+        "skipLibCheck": true,
         "plugins": [
             {
                 "name": "next"
@@ -26,5 +27,9 @@
         "next.config.js",
         "next-sitemap.config.js"
     ],
-    "exclude": ["node_modules"]
+    "exclude": [
+        "node_modules",
+        "../../packages/**",
+        "../../apps/api/**"
+    ]
 }

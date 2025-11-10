@@ -20,15 +20,15 @@ export function useUsers(options?: {
       limit: pageSize,
       offset: (page - 1) * pageSize,
     },
-    sort: {
-      field: (options?.sort?.field || 'name') as keyof User,
-      direction: options?.sort?.direction || 'asc' as const,
-    },
+    sort: options?.sort ? {
+      field: (options.sort.field || 'name') as keyof User,
+      direction: options.sort.direction || 'asc' as const,
+    } : undefined,
     filter: options?.filter,
   }
 
   return useQuery(orpc.user.list.queryOptions({
-    input: params,
+    input: params as any,
     enabled: options?.enabled ?? true,
     staleTime: 1000 * 60, // 1 minute
     gcTime: 1000 * 60 * 5, // 5 minutes

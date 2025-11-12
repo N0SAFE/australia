@@ -25,7 +25,10 @@ describe('AuthService', () => {
         {
           provide: MODULE_OPTIONS_TOKEN,
           useValue: {
-            auth: mockAuth
+            auth: mockAuth,
+            disableTrustedOriginsCors: false,
+            disableBodyParser: false,
+            disableGlobalAuthGuard: false,
           },
         },
       ],

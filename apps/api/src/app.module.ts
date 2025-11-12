@@ -40,7 +40,7 @@ import { StorageModule } from "./modules/storage/storage.module";
     ORPCModule.forRootAsync({
       useFactory: (request: Request) => ({
         interceptors: [
-          onError((error, ctx) => {
+          onError((error, _ctx) => {
             console.error(
               "oRPC Error:",
               error

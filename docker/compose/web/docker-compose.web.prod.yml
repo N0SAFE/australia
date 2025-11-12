@@ -7,14 +7,14 @@ services:
       dockerfile: ./docker/builder/web/Dockerfile.web.runtime.prod
       args:
         - NODE_ENV=production
-        - API_PORT=${API_PORT:-3001}
-        - API_URL=http://api-prod:${API_PORT:-3001}
+        - API_PORT=${API_PORT}
+        - API_URL=http://${COMPOSE_PROJECT_NAME:-nextjs-nestjs}-api-prod:${API_PORT}
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-        - NEXT_PUBLIC_APP_PORT=${NEXT_PUBLIC_APP_PORT:-3000}
+        - NEXT_PUBLIC_APP_PORT=${NEXT_PUBLIC_APP_PORT}
     restart: unless-stopped
     ports:
-      - "${NEXT_PUBLIC_APP_PORT:-3000}:${NEXT_PUBLIC_APP_PORT:-3000}"
+      - "${NEXT_PUBLIC_APP_PORT}:${NEXT_PUBLIC_APP_PORT}"
     depends_on:
       api-prod:
         condition: service_healthy
@@ -23,14 +23,14 @@ services:
       - NODE_ENV=production
       
       # URLs - Server-side (internal Docker network)
-      - API_URL=http://api-prod:${API_PORT:-3001}
+      - API_URL=http://${COMPOSE_PROJECT_NAME:-nextjs-nestjs}-api-prod:${API_PORT}
       
       # URLs - Client-side (external access - must be public URL in production)
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-      - NEXT_PUBLIC_API_PORT=${API_PORT:-3001}
+      - NEXT_PUBLIC_API_PORT=${API_PORT}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
-      - NEXT_PUBLIC_APP_PORT=${NEXT_PUBLIC_APP_PORT:-3000}
-
+      - NEXT_PUBLIC_APP_PORT=${NEXT_PUBLIC_APP_PORT}
+      
       # Authentication
       - DEV_AUTH_KEY=${DEV_AUTH_KEY}
     networks:

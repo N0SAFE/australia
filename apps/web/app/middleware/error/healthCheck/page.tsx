@@ -1,8 +1,9 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-export default function MiddlewareErrorHealthCheckPage() {
+function HealthCheckContent() {
   const searchParams = useSearchParams()
   const json = searchParams.get('json')
   const from = searchParams.get('from')
@@ -49,5 +50,21 @@ export default function MiddlewareErrorHealthCheckPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function MiddlewareErrorHealthCheckPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+        <div className="max-w-2xl rounded-lg border border-red-500 bg-red-50 p-6">
+          <h1 className="mb-4 text-2xl font-bold text-red-700">
+            Loading...
+          </h1>
+        </div>
+      </div>
+    }>
+      <HealthCheckContent />
+    </Suspense>
   )
 }

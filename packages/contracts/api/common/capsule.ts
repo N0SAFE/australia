@@ -68,8 +68,10 @@ export const capsuleSchema = z.object({
   isLocked: z.boolean(),
   lockType: lockTypeSchema.nullable(),
   lockConfig: lockConfigSchema.nullable(),
-  unlockedAt: z.string().datetime().nullable(),
+  unlockedAt: z.iso.datetime().nullable(),
+  openedAt: z.iso.datetime().nullable(),
+  isOpened: z.boolean(), // Derived from openedAt: true if openedAt is not null
   
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });

@@ -2,7 +2,8 @@ import { Controller } from '@nestjs/common';
 import { Implement, implement } from '@orpc/nest';
 import { capsuleContract } from '@repo/api-contracts';
 import { CapsuleService } from '../services/capsule.service';
-import { AllowAnonymous } from '../../../core/modules/auth/decorators/decorators';
+import { AllowAnonymous, Session as SessionDecorator } from '../../../core/modules/auth/decorators/decorators';
+import type { Session } from '@repo/auth';
 
 @Controller()
 export class CapsuleController {
@@ -18,9 +19,17 @@ export class CapsuleController {
     });
   }
 
-  // IMPORTANT: Specific routes (/month, /day) must come BEFORE wildcard routes (/:id)
-  // to prevent the wildcard from matching "month" or "day" as an ID
+  // IMPORTANT: Specific routes (/month, /day, /recent) must come BEFORE wildcard routes (/:id)
+  // to prevent the wildcard from matching "month", "day", or "recent" as an ID
   
+  @AllowAnonymous()
+  @Implement(capsuleContract.getRecent)
+  getRecent() {
+    return implement(capsuleContract.getRecent).handler(async () => {
+      return await this.capsuleService.getRecentCapsules();
+    });
+  }
+
   @AllowAnonymous()
   @Implement(capsuleContract.findByMonth)
   findByMonth() {
@@ -32,7 +41,7 @@ export class CapsuleController {
         // Log all capsules to see the data structure
         console.error('[Controller] ALL CAPSULES DATA:');
         result.capsules.forEach((cap: any, idx: number) => {
-          console.error(`\n[Controller] === Capsule ${idx} ===`);
+          console.error(`\n[Controller] === Capsule ${String(idx)} ===`);
           console.error(JSON.stringify(cap, null, 2));
         });
         
@@ -41,7 +50,7 @@ export class CapsuleController {
         try {
           capsuleFindByMonthOutput.parse(result);
           console.error('[Controller] ✅ Validation SUCCESS');
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error('[Controller] ❌ Validation FAILED');
           console.error('[Controller] Error:', err.message);
           if (err.issues) {
@@ -110,9 +119,8 @@ export class CapsuleController {
     });
   }
 
-  @AllowAnonymous()
   @Implement(capsuleContract.unlock)
-  unlock() {
+  unlock(@SessionDecorator() session: Session) {
     return implement(capsuleContract.unlock).handler(async ({ input }) => {
       const validInput = input as {
         id: string;
@@ -121,7 +129,31 @@ export class CapsuleController {
         deviceAction?: 'shake' | 'tilt' | 'tap';
         apiResponse?: unknown;
       };
-      const result = await this.capsuleService.unlockCapsule(validInput);
+      
+      // Extract user from session
+      const user = session.user;
+      
+      const result = await this.capsuleService.unlockCapsule(validInput, user);
+      
+      // Convert null to undefined for contract compatibility
+      return {
+        success: result.success,
+        message: result.message,
+        capsule: result.capsule === null ? undefined : result.capsule,
+      };
+    });
+  }
+
+  @AllowAnonymous()
+  @Implement(capsuleContract.markAsOpened)
+  markAsOpened(@SessionDecorator() session: Session | null) {
+    return implement(capsuleContract.markAsOpened).handler(async ({ input }) => {
+      const validInput = input as { id: string };
+      
+      // Extract user from session
+      const user = session?.user;
+      
+      const result = await this.capsuleService.markCapsuleAsOpened(validInput.id, user);
       
       // Convert null to undefined for contract compatibility
       return {

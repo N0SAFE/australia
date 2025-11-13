@@ -10,7 +10,8 @@ import { nextjsRegexpPageOnly, nextNoApi, noPublic } from './utils/static'
 import { validateEnvSafe } from '#/env'
 import { toAbsoluteUrl } from '@/lib/utils'
 import { createDebug } from '@/lib/debug'
-import { getSessionCookie } from "better-auth/cookies"
+import { getCookieCache, getSessionCookie } from "better-auth/cookies"
+import type { Session } from '@repo/auth'
 
 const debugFirstLoad = createDebug('middleware/firstload')
 
@@ -68,6 +69,22 @@ const withFirstLoad: MiddlewareFactory = (next: NextProxy) => {
         
         if (!sessionCookie) {
             debugFirstLoad('No session, skipping first load check')
+            return next(request, _next)
+        }
+
+        // Get session data to check user role
+        let session: Session | null = null
+        try {
+            session = await getCookieCache<Session>(request)
+        } catch (error) {
+            debugFirstLoad('Error getting session cache:', error)
+            return next(request, _next)
+        }
+
+        // Only apply first load check to users with 'sarah' role
+        const userRole = session?.user?.role
+        if (userRole !== 'sarah') {
+            debugFirstLoad(`User role is ${userRole ?? 'unknown'}, skipping first load check (only applies to sarah role)`)
             return next(request, _next)
         }
 

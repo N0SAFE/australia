@@ -1,27 +1,18 @@
 import { HomePage } from '@/components/pages/home';
 import { Capsule } from '@/types/capsule';
-import { getCapsulesByMonth } from '@/hooks/useCapsules';
-import dayjs from 'dayjs';
+import { getRecentCapsules } from '@/hooks/useCapsules';
 
 export default async function Home() {
-  const currentMonth = dayjs().format('YYYY-MM');
-  
   let capsules: Capsule[] = [];
   try {
-    console.log(currentMonth)
-    const resData = await getCapsulesByMonth(currentMonth);
-    console.log('resData', resData)
+    const resData = await getRecentCapsules();
+    console.log('Recent capsules:', resData)
     capsules = resData?.capsules ?? [];
   } catch (error) {
-    console.error('Failed to fetch capsules:', error);
+    console.error('Failed to fetch recent capsules:', error);
     // Return empty array on error
     capsules = [];
   }
 
-  const filteredCapsules = capsules.filter(capsule => {
-    const today = dayjs();
-    return !dayjs(capsule.openingDate).isAfter(today);
-  }).slice(-2);
-
-  return <HomePage data={filteredCapsules} />;
+  return <HomePage data={capsules} />;
 }

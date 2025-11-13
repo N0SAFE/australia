@@ -78,6 +78,13 @@
       "when": 1762743818673,
       "tag": "0010_remarkable_true_believers",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1762982031982,
+      "tag": "0011_funny_luckman",
+      "breakpoints": true
     }
   ]
 }

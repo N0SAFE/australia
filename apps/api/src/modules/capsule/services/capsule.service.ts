@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CapsuleRepository, type CreateCapsuleInput, type UpdateCapsuleInput, type GetCapsulesInput } from '../repositories/capsule.repository';
+import type { User } from '@repo/auth';
 
 @Injectable()
 export class CapsuleService {
@@ -54,6 +55,15 @@ export class CapsuleService {
   }
 
   /**
+   * Get recent capsules for home page
+   * Returns capsules from past week + all locked + all unread from past
+   */
+  async getRecentCapsules() {
+    const capsules = await this.capsuleRepository.getRecent();
+    return { capsules };
+  }
+
+  /**
    * Update capsule by ID
    */
   async updateCapsule(id: string, input: Omit<UpdateCapsuleInput, "id">) {
@@ -79,6 +89,7 @@ export class CapsuleService {
 
   /**
    * Attempt to unlock a capsule with the provided unlock method
+   * @param user - The user attempting to unlock (used for admin detection)
    */
   async unlockCapsule(input: {
     id: string;
@@ -86,7 +97,7 @@ export class CapsuleService {
     voiceTranscript?: string;
     deviceAction?: 'shake' | 'tilt' | 'tap';
     apiResponse?: unknown;
-  }) {
+  }, user?: User) {
     const capsule = await this.capsuleRepository.findById(input.id);
     
     if (!capsule) {
@@ -162,6 +173,18 @@ export class CapsuleService {
     }
 
     if (unlockSuccessful) {
+      // Check if user is admin - if so, preview mode (no DB modification)
+      const isAdmin = user?.role === 'admin' || user?.role?.includes('admin');
+      
+      if (isAdmin) {
+        return {
+          success: true,
+          message: 'Capsule unlock validated (admin preview - no database change)',
+          capsule: capsule,
+        };
+      }
+      
+      // Normal mode: unlock and update database
       const unlockedCapsule = await this.capsuleRepository.unlock(input.id);
       return {
         success: true,
@@ -171,5 +194,40 @@ export class CapsuleService {
     }
 
     return { success: false, message: 'Unlock attempt failed' };
+  }
+
+  /**
+   * Mark a capsule as opened (first view)
+   * @param user - The user opening the capsule (used for admin detection)
+   */
+  async markCapsuleAsOpened(id: string, user?: User) {
+    const capsule = await this.capsuleRepository.findById(id);
+    
+    if (!capsule) {
+      return { success: false, message: 'Capsule not found' };
+    }
+
+    if (capsule.openedAt) {
+      return { success: false, message: 'Capsule is already marked as opened' };
+    }
+
+    // Check if user is admin - if so, preview mode (no DB modification)
+    const isAdmin = user?.role === 'admin' || user?.role?.includes('admin');
+    
+    if (isAdmin) {
+      return {
+        success: true,
+        message: 'Capsule open validated (admin preview - no database change)',
+        capsule: capsule,
+      };
+    }
+    
+    // Normal mode: mark as opened and update database
+    const openedCapsule = await this.capsuleRepository.markAsOpened(id);
+    return {
+      success: true,
+      message: 'Capsule marked as opened successfully',
+      capsule: openedCapsule,
+    };
   }
 }

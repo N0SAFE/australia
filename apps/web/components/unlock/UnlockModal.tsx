@@ -9,6 +9,8 @@ import { DeviceUnlock } from './DeviceUnlock';
 import { TimeBasedUnlock } from './TimeBasedUnlock';
 import { getApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useSession } from '@/lib/auth';
+import { Shield } from 'lucide-react';
 
 export const UnlockModal: FC<{
   capsule: Capsule;
@@ -17,6 +19,10 @@ export const UnlockModal: FC<{
 }> = ({ capsule, open, onOpenChange }) => {
   const [error, setError] = useState('');
   const router = useRouter();
+  const { data: session } = useSession();
+  
+  // Check if user is admin
+  const isAdmin = session?.user?.role === 'admin' || session?.user?.role?.includes('admin');
 
   const handleUnlock = async (unlockData: LockConfig) => {
     try {
@@ -106,6 +112,17 @@ export const UnlockModal: FC<{
         <DialogTitle className="text-center">
           🔒 Capsule verrouillée
         </DialogTitle>
+
+        {/* Admin Preview Indicator */}
+        {isAdmin && (
+          <div className="bg-amber-50 border border-amber-200 rounded-md p-3 flex items-start gap-2">
+            <Shield className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800">
+              <p className="font-semibold">Mode Administrateur - Aperçu uniquement</p>
+              <p className="text-xs mt-1">Le déverrouillage ne sera pas enregistré dans la base de données. Cette action est temporaire pour cette session de prévisualisation.</p>
+            </div>
+          </div>
+        )}
 
         <div className="mt-4">
           {renderUnlockComponent()}

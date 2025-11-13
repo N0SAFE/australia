@@ -10,6 +10,7 @@ export default function UnlockPage() {
   const [isDragging, setIsDragging] = useState(false)
   const [dragPosition, setDragPosition] = useState(0)
   const [isUnlocked, setIsUnlocked] = useState(false)
+  const [isAnimatingUnlock, setIsAnimatingUnlock] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const startXRef = useRef(0)
 
@@ -18,8 +19,8 @@ export default function UnlockPage() {
     const now = Date.now()
     document.cookie = `lastUnlock=${now}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`
     
-    // Small delay to ensure cookie is set
-    await new Promise(resolve => setTimeout(resolve, 100))
+    // Wait for unlock animation to complete (1 second)
+    await new Promise(resolve => setTimeout(resolve, 1000))
     
     // Redirect to home
     router.push('/home')
@@ -45,9 +46,15 @@ export default function UnlockPage() {
     setDragPosition(newPosition)
 
     // Check if swiped far enough (80% of the way)
-    if (newPosition >= maxDrag * 0.8) {
+    if (newPosition >= maxDrag * 0.8 && !isAnimatingUnlock) {
       setIsUnlocked(true)
       setIsDragging(false)
+      setIsAnimatingUnlock(true)
+      
+      // Animate to full width first
+      setDragPosition(maxDrag)
+      
+      // Then trigger unlock after animation
       handleUnlock()
     }
   }
@@ -134,9 +141,11 @@ export default function UnlockPage() {
           {/* Background track */}
           <div className="absolute inset-0 rounded-full overflow-hidden">
             <div
-              className="h-full bg-pink-500/20 transition-all duration-200"
+              className="h-full bg-pink-500/20"
               style={{
                 width: `${dragProgress * 100}%`,
+                transition: isAnimatingUnlock ? 'width 0.5s ease-out, background-color 0.3s ease-out' : 'width 0.2s',
+                backgroundColor: isAnimatingUnlock ? 'rgba(236, 72, 153, 0.4)' : 'rgba(236, 72, 153, 0.2)',
               }}
             />
           </div>
@@ -158,8 +167,9 @@ export default function UnlockPage() {
             className="absolute top-1 left-1 w-14 h-14 bg-pink-500 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg z-10"
             style={{
               transform: `translateX(${dragPosition}px)`,
-              transition: isDragging ? 'none' : 'transform 0.3s ease-out',
+              transition: isDragging ? 'none' : isAnimatingUnlock ? 'transform 0.5s ease-out, opacity 0.3s ease-out 0.5s' : 'transform 0.3s ease-out',
               scale: isDragging ? '1.05' : '1',
+              opacity: isAnimatingUnlock ? 0 : 1,
             }}
             onMouseDown={handleMouseDown}
             onTouchStart={handleTouchStart}

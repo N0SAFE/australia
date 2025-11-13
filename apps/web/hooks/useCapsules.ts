@@ -69,6 +69,19 @@ export function useCapsulesByMonth(month: string, options?: { enabled?: boolean 
 }
 
 /**
+ * Query hook to fetch recent capsules for home page
+ * Returns capsules from past week + all locked + all unread from past
+ */
+export function useRecentCapsules(options?: { enabled?: boolean }) {
+  return useQuery(orpc.capsule.getRecent.queryOptions({
+    input: {},
+    enabled: options?.enabled ?? true,
+    staleTime: 1000 * 60, // 1 minute
+    gcTime: 1000 * 60 * 5, // 5 minutes
+  }))
+}
+
+/**
  * Mutation hook to create a new capsule
  */
 export function useCreateCapsule() {
@@ -189,12 +202,74 @@ export function useDeleteCapsule() {
 }
 
 /**
+ * Mutation hook to unlock a capsule
+ */
+export function useUnlockCapsule() {
+  const queryClient = useQueryClient()
+  
+  return useMutation(orpc.capsule.unlock.mutationOptions({
+    onSuccess: (result, variables) => {
+      if (result.success) {
+        // Invalidate ALL capsule queries to update the unlocked status everywhere
+        queryClient.invalidateQueries({ 
+          predicate: (query) => {
+            const key = query.queryKey as string[]
+            return key[0]?.toString().startsWith('capsule.')
+          }
+        })
+        
+        // Don't show toast for admin preview mode
+        if (!result.message?.includes('admin preview')) {
+          toast.success(result.message || 'Capsule déverrouillée avec succès')
+        }
+      } else {
+        toast.error(result.message || 'Échec du déverrouillage')
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Erreur lors du déverrouillage: ${error.message}`)
+    },
+  }))
+}
+
+/**
+ * Mutation hook to mark a capsule as opened
+ */
+export function useMarkCapsuleAsOpened() {
+  const queryClient = useQueryClient()
+  
+  return useMutation(orpc.capsule.markAsOpened.mutationOptions({
+    onSuccess: (result, variables) => {
+      if (result.success) {
+        // Invalidate ALL capsule queries to update the openedAt status everywhere
+        queryClient.invalidateQueries({ 
+          predicate: (query) => {
+            const key = query.queryKey as string[]
+            return key[0]?.toString().startsWith('capsule.')
+          }
+        })
+        
+        // Don't show toast for admin preview mode
+        if (!result.message?.includes('admin preview')) {
+          toast.success('Capsule marked as opened')
+        }
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to mark capsule as opened: ${error.message}`)
+    },
+  }))
+}
+
+/**
  * Utility hook combining all capsule mutations
  */
 export function useCapsuleActions() {
   const createCapsule = useCreateCapsule()
   const updateCapsule = useUpdateCapsule()
   const deleteCapsule = useDeleteCapsule()
+  const unlockCapsule = useUnlockCapsule()
+  const markAsOpened = useMarkCapsuleAsOpened()
 
   return {
     // Convenience methods
@@ -204,12 +279,18 @@ export function useCapsuleActions() {
     updateCapsuleAsync: updateCapsule.mutateAsync,
     deleteCapsule: deleteCapsule.mutate,
     deleteCapsuleAsync: deleteCapsule.mutateAsync,
+    unlockCapsule: unlockCapsule.mutate,
+    unlockCapsuleAsync: unlockCapsule.mutateAsync,
+    markAsOpened: markAsOpened.mutate,
+    markAsOpenedAsync: markAsOpened.mutateAsync,
     
     // Grouped loading states
     isLoading: {
       create: createCapsule.isPending,
       update: updateCapsule.isPending,
       delete: deleteCapsule.isPending,
+      unlock: unlockCapsule.isPending,
+      markAsOpened: markAsOpened.isPending,
     },
     
     // Grouped error states
@@ -217,6 +298,8 @@ export function useCapsuleActions() {
       create: createCapsule.error,
       update: updateCapsule.error,
       delete: deleteCapsule.error,
+      unlock: unlockCapsule.error,
+      markAsOpened: markAsOpened.error,
     },
   }
 }
@@ -257,4 +340,12 @@ export async function getCapsulesByDay(day: string) {
 export async function getCapsulesByMonth(month: string) {
   console.log(month)
   return orpc.capsule.findByMonth.call({ month })
+}
+
+/**
+ * Direct async function for fetching recent capsules (for server components)
+ * Returns capsules from past week + all locked + all unread from past
+ */
+export async function getRecentCapsules() {
+  return orpc.capsule.getRecent.call({})
 }

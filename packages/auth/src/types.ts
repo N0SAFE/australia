@@ -11,3 +11,4 @@ export interface IEnvService {
 export type Auth = Awaited<ReturnType<typeof betterAuthFactory>>['auth'];
 
 export type Session = Auth['$Infer']['Session']
+export type User = Session['user']

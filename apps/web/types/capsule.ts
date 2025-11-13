@@ -60,6 +60,8 @@ export type Capsule = {
   lockType: LockType | null;
   lockConfig: LockConfig | null;
   unlockedAt: string | null;
+  openedAt: string | null;
+  isOpened: boolean; // Derived from openedAt: true if openedAt is not null
   
   createdAt: string;
   updatedAt: string;

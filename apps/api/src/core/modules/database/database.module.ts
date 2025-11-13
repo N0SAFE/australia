@@ -15,8 +15,10 @@ import { EnvModule } from "../../../config/env/env.module";
         {
             provide: DATABASE_CONNECTION,
             useFactory: (envService: EnvService) => {
+                const databaseUrl = envService.get('DATABASE_URL');
+                console.log('🔍 DATABASE_URL:', databaseUrl);
                 const pool = new Pool({
-                    connectionString: envService.get('DATABASE_URL')
+                    connectionString: databaseUrl
                 });
                 return drizzle(pool, {
                     schema: schema

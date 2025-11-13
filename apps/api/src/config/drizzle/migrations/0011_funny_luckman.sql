@@ -1,0 +1,1 @@
+ALTER TABLE "capsule" ADD COLUMN "opened_at" timestamp;

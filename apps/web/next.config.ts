@@ -25,6 +25,8 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
   
+  cacheComponents: true,
+  
   // Image configuration for external images
   images: {
     // Disable image optimization (Sharp not needed)

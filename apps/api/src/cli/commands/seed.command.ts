@@ -1,7 +1,6 @@
 import { Command, CommandRunner } from 'nest-commander';
 import { Injectable } from '@nestjs/common';
-import * as schema from '../../config/drizzle/schema';
-import { roles } from '@repo/auth/permissions';
+import * as schema from '@/config/drizzle/schema';
 import { eq } from 'drizzle-orm';
 import { AuthService } from '@/core/modules/auth/services/auth.service';
 import { DatabaseService } from '@/core/modules/database/services/database.service';
@@ -11,7 +10,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 // Seed version identifier - increment this when you want to re-seed
-const SEED_VERSION = '1.6.0';
+const SEED_VERSION = '1.7.2';
 
 // Helper function to format date as YYYY-MM-DD
 function formatDate(date: Date): string {
@@ -195,9 +194,10 @@ export class SeedCommand extends CommandRunner {
         lockType?: 'code' | 'voice' | 'device_shake' | 'device_tilt' | 'device_tap' | 'api' | 'time_based' | null;
         lockConfig?: string | null;
         unlockedAt?: Date | null;
+        openedAt?: Date | null;
       }[] = [];
 
-      // 1. TEXT CONTENT WITH FILE LINKS - Past opening date (already unlocked)
+      // 1. TEXT CONTENT WITH FILE LINKS - Past opening date (already unlocked AND opened)
       // Copy seed files for demonstration
       const demoImage = await copySeedAsset(uploadDir, 'mountain-sunset.jpg', 'image');
       const demoVideo = await copySeedAsset(uploadDir, 'big-buck-bunny.mp4', 'video');
@@ -279,6 +279,126 @@ export class SeedCommand extends CommandRunner {
         lockType: null,
         lockConfig: null,
         unlockedAt: addDays(today, -30),
+        openedAt: addDays(today, -30),
+      });
+
+      // 1b. PAST CAPSULE - Unlocked but NOT opened (user unlocked it but never viewed) - CURRENT MONTH
+      // Calculate a date in current month but in the past
+      const currentMonthDate = new Date(today.getFullYear(), today.getMonth(), Math.max(1, today.getDate() - 5));
+      capsulesData.push({
+        id: randomUUID(),
+        openingDate: formatDate(currentMonthDate),
+        content: JSON.stringify([
+          {
+            type: 'h1',
+            children: [{text: 'Unlocked but Unread 📬'}]
+          },
+          {
+            type: 'p',
+            children: [{text: 'This capsule was unlocked a few days ago but never opened. Sometimes we unlock things without taking the time to truly see what\'s inside.'}]
+          },
+          {
+            type: 'h2',
+            children: [{text: 'A Waiting Message'}]
+          },
+          {
+            type: 'p',
+            children: [{text: 'The content has been accessible for days, but it patiently waits for someone to finally read it. What other opportunities in life are we missing by not following through?'}]
+          },
+          {
+            type: 'blockquote',
+            children: [{text: 'Having access is not the same as engaging with what\'s available.'}]
+          }
+        ]),
+        openingMessage: 'Unlocked a few days ago but still waiting to be read...',
+        isLocked: true, // Still locked
+        lockType: 'code',
+        lockConfig: JSON.stringify({
+          type: 'code',
+          code: '1111', // Code to unlock
+        }),
+        unlockedAt: null, // Not unlocked yet
+        openedAt: null, // Not opened yet
+      });
+
+      // 1c. PAST CAPSULE - Locked with CODE (not unlocked yet)
+      capsulesData.push({
+        id: randomUUID(),
+        openingDate: formatDate(addDays(today, -15)),
+        content: JSON.stringify([
+          {
+            type: 'h1',
+            children: [{text: 'The Locked Archive 🔐'}]
+          },
+          {
+            type: 'p',
+            children: [{text: 'This capsule has been available for 15 days but remains locked. The code protects valuable memories waiting to be discovered.'}]
+          },
+          {
+            type: 'h2',
+            children: [{text: 'Hint'}]
+          },
+          {
+            type: 'p',
+            children: [{text: 'The code is the year this project was created: 2024'}]
+          },
+          {
+            type: 'h2',
+            children: [{text: 'What Awaits'}]
+          },
+          {
+            type: 'p',
+            children: [{text: 'Behind this lock is a collection of thoughts and reflections from the past. Once unlocked, you\'ll gain access to memories that have been preserved in time.'}]
+          }
+        ]),
+        openingMessage: 'Available for 15 days - Still locked and waiting...',
+        isLocked: true,
+        lockType: 'code',
+        lockConfig: JSON.stringify({
+          type: 'code',
+          code: '2024',
+          attempts: 3,
+        }),
+        unlockedAt: null,
+        openedAt: null,
+      });
+
+      // 1d. PAST CAPSULE - Was locked, unlocked but not opened
+      const pastImagePath = await copySeedAsset(uploadDir, 'forest-trail.jpg', 'image');
+      capsulesData.push({
+        id: randomUUID(),
+        openingDate: formatDate(addDays(today, -10)),
+        content: JSON.stringify([
+          {
+            type: 'h1',
+            children: [{text: 'Forgotten Discovery 🗝️'}]
+          },
+          {
+            type: 'img',
+            url: pastImagePath,
+            alt: 'Forest Trail - A serene path through the forest',
+            width: 1920,
+            height: 1280,
+            children: []
+          },
+          {
+            type: 'h2',
+            children: [{text: 'Unlocked but Unexplored'}]
+          },
+          {
+            type: 'p',
+            children: [{text: 'Someone took the time to unlock this capsule 10 days ago, but the content remains unseen. The lock was opened, but the door was never crossed.'}]
+          }
+        ]),
+        openingMessage: 'Unlocked 10 days ago - Content still waiting to be discovered',
+        isLocked: false, // Fixed: unlocked capsules should have isLocked:false
+        lockType: 'code', // Keep track of original lock type
+        lockConfig: JSON.stringify({
+          type: 'code',
+          code: '5678', // Code that was used to unlock
+        }),
+        unlockedAt: addDays(today, -10), // Unlocked
+        openedAt: null, // But never opened
       });
 
       // 2. IMAGE CONTENT - Locked with CODE (simple)
@@ -502,6 +622,7 @@ export class SeedCommand extends CommandRunner {
         lockType: null,
         lockConfig: null,
         unlockedAt: addDays(today, -7),
+        openedAt: addDays(today, -7),
       });
 
       // 10. IMAGE CONTENT - Opening today, no lock
@@ -585,6 +706,11 @@ export class SeedCommand extends CommandRunner {
       // Insert all capsules
       await this.databaseService.db.insert(schema.capsule).values(capsulesData);
       console.log(`✅ Created ${String(capsulesData.length)} global capsules with diverse content and locks`);
+      console.log(`📊 Capsule States:`);
+      console.log(`   - Past capsules (opened): ${String(capsulesData.filter(c => c.openedAt && new Date(c.openingDate) < today).length)}`);
+      console.log(`   - Past capsules (unlocked but not opened): ${String(capsulesData.filter(c => c.unlockedAt && !c.openedAt && new Date(c.openingDate) < today).length)}`);
+      console.log(`   - Past capsules (still locked): ${String(capsulesData.filter(c => c.isLocked && !c.unlockedAt && new Date(c.openingDate) < today).length)}`);
+      console.log(`   - Future capsules: ${String(capsulesData.filter(c => new Date(c.openingDate) > today).length)}`);
 
       // Record that this seed version has been applied
       await this.databaseService.db.insert(schema.seedVersion).values({

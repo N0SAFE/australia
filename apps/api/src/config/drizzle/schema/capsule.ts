@@ -14,6 +14,7 @@ export const capsule = pgTable("capsule", {
   lockType: text("lock_type"), // code, voice, device_shake, api, etc.
   lockConfig: jsonb("lock_config"), // Configuration for the lock (code value, voice phrase, API endpoint, etc.)
   unlockedAt: timestamp("unlocked_at"), // When the capsule was unlocked
+  openedAt: timestamp("opened_at"), // When the capsule was first viewed/opened
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")

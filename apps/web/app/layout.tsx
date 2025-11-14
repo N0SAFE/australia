@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import localFont from 'next/font/local';
-import { ReactNode } from 'react';
+import { ReactNode, Suspense } from 'react';
 import { Toaster } from 'react-hot-toast';
 import ReactQueryProviders from '@/utils/providers/ReactQueryProviders';
 
@@ -33,7 +33,10 @@ export default async function RootLayout({
         className={`${PontanoSansFont.variable} ${PinyonScriptFont.variable} antialiased`}
       >
         <ReactQueryProviders>
-        {children}</ReactQueryProviders>
+          <Suspense fallback={<div className="w-full h-dvh flex justify-center items-center">Loading...</div>}>
+            {children}
+          </Suspense>
+        </ReactQueryProviders>
         <Toaster />
       </body>
     </html>

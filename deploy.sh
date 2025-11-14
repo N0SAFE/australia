@@ -377,6 +377,123 @@ else
     print_info "You can run ./setup-ssl.sh later to obtain certificates"
 fi
 
+# Configure PostgreSQL for Docker network access
+print_header "🐘 Configuring PostgreSQL for Docker Network Access"
+
+if command -v psql &> /dev/null; then
+    print_info "PostgreSQL found. Configuring network access for Docker containers..."
+    
+    # Docker containers access host PostgreSQL via the Docker bridge gateway IP
+    # The gateway IP is stable (typically 172.x.0.1) and acts as the "host" from container perspective
+    # We add common Docker network ranges to handle any bridge network Docker might create
+    
+    print_info "Configuring PostgreSQL to accept connections from Docker bridge networks..."
+    print_info "Containers connect from IPs within Docker subnets (e.g., 172.18.0.2, 172.18.0.3)"
+    
+    # Docker Network Subnets
+    # Containers get IPs from these subnets (e.g., 172.18.0.2)
+    # We must allow the ENTIRE subnet, not just gateway IPs
+    
+    declare -a DOCKER_SUBNETS=()
+    
+    # Add standard Docker bridge network ranges (172.16-31.0.0/16)
+    # Docker uses 172.17.0.0/16 by default and allocates custom bridges sequentially
+    for i in {16..31}; do
+        DOCKER_SUBNETS+=("172.${i}.0.0/16")
+    done
+    
+    # Check for custom Docker network ranges in daemon.json
+    DOCKER_CONFIG="/etc/docker/daemon.json"
+    if [ -f "$DOCKER_CONFIG" ]; then
+        print_info "Checking Docker daemon.json for custom network ranges..."
+        
+        # Extract default-address-pools if configured
+        # Example: "default-address-pools": [{"base": "10.10.0.0/16", "size": 24}]
+        CUSTOM_BASES=$(grep -oP '"base"\s*:\s*"\K[0-9.]+/[0-9]+' "$DOCKER_CONFIG" 2>/dev/null || echo "")
+        
+        if [ ! -z "$CUSTOM_BASES" ]; then
+            while IFS= read -r BASE; do
+                DOCKER_SUBNETS+=("$BASE")
+                print_info "Found custom Docker network: $BASE"
+            done <<< "$CUSTOM_BASES"
+        fi
+    fi
+    
+    print_info "Total Docker subnets to configure: ${#DOCKER_SUBNETS[@]}"
+    
+    # Configure postgresql.conf to listen on Docker bridge interfaces
+    PG_CONF="/etc/postgresql/16/main/postgresql.conf"
+    if [ -f "$PG_CONF" ]; then
+        print_info "Configuring PostgreSQL to listen on all interfaces..."
+        
+        # Check if already configured
+        if grep -q "^listen_addresses = '\*'" "$PG_CONF"; then
+            print_info "✓ PostgreSQL already listening on all interfaces"
+        else
+            # Backup and update
+            cp "$PG_CONF" "$PG_CONF.backup.$(date +%Y%m%d_%H%M%S)"
+            
+            # Update listen_addresses to accept connections from all interfaces
+            # This is safe because pg_hba.conf controls authentication
+            sed -i "s/^#listen_addresses = .*/listen_addresses = '*'/" "$PG_CONF"
+            sed -i "s/^listen_addresses = 'localhost'/listen_addresses = '*'/" "$PG_CONF"
+            
+            print_success "✓ Updated listen_addresses to '*'"
+            NEED_RESTART=true
+        fi
+    fi
+    
+    # Configure pg_hba.conf
+    PG_HBA_CONF="/etc/postgresql/16/main/pg_hba.conf"
+    
+    if [ -f "$PG_HBA_CONF" ]; then
+        print_info "Updating $PG_HBA_CONF..."
+        
+        for SUBNET in "${DOCKER_SUBNETS[@]}"; do
+            # Check if subnet already exists in pg_hba.conf
+            if grep -q "host.*all.*all.*$SUBNET" "$PG_HBA_CONF"; then
+                print_info "✓ $SUBNET already configured"
+            else
+                print_info "Adding subnet $SUBNET to pg_hba.conf..."
+                # Use md5 authentication (password-based, no SSL required)
+                # This is safe because Docker networks are isolated from external access
+                echo "host    all             all             $SUBNET           md5" >> "$PG_HBA_CONF"
+                print_success "✓ Added $SUBNET to PostgreSQL allowed connections"
+            fi
+        done
+        
+        # Restart or reload PostgreSQL based on what changed
+        if systemctl is-active --quiet postgresql; then
+            if [ "${NEED_RESTART:-false}" = "true" ]; then
+                print_info "Restarting PostgreSQL to apply listen_addresses change..."
+                systemctl restart postgresql
+                print_success "PostgreSQL restarted"
+            else
+                systemctl reload postgresql
+                print_success "PostgreSQL configuration reloaded"
+            fi
+        else
+            print_warning "PostgreSQL service is not running. Configuration will apply on next start."
+        fi
+        
+        print_info ""
+        print_info "📝 PostgreSQL Network Configuration:"
+        print_info "   ✓ Docker bridge networks (172.16-31.0.0/16) are allowed"
+        print_info "   ✓ Containers connect via: host.docker.internal → PostgreSQL"
+        print_info "   ✓ Authentication: MD5 password (no SSL required for Docker networks)"
+        print_info "   ✓ Docker networks are isolated from external access"
+        print_info ""
+        print_info "   Connection string: postgresql://user:pass@host.docker.internal:5432/db"
+        print_info ""
+    else
+        print_warning "PostgreSQL configuration file not found at $PG_HBA_CONF"
+        print_info "If using a different PostgreSQL version, manually add Docker network ranges to pg_hba.conf"
+    fi
+else
+    print_info "PostgreSQL not found on host. Skipping network configuration."
+    print_info "If using external PostgreSQL, ensure Docker network has access."
+fi
+
 # Build and start Docker containers
 print_header "🐳 Building and Starting Docker Containers"
 
@@ -386,6 +503,7 @@ cd "$PROJECT_DIR"
 # Run docker-compose as the actual user (with sudo privileges for docker)
 if su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && docker-compose -f docker/compose/docker-compose.prod.yml --env-file .env.prod up -d --build"; then
     print_success "Docker containers started successfully"
+    print_info "PostgreSQL is accessible via Docker bridge gateway (already configured)"
 else
     print_error "Failed to start Docker containers"
     print_info "Check logs with: docker-compose -f docker/compose/docker-compose.prod.yml logs"

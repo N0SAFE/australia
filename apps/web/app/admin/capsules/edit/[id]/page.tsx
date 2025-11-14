@@ -1,3 +1,4 @@
+import { connection } from 'next/server';
 import { Capsule } from '@/types/capsule';
 import { AdminCapsuleDetailsPage } from '@/components/admin-capsule-details';
 
@@ -8,6 +9,7 @@ export default async function AdminUserDetails({
     id: string;
   }>
 }) {
+  await connection();
   const { id } = await params;
 
   const capsule: Capsule = {

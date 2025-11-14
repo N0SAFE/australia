@@ -1,3 +1,4 @@
+import { connection } from 'next/server'
 import { notFound } from 'next/navigation'
 import { getCapsule } from '@/hooks/useCapsules'
 import { AdminCapsuleDetailsPage } from '@/components/admin-capsule-details'
@@ -7,6 +8,7 @@ interface PageProps {
 }
 
 export default async function AdminCapsuleDetails({ params }: PageProps) {
+  await connection()
   const { id } = await params
   
   try {

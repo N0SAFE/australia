@@ -15,6 +15,7 @@ import * as UserAppLayoutHomeRoute from "@/app/(user)/(app)/(layout)/home/page.i
 import * as UserLoginRoute from "@/app/(user)/login/page.info";
 import * as PresentationRoute from "@/app/(user)/presentation/page.info";
 import * as UserRegisterRoute from "@/app/(user)/register/page.info";
+import * as UnlockRoute from "@/app/(user)/unlock/page.info";
 import * as AdminRoute from "@/app/admin/page.info";
 import * as AdminCapsulesRoute from "@/app/admin/capsules/page.info";
 import * as AdminCapsulesIdRoute from "@/app/admin/capsules/[id]/page.info";
@@ -35,7 +36,6 @@ import * as ApiUsersMeRoute from "@/app/api/users/me/route.info";
 import * as InviteCodeRoute from "@/app/invite/[code]/page.info";
 import * as MiddlewareErrorEnvRoute from "@/app/middleware/error/env/page.info";
 import * as MiddlewareErrorHealthCheckRoute from "@/app/middleware/error/healthCheck/page.info";
-import * as UnlockRoute from "@/app/unlock/page.info";
 
 export const User = makeRoute(
   "/(user)",
@@ -98,6 +98,13 @@ export const UserRegister = makeRoute(
   {
     ...defaultInfo,
     ...UserRegisterRoute.Route
+  }
+);
+export const Unlock = makeRoute(
+  "/(user)/unlock",
+  {
+    ...defaultInfo,
+    ...UnlockRoute.Route
   }
 );
 export const Admin = makeRoute(
@@ -175,13 +182,6 @@ export const MiddlewareErrorHealthCheck = makeRoute(
   {
     ...defaultInfo,
     ...MiddlewareErrorHealthCheckRoute.Route
-  }
-);
-export const Unlock = makeRoute(
-  "/unlock",
-  {
-    ...defaultInfo,
-    ...UnlockRoute.Route
   }
 );
 

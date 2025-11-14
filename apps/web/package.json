@@ -14,7 +14,7 @@
     "analyze": "cross-env ANALYZE=true bun --bun build",
     "build": "bun --bun scripts/build.ts",
     "build:static-only": "bun x next-sitemap",
-    "compile": "next build --experimental-build-mode=compile --turbopack",
+    "compile": "next build --experimental-build-mode=compile --turbopack --debug-prerender",
     "local:build": "bun x @repo/env mock web --command 'bun run build'",
     "local:compile": "bun x @repo/env mock web --command 'bun run compile'",
     "generate": "bun --bun openapi && next-sitemap",

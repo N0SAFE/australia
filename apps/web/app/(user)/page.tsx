@@ -1,6 +1,6 @@
-import { Logo } from '@/components/svg/logo';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
+import { Logo } from "@/components/svg/logo";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default async function Home() {
   return <div className="w-full h-dvh flex flex-col justify-between items-center">

@@ -347,5 +347,6 @@ export async function getCapsulesByMonth(month: string) {
  * Returns capsules from past week + all locked + all unread from past
  */
 export async function getRecentCapsules() {
-  return orpc.capsule.getRecent.call({})
+  const result = await orpc.capsule.getRecent.call({})
+  return result?.capsules ?? []
 }

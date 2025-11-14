@@ -218,6 +218,7 @@
         "dev:api:run": "envcli docker exec -it ${COMPOSE_PROJECT_NAME:-nextjs-directus}-api-dev /bin/sh",
         "dev:web:run": "envcli docker exec -it ${COMPOSE_PROJECT_NAME:-nextjs-directus}-web-dev /bin/sh",
         "dev:local": "turbo dev",
+        "test:build": "bun packages/env/src/cli.ts mock --command 'bun run build'",
         "build": "turbo build",
         "compile": "bun packages/env/src/cli.ts mock --command 'turbo compile'",
         "local:build": "bun packages/env/src/cli.ts mock --command 'turbo build'",

@@ -2,8 +2,11 @@ import { getCapsulesByMonth } from '@/hooks/useCapsules';
 import { CapsuleCard } from '@/components/capsule';
 import { Capsule } from '@/types/capsule';
 import dayjs from 'dayjs';
+import { connection } from 'next/server'
 
 export default async function Capsules() {
+  // Force dynamic rendering to allow dayjs() usage
+  await connection();
   const currentMonth = dayjs().format('YYYY-MM');
   
   let capsules: Capsule[] = [];

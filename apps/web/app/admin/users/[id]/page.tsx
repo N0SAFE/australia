@@ -1,3 +1,4 @@
+import { connection } from 'next/server'
 import { notFound } from 'next/navigation'
 import { getUser } from '@/hooks/useUsers'
 import { AdminUserDetailsPage } from '@/components/admin-user-details'
@@ -7,6 +8,7 @@ interface PageProps {
 }
 
 export default async function AdminUserDetails({ params }: PageProps) {
+  await connection()
   const { id } = await params
   
   try {

@@ -11,6 +11,7 @@ export const mockEnv = {
         DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/dev',
         API_PORT: '3001',
         AUTH_SECRET: 'mock-auth-secret-key-for-development-only-change-in-production',
+        BETTER_AUTH_SECRET: 'mock-auth-secret-key-for-development-only-change-in-production',
         DEV_AUTH_KEY: 'mock-dev-auth-key-for-development-only',
         PASSKEY_RPID: 'localhost',
         PASSKEY_RPNAME: 'NestJS Directus Turborepo Template',

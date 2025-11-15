@@ -17,9 +17,9 @@ import * as ApiCapsulesId from "../app/api/capsules/[id]/route.info";
 
 import * as ApiUsersLogin from "../app/api/users/login/route.info";
 
-import * as ApiUsersMe from "../app/api/users/me/route.info";
-
 import * as ApiUsersId from "../app/api/users/[id]/route.info";
+
+import * as ApiUsersMe from "../app/api/users/me/route.info";
 
 import * as ApiCapsulesDayDay from "../app/api/capsules/day/[day]/route.info";
 
@@ -143,6 +143,24 @@ registry.registerPath({
   },
 });
 registry.registerPath({
+  method: "get",
+  path: "/api/users/{id}",
+  summary: "",
+  request: {
+  params: ApiUsersId.Route.params,
+  },
+  responses: {
+    200: {
+      description: "Success",
+      content: {
+        "application/json": {
+          schema: ApiUsersId.GET.result,
+        },
+      },
+    },
+  },
+});
+registry.registerPath({
   method: "post",
   path: "/api/users/me",
   summary: "",
@@ -163,24 +181,6 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: ApiUsersMe.POST.result,
-        },
-      },
-    },
-  },
-});
-registry.registerPath({
-  method: "get",
-  path: "/api/users/{id}",
-  summary: "",
-  request: {
-  params: ApiUsersId.Route.params,
-  },
-  responses: {
-    200: {
-      description: "Success",
-      content: {
-        "application/json": {
-          schema: ApiUsersId.GET.result,
         },
       },
     },

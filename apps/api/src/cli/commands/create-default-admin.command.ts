@@ -9,7 +9,7 @@ import { apiEnvSchema } from '@repo/env';
 import zod from 'zod/v4';
 
 // Extend the API schema with command-specific environment variables
-const createDefaultAdminEnvSchema = apiEnvSchema.extend({
+const createDefaultAdminEnvSchema = apiEnvSchema.safeExtend({
   DEFAULT_ADMIN_EMAIL: zod.email().min(1, 'DEFAULT_ADMIN_EMAIL is required'),
   DEFAULT_ADMIN_PASSWORD: zod.string().min(1, 'DEFAULT_ADMIN_PASSWORD is required'),
 });

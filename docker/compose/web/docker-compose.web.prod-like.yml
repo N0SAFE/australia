@@ -65,6 +65,8 @@ services:
       - NEXT_PUBLIC_APP_PORT=${NEXT_PUBLIC_APP_PORT:-3000}
 
       # Authentication
+      - AUTH_SECRET=${AUTH_SECRET}
+      - BETTER_AUTH_SECRET=${AUTH_SECRET}
       - DEV_AUTH_KEY=${DEV_AUTH_KEY:-dev-auth-key}
     networks:
       - app_network_prod

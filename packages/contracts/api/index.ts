@@ -1,5 +1,5 @@
 import { oc } from "@orpc/contract";
-import { userContract, healthContract, capsuleContract, storageContract, invitationContract } from "./modules/index";
+import { userContract, healthContract, capsuleContract, storageContract, invitationContract, presentationContract } from "./modules/index";
 
 // Main app contract that combines all feature contracts
 export const appContract = oc.router({
@@ -8,6 +8,7 @@ export const appContract = oc.router({
   capsule: capsuleContract,
   storage: storageContract,
   invitation: invitationContract,
+  presentation: presentationContract,
 });
 
 export type AppContract = typeof appContract;

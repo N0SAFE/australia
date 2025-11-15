@@ -28,9 +28,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
-import { Eye, Pencil, Search, Plus, Copy, CheckCircle2 } from 'lucide-react';
+import { Eye, Pencil, Search, Plus, Copy, CheckCircle2, MoreHorizontal, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@repo/ui/components/shadcn/dropdown-menu';
 import { authClient } from '@/lib/auth';
 import { toast } from 'sonner';
 import { orpc } from '@/lib/orpc';
@@ -200,7 +206,20 @@ const columns = [
   }),
   columnHelper.accessor('name', {
     header: 'Name',
-    cell: info => <span className="font-medium">{info.getValue()}</span>,
+    cell: info => {
+      const status = info.row.original.invitationStatus;
+      const isPending = status === 'pending' || status === 'expired';
+      const name = info.getValue();
+      
+      return (
+        <span className="font-medium">
+          {name}
+          {isPending && (
+            <span className="ml-2 text-xs text-muted-foreground italic">(Invitation)</span>
+          )}
+        </span>
+      );
+    },
     enableSorting: true,
   }),
   columnHelper.accessor('email', {
@@ -228,6 +247,57 @@ const columns = [
           </span>
         })}
       </span>;
+    },
+    enableSorting: false,
+  }),
+  columnHelper.accessor('invitationStatus', {
+    header: 'Invitation Status',
+    cell: info => {
+      const status = info.getValue();
+      const token = info.row.original.invitationToken;
+      
+      const copyInviteLink = async () => {
+        if (!token) return;
+        const inviteUrl = `${window.location.origin}/invite/${token}`;
+        try {
+          await navigator.clipboard.writeText(inviteUrl);
+          toast.success('Invitation link copied to clipboard');
+        } catch (error) {
+          toast.error('Failed to copy to clipboard');
+        }
+      };
+
+      if (!status) {
+        return <span className="text-muted-foreground italic text-xs">Not invited</span>;
+      }
+
+      return (
+        <div className="flex items-center gap-2">
+          <span className={cn(
+            "py-1 px-2.5 text-xs rounded-md font-semibold",
+            status === 'accepted' && 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200',
+            status === 'pending' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200',
+            status === 'expired' && 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-200',
+          )}>
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </span>
+          {status === 'pending' && token && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={copyInviteLink} className="gap-2">
+                  <ExternalLink className="h-4 w-4" />
+                  Show invitation link
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      );
     },
     enableSorting: false,
   }),
@@ -271,6 +341,17 @@ const RowActions = ({
 }: {
   row: Row<User>,
 }) => {
+  const status = row.original.invitationStatus;
+  const isPendingInvitation = (status === 'pending' || status === 'expired') && !row.original.emailVerified;
+  
+  if (isPendingInvitation) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground italic">No actions available</span>
+      </div>
+    );
+  }
+  
   return (
     <div className="flex items-center gap-2">
       <Link

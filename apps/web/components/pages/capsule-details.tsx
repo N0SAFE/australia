@@ -9,6 +9,27 @@ import { useSession } from '@/lib/auth';
 import { Shield } from 'lucide-react';
 import { useMarkCapsuleAsOpened } from '@/hooks/useCapsules';
 
+/**
+ * CapsuleContent - Pure content display without interactions
+ * Use this for admin previews or embedded displays
+ */
+export function CapsuleContent({
+  data,
+}: {
+  data: Capsule;
+}) {
+  return (
+    <div className="m-5">
+      <ContentRenderer capsule={data} />
+    </div>
+  );
+}
+
+/**
+ * CapsuleDetails - Full interactive capsule display
+ * Includes opening dialog, lock/unlock modals, admin features
+ * Use this for public capsule pages
+ */
 export function CapsuleDetails({
   data,
 }: {

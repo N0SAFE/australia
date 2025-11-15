@@ -36,10 +36,6 @@ export function createORPCClientWithCookies() {
                     try {
                         const nh = await import('next/headers')
                         headers.cookie = (await nh.cookies()).toString()
-                        console.log(
-                            'ORPC Server-side Request - setting cookies',
-                            headers.cookie
-                        )
                     } catch {
                         console.log(
                             'Warning: next/headers could not be imported. Are you running in a non-Next.js environment?'

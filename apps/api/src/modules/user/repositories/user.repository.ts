@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { DatabaseService } from "../../../core/modules/database/services/database.service";
-import { user } from "@/config/drizzle/schema/auth";
-import { eq, desc, asc, like, count, and, SQL } from "drizzle-orm";
+import { user, invitation } from "@/config/drizzle/schema/auth";
+import { eq, desc, asc, like, count, and, SQL, sql } from "drizzle-orm";
 import { userCreateInput, userUpdateInput, userListInput, userFindByIdOutput } from "@repo/api-contracts";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -85,24 +85,30 @@ export class UserRepository {
 
     /**
      * Find all users with pagination and filtering
+     * This includes both:
+     * 1. Users who have accounts (with or without invitations)
+     * 2. Pending invitations for users who haven't created accounts yet
      */
     async findMany(input: GetUsersInput) {
-        // Build the where conditions
-        const conditions: SQL[] = [];
+        // Build the where conditions for users
+        const userConditions: SQL[] = [];
+        const invitationConditions: SQL[] = [];
 
         if (input.filter?.name) {
-            conditions.push(like(user.name, `%${input.filter.name}%`));
+            userConditions.push(like(user.name, `%${input.filter.name}%`));
         }
 
         if (input.filter?.email) {
-            conditions.push(like(user.email, `%${input.filter.email}%`));
+            userConditions.push(like(user.email, `%${input.filter.email}%`));
+            invitationConditions.push(like(invitation.email, `%${input.filter.email}%`));
         }
 
         if (input.filter?.id) {
-            conditions.push(eq(user.id, input.filter.id));
+            userConditions.push(eq(user.id, input.filter.id));
         }
 
-        const whereCondition = conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : and(...conditions)) : undefined;
+        const userWhereCondition = userConditions.length > 0 ? (userConditions.length === 1 ? userConditions[0] : and(...userConditions)) : undefined;
+        const invitationWhereCondition = invitationConditions.length > 0 ? (invitationConditions.length === 1 ? invitationConditions[0] : and(...invitationConditions)) : undefined;
 
         // Build the order by condition
         let orderByCondition: SQL;
@@ -138,20 +144,96 @@ export class UserRepository {
             }
         }
 
-        // Execute the main query with all conditions
-        const users = whereCondition
-            ? await this.databaseService.db.select().from(user).where(whereCondition).orderBy(orderByCondition).limit(input.pagination.limit).offset(input.pagination.offset)
-            : await this.databaseService.db.select().from(user).orderBy(orderByCondition).limit(input.pagination.limit).offset(input.pagination.offset);
+        // First, get all existing users with their invitation status
+        const existingUsersQuery = this.databaseService.db
+            .select({
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                emailVerified: user.emailVerified,
+                image: user.image,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+                invitationStatus: sql<string | null>`
+                    CASE 
+                        WHEN ${invitation.usedAt} IS NOT NULL THEN 'accepted'
+                        WHEN ${invitation.expiresAt} < NOW() THEN 'expired'
+                        WHEN ${invitation.token} IS NOT NULL THEN 'pending'
+                        ELSE NULL
+                    END
+                `.as('invitation_status'),
+                invitationToken: invitation.token,
+            })
+            .from(user)
+            .leftJoin(invitation, eq(user.email, invitation.email))
+            .orderBy(orderByCondition);
 
-        // Get total count for pagination info
-        const totalResult = whereCondition
-            ? await this.databaseService.db.select({ count: count() }).from(user).where(whereCondition)
-            : await this.databaseService.db.select({ count: count() }).from(user);
+        const existingUsers = userWhereCondition
+            ? await existingUsersQuery.where(userWhereCondition)
+            : await existingUsersQuery;
 
-        const total = totalResult[0]?.count || 0;
+        // Get all invitation emails that have users (to exclude them from pending invitations)
+        const existingUserEmails = new Set(existingUsers.map(u => u.email));
+
+        // Second, get pending invitations for emails that don't have user accounts yet
+        const pendingInvitationsQuery = this.databaseService.db
+            .select({
+                id: invitation.id,
+                email: invitation.email,
+                token: invitation.token,
+                createdAt: invitation.createdAt,
+                expiresAt: invitation.expiresAt,
+                usedAt: invitation.usedAt,
+            })
+            .from(invitation);
+
+        const allInvitations = invitationWhereCondition
+            ? await pendingInvitationsQuery.where(invitationWhereCondition)
+            : await pendingInvitationsQuery;
+
+        // Filter out invitations for emails that already have user accounts
+        const pendingInvitations = allInvitations
+            .filter(inv => !existingUserEmails.has(inv.email))
+            .map(inv => {
+                const now = new Date();
+                let status: 'pending' | 'expired' | 'accepted' = 'pending';
+                
+                if (inv.usedAt) {
+                    status = 'accepted';
+                } else if (inv.expiresAt < now) {
+                    status = 'expired';
+                }
+
+                return {
+                    id: inv.id, // Use invitation ID for pending invitations
+                    name: inv.email.split('@')[0], // Generate name from email
+                    email: inv.email,
+                    emailVerified: false,
+                    image: null,
+                    createdAt: inv.createdAt,
+                    updatedAt: inv.createdAt,
+                    invitationStatus: status,
+                    invitationToken: inv.token,
+                };
+            });
+
+        // Combine existing users and pending invitations
+        const allRecords = [...existingUsers, ...pendingInvitations];
+
+        // Apply pagination
+        const paginatedRecords = allRecords.slice(
+            input.pagination.offset,
+            input.pagination.offset + input.pagination.limit
+        );
+
+        const total = allRecords.length;
 
         return {
-            users: this.transformUsers(users),
+            users: paginatedRecords.map(u => ({
+                ...this.transformUser(u),
+                invitationStatus: u.invitationStatus,
+                invitationToken: u.invitationToken,
+            })),
             meta: {
                 pagination: {
                     total,

@@ -14,7 +14,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { authClient } from '@/lib/auth/index';
 import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { UserAppLayoutHome } from '@/routes';
 import {
     Form,
     FormControl,
@@ -26,6 +27,8 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirectUrl');
   
   const form = useForm<z.infer<typeof loginSchema>>({
         resolver: zodResolver(loginSchema),
@@ -47,7 +50,7 @@ export default function LoginPage() {
                 toast.error(error.message ?? 'Authentication failed')
             } else {
               toast.success('Connexion réussie');
-              router.push('/home');
+              router.push(redirectUrl || UserAppLayoutHome({}));
             }
         }
     })

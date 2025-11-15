@@ -31,14 +31,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import Link from 'next/link';
 import { Eye, Pencil, Search, Filter, Calendar, MessageSquare, Lock, Unlock, Sparkles } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
@@ -48,6 +48,7 @@ import { PlateEditor } from '@/components/blocks/editor-00/plate-editor';
 import type { Value } from 'platejs';
 import { Separator } from '@/components/ui/separator';
 import { Toggle } from '@/components/ui/toggle';
+import { CapsuleContent } from '@/components/pages/capsule-details';
 
 // Create Capsule Dialog Component
 function CreateCapsuleDialog() {
@@ -98,28 +99,28 @@ function CreateCapsuleDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
         <Button variant="default" size="sm" className="gap-2 shadow-sm hover:shadow-md transition-shadow">
           <Plus className="h-4 w-4" />
           Create Capsule
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-3xl max-h-[95vh] p-0 gap-0">
+      </SheetTrigger>
+      <SheetContent side="right" className="w-full sm:w-[90vw] sm:max-w-4xl p-0 gap-0 overflow-y-auto">
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 space-y-2 sm:space-y-3">
+          <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 space-y-2 sm:space-y-3">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10">
                 <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
               <div className="flex-1">
-                <DialogTitle className="text-lg sm:text-2xl">Create New Time Capsule</DialogTitle>
-                <DialogDescription className="text-xs sm:text-sm mt-0.5 sm:mt-1">
+                <SheetTitle className="text-lg sm:text-2xl">Create New Time Capsule</SheetTitle>
+                <SheetDescription className="text-xs sm:text-sm mt-0.5 sm:mt-1">
                   Preserve a moment in time with rich content that will be revealed later.
-                </DialogDescription>
+                </SheetDescription>
               </div>
             </div>
-          </DialogHeader>
+          </SheetHeader>
           
           <Separator />
           
@@ -263,7 +264,7 @@ function CreateCapsuleDialog() {
 
           <Separator />
           
-          <DialogFooter className="px-4 py-3 sm:px-6 sm:py-4 bg-muted/30">
+          <SheetFooter className="px-4 py-3 sm:px-6 sm:py-4 bg-muted/30">
             <div className="flex w-full gap-2 sm:gap-3 sm:justify-end">
               <Button
                 type="button"
@@ -292,10 +293,10 @@ function CreateCapsuleDialog() {
                 )}
               </Button>
             </div>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -383,43 +384,25 @@ const RowActions = ({
 }: {
   row: Row<Capsule>,
 }) => {
-  const content = row.getValue('content') as string;
-  
-  // Parse the Plate.js content
-  let editorValue: Value;
-  try {
-    editorValue = JSON.parse(content);
-  } catch (e) {
-    editorValue = [{ type: 'p', children: [{ text: content }] }];
-  }
-  
   return (
     <div className="flex items-center gap-2">
-      <Dialog>
-        <DialogTrigger asChild>
+      <Sheet>
+        <SheetTrigger asChild>
           <Button variant="outline" size="sm" className="h-8 px-2">
             <Eye className="h-3.5 w-3.5 mr-1" />
             Preview
           </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span>Capsule Content</span>
-            </DialogTitle>
-            <DialogDescription>
+        </SheetTrigger>
+        <SheetContent side="right" className="w-full sm:w-[90vw] sm:max-w-4xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Capsule Preview</SheetTitle>
+            <SheetDescription>
               Opening: {new Date(row.original.openingDate).toLocaleDateString()}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 border rounded-md">
-            <PlateEditor
-              value={editorValue}
-              readOnly={true}
-              placeholder=""
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+            </SheetDescription>
+          </SheetHeader>
+          <CapsuleContent data={row.original} />
+        </SheetContent>
+      </Sheet>
       <Link
         href={`/admin/capsules/${row.getValue('id')}`}
         className="p-2 hover:bg-accent rounded-md transition-colors"

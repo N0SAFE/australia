@@ -44,28 +44,10 @@ const withFirstLoad: MiddlewareFactory = (next: NextProxy) => {
             return next(request, _next)
         }
 
-        // If user is accessing admin pages, they automatically bypass the presentation
-        if (pathname.startsWith('/admin')) {
-            debugFirstLoad('Admin path detected, marking presentation as seen')
-            
-            // Check if the cookie is already set to avoid unnecessary response modification
-            const hasSeenPresentation = request.cookies.get('presentation_seen')?.value === 'true'
-            
-            if (!hasSeenPresentation) {
-                // Create a response with the cookie set
-                const response = NextResponse.next()
-                response.cookies.set('presentation_seen', 'true', { 
-                    path: '/', 
-                    maxAge: 31536000 // 1 year
-                })
-                return response
-            }
-            
-            return next(request, _next)
-        }
-
         // Check if user is authenticated
         const sessionCookie = getSessionCookie(request)
+        
+        console.log('Session cookie:', sessionCookie)
         
         if (!sessionCookie) {
             debugFirstLoad('No session, skipping first load check')
@@ -76,7 +58,9 @@ const withFirstLoad: MiddlewareFactory = (next: NextProxy) => {
         let session: Session | null = null
         try {
             session = await getCookieCache<Session>(request)
+            console.log('session: ', session)
         } catch (error) {
+            console.log('session access error:', error)
             debugFirstLoad('Error getting session cache:', error)
             return next(request, _next)
         }

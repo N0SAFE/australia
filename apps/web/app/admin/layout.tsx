@@ -9,7 +9,7 @@ export default function AdminLayout({
 }) {
   return <SidebarProvider>
     <AdminNavbar />
-    <div className="w-full ">
+    <div className="w-full overflow-x-hidden">
       <div className="w-full h-fit p-3">
         <SidebarTrigger iconClassName="size-6 text-muted-foreground" />
       </div>

@@ -21,7 +21,7 @@ const debugAuthError = console.log
 const env = validateEnvSafe(process.env).data
 
 const adminRegexpAndChildren = /^\/admin(\/.*)?$/
-const userRegexpAndChildren = /^(?!\/($|login(\/.*)?$|register(\/.*)?$|admin(\/.*)?$|presentation$|unlock$))\/.*$/
+const userRegexpAndChildren = /^(?!\/($|login(\/.*)?$|register(\/.*)?$|admin(\/.*)?$|presentation$|unlock$|invite$))\/.*$/
 
 const withAuth: MiddlewareFactory = (next: NextProxy) => {
     if (!env) {
@@ -57,7 +57,7 @@ const withAuth: MiddlewareFactory = (next: NextProxy) => {
             
             const s = await getCookieCache<Session>(request)
             
-            console.log(s)
+            console.log("s", s)
             
             debugAuth('Session processed:', {
                 hasSession: !!sessionCookie,

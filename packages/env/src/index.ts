@@ -37,6 +37,7 @@ export const apiEnvSchema = zod.object({
     
     // Authentication
     AUTH_SECRET: zod.string().min(1, 'AUTH_SECRET is required'),
+    BETTER_AUTH_SECRET: zod.string().min(1, 'BETTER_AUTH_SECRET is required'),
     DEV_AUTH_KEY: zod.string().optional(),
     
     // Passkey
@@ -49,6 +50,14 @@ export const apiEnvSchema = zod.object({
     
     // Shared
     ...sharedEnvVars,
+}).refine((data) => {
+    if (data.BETTER_AUTH_SECRET && data.BETTER_AUTH_SECRET !== data.AUTH_SECRET) {
+        return false
+    }
+    return true
+}, {
+    message: 'BETTER_AUTH_SECRET must match AUTH_SECRET when provided',
+    path: ['BETTER_AUTH_SECRET'],
 })
 
 /**

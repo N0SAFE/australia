@@ -21,11 +21,14 @@ import { AuthGuard } from "./core/modules/auth/guards/auth.guard";
 import { RoleGuard } from "./core/modules/auth/guards/role.guard";
 import { REQUEST } from '@nestjs/core'
 import { StorageModule } from "./modules/storage/storage.module";
+import { FileStorageModule } from "./core/modules/file-storage/file-storage.module";
+import { PresentationModule } from "./modules/presentation/presentation.module";
 
 @Module({
   imports: [
     EnvModule,
     DatabaseModule,
+    FileStorageModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, EnvModule],
       useFactory: createBetterAuth,
@@ -37,6 +40,7 @@ import { StorageModule } from "./modules/storage/storage.module";
     CapsuleModule,
     InvitationModule,
     StorageModule,
+    PresentationModule,
     ORPCModule.forRootAsync({
       useFactory: (request: Request) => ({
         interceptors: [

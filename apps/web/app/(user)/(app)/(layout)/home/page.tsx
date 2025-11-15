@@ -5,9 +5,8 @@ import { getRecentCapsules } from '@/hooks/useCapsules';
 export default async function Home() {
   let capsules: Capsule[] = [];
   try {
-    const resData = await getRecentCapsules();
-    console.log('Recent capsules:', resData)
-    capsules = resData?.capsules ?? [];
+    const result = await getRecentCapsules();
+    capsules = result?.capsules ?? [];
   } catch (error) {
     console.error('Failed to fetch recent capsules:', error);
     // Return empty array on error

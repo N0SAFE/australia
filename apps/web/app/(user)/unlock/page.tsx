@@ -1,12 +1,15 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Logo } from '@/components/svg/logo'
+import { UserAppLayoutHome } from '@/routes'
 
 export default function UnlockPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectUrl = searchParams.get('redirectUrl')
   const [isDragging, setIsDragging] = useState(false)
   const [dragPosition, setDragPosition] = useState(0)
   const [isUnlocked, setIsUnlocked] = useState(false)
@@ -22,8 +25,8 @@ export default function UnlockPage() {
     // Wait for unlock animation to complete (1 second)
     await new Promise(resolve => setTimeout(resolve, 1000))
     
-    // Redirect to home
-    router.push('/home')
+    // Redirect to redirectUrl or default to home
+    router.push(redirectUrl || UserAppLayoutHome({}))
     router.refresh()
   }
 
@@ -118,7 +121,7 @@ export default function UnlockPage() {
     : 0
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-between p-8 bg-linear-to-b from-pink-200 via-pink-300 to-pink-400">
+    <div className="h-dvh w-full flex flex-col items-center justify-between p-8 bg-linear-to-b from-pink-200 via-pink-300 to-pink-400 overflow-hidden">
       {/* Logo */}
       <Logo className="text-pink-dark mx-auto h-20 w-fit" ></Logo>
 
@@ -130,7 +133,7 @@ export default function UnlockPage() {
       </div>
 
       {/* Bottom Swipe to Unlock */}
-      <div className="pb-12 w-full max-w-md">
+      <div className="pb-12 w-full max-w-md mx-auto">
         <div
           ref={containerRef}
           className="relative w-full bg-white/90 rounded-full p-1 shadow-lg overflow-hidden select-none h-16"

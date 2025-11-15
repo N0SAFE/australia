@@ -10,21 +10,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@repo/ui/components/shadcn/card'
+import { User, UserLogin, UserAppLayoutHome } from '@/routes'
 
 interface InviteAcceptanceClientProps {
-  token: string
+  token: string;
+  redirectUrl?: string;
 }
 
-export function InviteAcceptanceClient({ token }: InviteAcceptanceClientProps) {
+export function InviteAcceptanceClient({ token, redirectUrl }: InviteAcceptanceClientProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isValidating, setIsValidating] = useState(true)
   const [isValidToken, setIsValidToken] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [invitationEmail, setInvitationEmail] = useState("")
   const [formData, setFormData] = useState({
-    name: '',
-    password: '',
-    confirmPassword: '',
+    name: "",
+    password: "",
+    confirmPassword: "",
   })
 
   useEffect(() => {
@@ -37,25 +40,27 @@ export function InviteAcceptanceClient({ token }: InviteAcceptanceClientProps) {
 
     const validateToken = async () => {
       try {
-        setIsValidating(true)
-        const result = await orpc.invitation.check.call({ token })
+        const result = await orpc.invitation.check.call({
+          token,
+        })
 
         if (result.success) {
           setIsValidToken(true)
+          setInvitationEmail(result.email) // Store email for auto-login
           toast.info(`Creating account for: ${result.email}`)
         } else {
-          setIsValidToken(false)
           setValidationError(result.message)
         }
-      } catch (error: unknown) {
-        console.error('Error validating token:', error)
-        setIsValidToken(false)
-        setValidationError('Failed to validate invitation token')
+      } catch (error) {
+        console.error("Token validation error:", error)
+        setValidationError(
+          "Failed to validate invitation token. Please try again."
+        )
       } finally {
         setIsValidating(false)
       }
     }
-
+    
     void validateToken()
   }, [token])
 
@@ -100,10 +105,30 @@ export function InviteAcceptanceClient({ token }: InviteAcceptanceClientProps) {
       })
 
       if (result.success) {
-        toast.success(result.message || 'Account created successfully! Please login with your new credentials.')
-        setTimeout(() => {
-          router.push('/login')
-        }, 1500)
+        toast.success('Account created successfully! Logging you in...')
+        
+        try {
+          // Auto-login the user
+          await authClient.signIn.email({
+            email: invitationEmail,
+            password: formData.password,
+            fetchOptions: {
+              onSuccess: () => {
+                const destination = redirectUrl || UserAppLayoutHome({})
+                router.push(destination)
+              },
+              onError: (ctx) => {
+                console.error('Auto-login failed:', ctx.error)
+                toast.error('Login failed. Please try logging in manually.')
+                router.push(UserLogin({}))
+              }
+            }
+          })
+        } catch (error) {
+          console.error('Auto-login error:', error)
+          toast.error('An error occurred. Please try logging in manually.')
+          router.push(UserLogin({}))
+        }
       } else {
         toast.error(result.message || 'Failed to create account')
       }
@@ -150,7 +175,7 @@ export function InviteAcceptanceClient({ token }: InviteAcceptanceClientProps) {
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => router.push('/')}
+              onClick={() => router.push(User({}))}
             >
               Go to Home
             </Button>
@@ -231,7 +256,7 @@ export function InviteAcceptanceClient({ token }: InviteAcceptanceClientProps) {
               type="button"
               variant="outline"
               className="w-full"
-              onClick={() => router.push('/')}
+              onClick={() => router.push(User({}))}
               disabled={isSubmitting}
             >
               Cancel

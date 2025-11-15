@@ -117,6 +117,8 @@ services:
       - NEXT_PUBLIC_DOC_PORT=${NEXT_PUBLIC_DOC_PORT:-3020}
       
       # Authentication
+      - AUTH_SECRET=${AUTH_SECRET:-fallback-auth-secret}
+      - BETTER_AUTH_SECRET=${AUTH_SECRET:-fallback-auth-secret}
       - NEXT_PUBLIC_DEV_AUTH_KEY=${NEXT_PUBLIC_DEV_AUTH_KEY:-${DEV_AUTH_KEY:-dev-fallback-key}}
       
       # Debug Configuration

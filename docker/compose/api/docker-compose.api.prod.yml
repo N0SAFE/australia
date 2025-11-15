@@ -54,6 +54,7 @@ services:
       
       # Authentication
       - AUTH_SECRET=${AUTH_SECRET}
+      - BETTER_AUTH_SECRET=${AUTH_SECRET}
       - DEV_AUTH_KEY=${DEV_AUTH_KEY}
       
       # Default Admin User

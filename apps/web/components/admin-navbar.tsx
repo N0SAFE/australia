@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import {
-  Users, Image
+  Users, Image, Video
 } from "lucide-react"
 
 import {
@@ -36,6 +36,17 @@ const data = {
         {
           title: "Liste",
           url: "/admin/capsules",
+        },
+      ],
+    },
+    {
+      title: "Presentation",
+      url: "/admin/presentation",
+      icon: Video,
+      items: [
+        {
+          title: "Manage Video",
+          url: "/admin/presentation",
         },
       ],
     },

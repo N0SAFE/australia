@@ -78,7 +78,8 @@ services:
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       
       # Authentication
-      - AUTH_SECRET=${AUTH_SECRET:-auth-fallback-secret}
+      - AUTH_SECRET=${AUTH_SECRET:-fallback-auth-secret}
+      - BETTER_AUTH_SECRET=${AUTH_SECRET:-fallback-auth-secret}
       - DEV_AUTH_KEY=${DEV_AUTH_KEY:-dev-auth-key}
       
       # Uploads

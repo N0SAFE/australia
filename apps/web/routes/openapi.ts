@@ -11,15 +11,15 @@ import * as ApiUsers from "../app/api/users/route.info";
 
 import * as ApiHealth from "../app/api/health/route.info";
 
+import * as ApiCapsulesMonth from "../app/api/capsules/month/route.info";
+
+import * as ApiCapsulesId from "../app/api/capsules/[id]/route.info";
+
 import * as ApiUsersLogin from "../app/api/users/login/route.info";
 
 import * as ApiUsersMe from "../app/api/users/me/route.info";
 
 import * as ApiUsersId from "../app/api/users/[id]/route.info";
-
-import * as ApiCapsulesMonth from "../app/api/capsules/month/route.info";
-
-import * as ApiCapsulesId from "../app/api/capsules/[id]/route.info";
 
 import * as ApiCapsulesDayDay from "../app/api/capsules/day/[day]/route.info";
 
@@ -75,6 +75,42 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: ApiHealth.GET.result,
+        },
+      },
+    },
+  },
+});
+registry.registerPath({
+  method: "get",
+  path: "/api/capsules/month",
+  summary: "",
+  request: {
+  params: ApiCapsulesMonth.Route.params,
+  },
+  responses: {
+    200: {
+      description: "Success",
+      content: {
+        "application/json": {
+          schema: ApiCapsulesMonth.GET.result,
+        },
+      },
+    },
+  },
+});
+registry.registerPath({
+  method: "get",
+  path: "/api/capsules/{id}",
+  summary: "",
+  request: {
+  params: ApiCapsulesId.Route.params,
+  },
+  responses: {
+    200: {
+      description: "Success",
+      content: {
+        "application/json": {
+          schema: ApiCapsulesId.GET.result,
         },
       },
     },
@@ -145,42 +181,6 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: ApiUsersId.GET.result,
-        },
-      },
-    },
-  },
-});
-registry.registerPath({
-  method: "get",
-  path: "/api/capsules/month",
-  summary: "",
-  request: {
-  params: ApiCapsulesMonth.Route.params,
-  },
-  responses: {
-    200: {
-      description: "Success",
-      content: {
-        "application/json": {
-          schema: ApiCapsulesMonth.GET.result,
-        },
-      },
-    },
-  },
-});
-registry.registerPath({
-  method: "get",
-  path: "/api/capsules/{id}",
-  summary: "",
-  request: {
-  params: ApiCapsulesId.Route.params,
-  },
-  responses: {
-    200: {
-      description: "Success",
-      content: {
-        "application/json": {
-          schema: ApiCapsulesId.GET.result,
         },
       },
     },

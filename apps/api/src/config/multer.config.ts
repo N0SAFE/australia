@@ -20,8 +20,17 @@ subdirs.forEach((subdir) => {
 export const multerConfig = {
   storage: diskStorage({
     destination: (req, file, cb) => {
-      // Store all files in the root uploads directory (flat structure)
-      cb(null, uploadsDir);
+      // Determine subdirectory based on mimetype
+      let subdir = 'images';
+      if (file.mimetype.startsWith('video/')) {
+        subdir = 'videos';
+      } else if (file.mimetype.startsWith('audio/')) {
+        subdir = 'audio';
+      }
+      
+      // Store files in appropriate subdirectory
+      const destination = join(uploadsDir, subdir);
+      cb(null, destination);
     },
     filename: (req, file, cb) => {
       const uniqueSuffix = `${Date.now().toString()}-${Math.round(Math.random() * 1e9).toString()}`;

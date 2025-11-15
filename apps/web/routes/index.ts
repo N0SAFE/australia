@@ -13,7 +13,7 @@ import * as UserAppLayoutCapsulesIdRoute from "@/app/(user)/(app)/(layout)/capsu
 import * as UserAppLayoutCapsulesDateDateRoute from "@/app/(user)/(app)/(layout)/capsules/date/[date]/page.info";
 import * as UserAppLayoutHomeRoute from "@/app/(user)/(app)/(layout)/home/page.info";
 import * as UserLoginRoute from "@/app/(user)/login/page.info";
-import * as PresentationRoute from "@/app/(user)/presentation/page.info";
+import * as UserPresentationRoute from "@/app/(user)/presentation/page.info";
 import * as UserRegisterRoute from "@/app/(user)/register/page.info";
 import * as UnlockRoute from "@/app/(user)/unlock/page.info";
 import * as AdminRoute from "@/app/admin/page.info";
@@ -21,6 +21,7 @@ import * as AdminCapsulesRoute from "@/app/admin/capsules/page.info";
 import * as AdminCapsulesIdRoute from "@/app/admin/capsules/[id]/page.info";
 import * as AdminCapsulesIdEditRoute from "@/app/admin/capsules/[id]/edit/page.info";
 import * as AdminCapsulesEditIdRoute from "@/app/admin/capsules/edit/[id]/page.info";
+import * as AdminPresentationRoute from "@/app/admin/presentation/page.info";
 import * as AdminUsersRoute from "@/app/admin/users/page.info";
 import * as AdminUsersIdRoute from "@/app/admin/users/[id]/page.info";
 import * as AdminUsersIdEditRoute from "@/app/admin/users/[id]/edit/page.info";
@@ -86,11 +87,11 @@ export const UserLogin = makeRoute(
     ...UserLoginRoute.Route
   }
 );
-export const Presentation = makeRoute(
+export const UserPresentation = makeRoute(
   "/(user)/presentation",
   {
     ...defaultInfo,
-    ...PresentationRoute.Route
+    ...UserPresentationRoute.Route
   }
 );
 export const UserRegister = makeRoute(
@@ -140,6 +141,13 @@ export const AdminCapsulesEditId = makeRoute(
   {
     ...defaultInfo,
     ...AdminCapsulesEditIdRoute.Route
+  }
+);
+export const AdminPresentation = makeRoute(
+  "/admin/presentation",
+  {
+    ...defaultInfo,
+    ...AdminPresentationRoute.Route
   }
 );
 export const AdminUsers = makeRoute(

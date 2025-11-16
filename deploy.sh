@@ -250,7 +250,7 @@ if [ -f "$PROJECT_DIR/nginx.conf" ]; then
 server {
     listen 80;
     listen [::]:80;
-    server_name the-gossip-club.sebille.net;
+    server_name app.gossip-club.sebille.net;
 
     # Let's Encrypt challenge location
     location /.well-known/acme-challenge/ {
@@ -274,7 +274,7 @@ server {
 server {
     listen 80;
     listen [::]:80;
-    server_name api-the-gossip-club.sebille.net;
+    server_name api.gossip-club.sebille.net;
 
     # Let's Encrypt challenge location
     location /.well-known/acme-challenge/ {
@@ -330,25 +330,25 @@ if [[ "$OBTAIN_SSL" =~ ^[Yy]$ ]]; then
         
         # Obtain certificate for Australia app
         if certbot certonly --webroot -w /var/www/certbot \
-            -d the-gossip-club.sebille.net \
+            -d app.gossip-club.sebille.net \
             --email "$EMAIL" \
             --agree-tos \
             --non-interactive; then
-            print_success "Certificate obtained for the-gossip-club.sebille.net"
+            print_success "Certificate obtained for app.gossip-club.sebille.net"
         else
-            print_warning "Failed to obtain certificate for the-gossip-club.sebille.net"
+            print_warning "Failed to obtain certificate for app.gossip-club.sebille.net"
             print_info "Make sure DNS is properly configured and ports 80/443 are open"
         fi
         
         # Obtain certificate for API
         if certbot certonly --webroot -w /var/www/certbot \
-            -d api-the-gossip-club.sebille.net \
+            -d api.gossip-club.sebille.net \
             --email "$EMAIL" \
             --agree-tos \
             --non-interactive; then
-            print_success "Certificate obtained for api-the-gossip-club.sebille.net"
+            print_success "Certificate obtained for api.gossip-club.sebille.net"
         else
-            print_warning "Failed to obtain certificate for api-the-gossip-club.sebille.net"
+            print_warning "Failed to obtain certificate for api.gossip-club.sebille.net"
             print_info "Make sure DNS is properly configured and ports 80/443 are open"
         fi
         
@@ -555,8 +555,8 @@ echo "  ⚙️  Environment File: $PROJECT_DIR/.env.prod"
 echo ""
 print_info "Services:"
 echo ""
-echo "  🌐 Australia App: https://the-gossip-club.sebille.net"
-echo "  🔌 API: https://api-the-gossip-club.sebille.net"
+echo "  🌐 Australia App: https://app.gossip-club.sebille.net"
+echo "  🔌 API: https://api.gossip-club.sebille.net"
 echo ""
 print_info "Useful Commands:"
 echo ""
@@ -569,16 +569,16 @@ echo ""
 print_warning "Next Steps:"
 echo ""
 echo "  1. Make sure your DNS records are configured:"
-echo "     - the-gossip-club.sebille.net → $(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')"
-echo "     - api-the-gossip-club.sebille.net → $(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')"
+echo "     - app.gossip-club.sebille.net → $(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')"
+echo "     - api.gossip-club.sebille.net → $(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')"
 echo ""
 echo "  2. If you skipped SSL setup, run: sudo ./setup-ssl.sh"
 echo ""
 echo "  3. Review your secrets in: $PROJECT_DIR/.secrets.txt"
 echo ""
 echo "  4. Test your application:"
-echo "     - Open https://the-gossip-club.sebille.net in your browser"
-echo "     - Check API health: https://api-the-gossip-club.sebille.net/health"
+echo "     - Open https://app.gossip-club.sebille.net in your browser"
+echo "     - Check API health: https://api.gossip-club.sebille.net/health"
 echo ""
 print_success "Happy deploying! 🚀"
 echo ""

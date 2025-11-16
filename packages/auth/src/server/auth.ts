@@ -12,15 +12,16 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
     database: unknown,
     env: {
         DEV_AUTH_KEY: string | undefined;
-        PASSKEY_RPID: string;
-        PASSKEY_RPNAME: string;
-        PASSKEY_ORIGIN: string;
+        PASSKEY_RPID?: string | undefined;
+        PASSKEY_RPNAME?: string | undefined;
+        PASSKEY_ORIGIN?: string | undefined;
         NODE_ENV: string;
         BETTER_AUTH_SECRET?: string;
         BASE_URL?: string;
         APP_URL?: string;
         NEXT_PUBLIC_APP_URL?: string;
         TRUSTED_ORIGINS?: string;
+        AUTH_BASE_DOMAIN?: string;
     }
 ) => {
     const dbInstance = database as NodePgDatabase<TSchema>;
@@ -36,6 +37,7 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
         APP_URL,
         NEXT_PUBLIC_APP_URL,
         TRUSTED_ORIGINS,
+        AUTH_BASE_DOMAIN,
     } = env
 
     // Build trusted origins: both public and private web app URLs + additional origins
@@ -59,30 +61,11 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
 
     const isHttps = BASE_URL?.startsWith('https://') ?? false;
 
-    // Extract domain for cookie sharing between API and Web
-    // Handles various domain patterns:
-    // - Simple subdomain: api.domain.com + domain.com -> .domain.com
-    // - Complex subdomain: api-service.domain.com + service.domain.com -> .domain.com
-    // - Different subdomains: api-the-gossip-club.sebille.net + the-gossip-club.sebille.net -> .sebille.net
-    let cookieDomain: string | undefined;
-    if (isHttps && BASE_URL) {
-        try {
-            const url = new URL(BASE_URL);
-            const hostname = url.hostname;
-            const parts = hostname.split('.');
-            
-            // For domains like "api-the-gossip-club.sebille.net", we want ".sebille.net"
-            // For domains like "api.domain.com", we want ".domain.com"
-            // Strategy: Always use the last 2 parts (TLD + domain)
-            if (parts.length >= 2) {
-                // Extract last 2 parts: sebille.net, domain.com, etc.
-                cookieDomain = `.${parts.slice(-2).join('.')}`;
-            }
-            // Don't set domain for localhost (parts.length === 1)
-        } catch (err) {
-            console.warn('Failed to extract cookie domain from BASE_URL:', err);
-        }
-    }
+    // Use explicit AUTH_BASE_DOMAIN if provided, otherwise no domain sharing
+    // AUTH_BASE_DOMAIN should be set to the parent domain (e.g., ".sebille.net")
+    // This allows cookie sharing between subdomains like:
+    // - api-the-gossip-club.sebille.net + the-gossip-club.sebille.net
+    const cookieDomain: string | undefined = isHttps && AUTH_BASE_DOMAIN ? AUTH_BASE_DOMAIN : undefined;
 
     return {
         auth: betterAuth({

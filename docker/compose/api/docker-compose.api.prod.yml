@@ -62,6 +62,7 @@ services:
       # Authentication
       - AUTH_SECRET=${AUTH_SECRET}
       - BETTER_AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_BASE_DOMAIN=${AUTH_BASE_DOMAIN}
       - DEV_AUTH_KEY=${DEV_AUTH_KEY}
       - TRUSTED_ORIGINS=${TRUSTED_ORIGINS}
       

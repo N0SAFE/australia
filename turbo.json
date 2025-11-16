@@ -29,7 +29,8 @@
         "PASSKEY_RPNAME",
         "PASSKEY_ORIGIN",
         "UPLOADS_DIR",
-        "TRUSTED_ORIGINS"
+        "TRUSTED_ORIGINS",
+        "AUTH_BASE_DOMAIN"
     ],
     "tasks": {
         "dev": {

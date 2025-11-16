@@ -381,11 +381,76 @@ else
     print_info "You can run ./setup-ssl.sh later to obtain certificates"
 fi
 
+# Configure PostgreSQL database and user
+print_header "🐘 Configuring PostgreSQL Database and User"
+
+if command -v psql &> /dev/null; then
+    print_info "PostgreSQL found. Setting up database and user..."
+    
+    # Extract database credentials from .env.prod
+    DB_USER=$(grep DATABASE_URL "$PROJECT_DIR/.env.prod" | grep -oP 'postgresql://\K[^:]+')
+    DB_PASSWORD=$(grep DATABASE_URL "$PROJECT_DIR/.env.prod" | grep -oP 'postgresql://[^:]+:\K[^@]+')
+    DB_NAME=$(grep DATABASE_URL "$PROJECT_DIR/.env.prod" | grep -oP '/[^/]+$' | tr -d '/')
+    
+    print_info "Database credentials from .env.prod:"
+    print_info "  User: $DB_USER"
+    print_info "  Database: $DB_NAME"
+    print_info "  Password: [HIDDEN]"
+    
+    # Check if user exists
+    USER_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER';")
+    
+    if [ "$USER_EXISTS" = "1" ]; then
+        print_info "✓ PostgreSQL user '$DB_USER' already exists"
+        
+        # Update password just in case it changed
+        print_info "Updating user password..."
+        sudo -u postgres psql -c "ALTER USER $DB_USER WITH PASSWORD '$DB_PASSWORD';" > /dev/null
+        print_success "✓ Password updated for user '$DB_USER'"
+    else
+        print_info "Creating PostgreSQL user '$DB_USER'..."
+        sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';" > /dev/null
+        print_success "✓ Created PostgreSQL user '$DB_USER'"
+    fi
+    
+    # Grant necessary privileges to the user
+    print_info "Granting privileges to user '$DB_USER'..."
+    sudo -u postgres psql -c "ALTER USER $DB_USER WITH CREATEDB;" > /dev/null
+    print_success "✓ Granted CREATEDB privilege to '$DB_USER'"
+    
+    # Check if database exists
+    DB_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME';")
+    
+    if [ "$DB_EXISTS" = "1" ]; then
+        print_info "✓ Database '$DB_NAME' already exists"
+    else
+        print_info "Creating database '$DB_NAME'..."
+        sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" > /dev/null
+        print_success "✓ Created database '$DB_NAME'"
+    fi
+    
+    # Ensure the user owns the database
+    print_info "Setting database ownership..."
+    sudo -u postgres psql -c "ALTER DATABASE $DB_NAME OWNER TO $DB_USER;" > /dev/null
+    print_success "✓ Set '$DB_USER' as owner of '$DB_NAME'"
+    
+    # Grant all privileges on the database
+    print_info "Granting database privileges..."
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;" > /dev/null
+    print_success "✓ Granted all privileges on '$DB_NAME' to '$DB_USER'"
+    
+    print_success "PostgreSQL database and user configuration complete!"
+    print_info ""
+else
+    print_warning "PostgreSQL not found on host."
+    print_info "If using external PostgreSQL, ensure database and user are created manually."
+fi
+
 # Configure PostgreSQL for Docker network access
 print_header "🐘 Configuring PostgreSQL for Docker Network Access"
 
 if command -v psql &> /dev/null; then
-    print_info "PostgreSQL found. Configuring network access for Docker containers..."
+    print_info "Configuring network access for Docker containers..."
     
     # Docker containers access host PostgreSQL via the Docker bridge gateway IP
     # The gateway IP is stable (typically 172.x.0.1) and acts as the "host" from container perspective
@@ -520,7 +585,7 @@ sleep 10
 
 # Check container status
 print_header "📊 Container Status"
-su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && docker-compose -f docker/compose/docker-compose.prod.yml ps"
+su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && docker-compose -f docker/compose/docker-compose.prod.yml --env-file .env.prod ps"
 
 # Configure firewall (if UFW is available)
 print_header "🔥 Configuring Firewall"
@@ -572,9 +637,10 @@ echo "  🔒 SSL status: sudo certbot certificates"
 echo ""
 print_warning "Next Steps:"
 echo ""
+SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')
 echo "  1. Make sure your DNS records are configured:"
-echo "     - app.gossip-club.sebille.net → $(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')"
-echo "     - api.gossip-club.sebille.net → $(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')"
+echo "     - app.gossip-club.sebille.net → $SERVER_IP"
+echo "     - api.gossip-club.sebille.net → $SERVER_IP"
 echo ""
 echo "  2. If you skipped SSL setup, run: sudo ./setup-ssl.sh"
 echo ""

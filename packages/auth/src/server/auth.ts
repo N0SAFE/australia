@@ -76,17 +76,13 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
                 // In production with HTTPS, use secure cookies
                 // CRITICAL: Must match the isSecure setting in middleware
                 useSecureCookies: isHttps,
-                // Set cross-origin cookie options for mobile compatibility
+                // Set cross-origin cookie options for subdomain sharing
+                // The domain should be set here, not in cookieOptions
                 crossSubDomainCookies: {
-                    enabled: isHttps,
+                    enabled: isHttps && !!cookieDomain,
+                    ...(cookieDomain ? { domain: cookieDomain } : {}),
                 },
             },
-            // CRITICAL: Set cookie domain to allow sharing between api.domain.com and domain.com
-            ...(cookieDomain ? {
-                cookieOptions: {
-                    domain: cookieDomain,
-                },
-            } : {}),
             database: drizzleAdapter(dbInstance, {
                 provider: "pg",
             }),

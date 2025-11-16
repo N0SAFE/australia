@@ -24,9 +24,12 @@ export default function UnlockPage() {
     // Use SameSite=None with Secure in production (HTTPS), SameSite=Lax in development
     const isProduction = process.env.NODE_ENV === 'production'
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
-    const sameSite = (isProduction || isHttps) ? 'None; Secure' : 'Lax'
+    const useSecure = isProduction || isHttps
+    const cookieAttributes = useSecure 
+        ? `path=/; SameSite=None; Secure` 
+        : `path=/; SameSite=Lax`
     
-    document.cookie = `lastUnlock=${now}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=${sameSite}`
+    document.cookie = `lastUnlock=${now}; max-age=${60 * 60 * 24 * 365}; ${cookieAttributes}`
     
     // Wait for unlock animation to complete (1 second)
     await new Promise(resolve => setTimeout(resolve, 1000))

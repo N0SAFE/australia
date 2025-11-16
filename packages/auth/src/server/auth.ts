@@ -57,17 +57,20 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
         origins.push(...additionalOrigins);
     }
 
+    const isHttps = BASE_URL?.startsWith('https://') ?? false;
+
     return {
         auth: betterAuth({
             secret: BETTER_AUTH_SECRET ?? process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET,
             baseURL: BASE_URL ?? process.env.NEXT_PUBLIC_API_URL,
             trustedOrigins: origins.length > 0 ? origins : undefined,
             advanced: {
-                // In Docker without HTTPS termination, use non-secure cookies even in production
-                // This ensures cookie names match between API and Web
-                useSecureCookies: BASE_URL?.startsWith('https://') ?? false,
-                cookieOptions: {
-                    sameSite: BASE_URL?.startsWith('https://') ? 'none' : 'lax',
+                // In production with HTTPS, use secure cookies
+                // CRITICAL: Must match the isSecure setting in middleware
+                useSecureCookies: isHttps,
+                // Set cross-origin cookie options for mobile compatibility
+                crossSubDomainCookies: {
+                    enabled: isHttps,
                 },
             },
             database: drizzleAdapter(dbInstance, {

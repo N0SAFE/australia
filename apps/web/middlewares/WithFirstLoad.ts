@@ -56,12 +56,13 @@ const withFirstLoad: MiddlewareFactory = (next: NextProxy) => {
 
         // Get session data to check user role
         let session: Session | null = null
+        const isHttps = env.NEXT_PUBLIC_API_URL?.startsWith('https://') ?? false
+        
         try {
             session = await getCookieCache<Session>(request, {
                 secret: env.BETTER_AUTH_SECRET,
-                // Match the cookie security setting from the API
-                // In Docker without HTTPS termination, use non-secure cookies
-                isSecure: env.NEXT_PUBLIC_API_URL?.startsWith('https://') ?? false
+                // CRITICAL: Must match the server's useSecureCookies setting
+                isSecure: isHttps
             })
             console.log('session: ', session)
         } catch (error) {

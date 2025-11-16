@@ -42,9 +42,12 @@ export default function PresentationPage() {
     // Use SameSite=None with Secure in production (HTTPS), SameSite=Lax in development
     const isProduction = process.env.NODE_ENV === 'production'
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
-    const sameSite = (isProduction || isHttps) ? 'None; Secure' : 'Lax'
+    const useSecure = isProduction || isHttps
+    const cookieAttributes = useSecure 
+        ? `path=/; SameSite=None; Secure` 
+        : `path=/; SameSite=Lax`
     
-    document.cookie = `presentation_seen=true; path=/; max-age=31536000; SameSite=${sameSite}` // 1 year
+    document.cookie = `presentation_seen=true; max-age=31536000; ${cookieAttributes}` // 1 year
     
     // Navigate to redirectUrl or home
     router.push(redirectUrl || UserAppLayoutHome({}))

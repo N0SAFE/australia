@@ -180,6 +180,19 @@ export function InviteAcceptanceClient({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)}>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <FormLabel>Email</FormLabel>
+                <Input
+                  type="email"
+                  value={checkInvitation.data?.email || ""}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  This account will be created with this email address
+                </p>
+              </div>
+
               <FormField
                 control={form.control}
                 name="name"

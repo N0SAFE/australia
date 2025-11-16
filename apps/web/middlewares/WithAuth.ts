@@ -52,22 +52,26 @@ const withAuth: MiddlewareFactory = (next: NextProxy) => {
         let sessionCookie: string | null = null
         let sessionError: unknown = null
         const startTime = Date.now()
+        const isHttps = env.NEXT_PUBLIC_API_URL?.startsWith('https://') ?? false
 
         try {
-            debugAuth('Getting session using Better Auth')
+            debugAuth('Getting session using Better Auth', {
+                isHttps,
+                allCookies: request.cookies.getAll().map(c => ({ name: c.name, hasValue: !!c.value })),
+            })
             
             sessionCookie = getSessionCookie(request);
             
             const s = await getCookieCache<Session>(request, {
                 secret: env.BETTER_AUTH_SECRET,
-                // Match the cookie security setting from the API
-                // In Docker without HTTPS termination, use non-secure cookies
-                isSecure: env.NEXT_PUBLIC_API_URL?.startsWith('https://') ?? false
+                // CRITICAL: Must match the server's useSecureCookies setting
+                isSecure: isHttps
             })
             
             debugAuth('Session processed:', {
                 hasSession: !!sessionCookie,
                 hasCachedSession: !!s,
+                cookieValue: sessionCookie ? 'present' : 'null',
             })
             
         } catch (error) {

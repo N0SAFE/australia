@@ -48,4 +48,4 @@ _experiment
 !/.env*.template
 !/.env*.example
 
-/.secret.txt
+/.secrets.txt

@@ -178,26 +178,30 @@ if [ ! -f "$PROJECT_DIR/.env.prod" ]; then
         
         # Generate secure secrets
         print_info "Generating secure secrets..."
+        DB_USER="gossip_club"
+        DB_NAME="gossip_club"
         DB_PASSWORD=$(openssl rand -hex 32)
-        JWT_SECRET=$(openssl rand -hex 32)
         AUTH_SECRET=$(openssl rand -hex 32)
-        API_ADMIN_TOKEN=$(openssl rand -hex 32)
         
-        # Update .env.prod with generated secrets
-        sed -i "s/your-secure-database-password-here/$DB_PASSWORD/g" "$PROJECT_DIR/.env.prod"
-        sed -i "s/your-secure-jwt-secret-here/$JWT_SECRET/g" "$PROJECT_DIR/.env.prod"
-        sed -i "s/your-secure-auth-secret-here/$AUTH_SECRET/g" "$PROJECT_DIR/.env.prod"
-        sed -i "s/your-secure-admin-token-here/$API_ADMIN_TOKEN/g" "$PROJECT_DIR/.env.prod"
+        # Construct database URL
+        DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@host.docker.internal:5432/${DB_NAME}"
+        
+        # Update .env.prod with generated values
+        sed -i "s|DATABASE_URL=.*|DATABASE_URL=${DATABASE_URL}|g" "$PROJECT_DIR/.env.prod"
+        sed -i "s|AUTH_SECRET=.*|AUTH_SECRET=${AUTH_SECRET}|g" "$PROJECT_DIR/.env.prod"
+        sed -i "s|BETTER_AUTH_SECRET=.*|BETTER_AUTH_SECRET=${AUTH_SECRET}|g" "$PROJECT_DIR/.env.prod"
         
         # Save secrets to a file
         cat > "$PROJECT_DIR/.secrets.txt" << EOF
 # Generated Secrets - Keep this file secure!
 # Generated on: $(date)
 
+DB_USER=$DB_USER
+DB_NAME=$DB_NAME
 DB_PASSWORD=$DB_PASSWORD
-JWT_SECRET=$JWT_SECRET
+DATABASE_URL=$DATABASE_URL
 AUTH_SECRET=$AUTH_SECRET
-API_ADMIN_TOKEN=$API_ADMIN_TOKEN
+BETTER_AUTH_SECRET=$AUTH_SECRET
 EOF
         
         chmod 600 "$PROJECT_DIR/.secrets.txt"

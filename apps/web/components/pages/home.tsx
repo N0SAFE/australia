@@ -15,7 +15,7 @@ export function HomePage({
   const user = session?.user;
 
   return <div className="w-full flex flex-col justify-center items-center gap-8 mt-8">
-    <h1 className="text-6xl text-pink-dark font-script">Hey {user?.name?.split(' ')[0] || 'there'} !</h1>
+    <h1 className="text-6xl text-pink-dark font-script" suppressHydrationWarning>Hey {user?.name?.split(' ')[0] || 'there'} !</h1>
 
     <h2 className="text-2xl font-bold mt-5">Les dernières capsules</h2>
 

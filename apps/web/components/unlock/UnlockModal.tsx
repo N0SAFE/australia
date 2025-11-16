@@ -116,7 +116,7 @@ export const UnlockModal: FC<{
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-white border-none">
+      <DialogContent className="sm:max-w-md bg-white border-none" suppressHydrationWarning>
         <DialogTitle className="text-center">
           🔒 Capsule verrouillée
         </DialogTitle>

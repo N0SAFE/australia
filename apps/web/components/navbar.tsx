@@ -19,7 +19,7 @@ export function Navbar ()  {
   const pathname = usePathname();
   const isAdminPath = pathname?.startsWith('/admin');
 
-  return <div className="fixed bottom-0 left-0 right-0 bg-pink-light/80 backdrop-blur-sm text-white rounded-t-xl shadow-[0_0_9px_rgba(187,20,98,0.3)] flex justify-around items-center h-20 z-50">
+  return <div className="fixed bottom-0 left-0 right-0 bg-pink-light/80 backdrop-blur-sm text-white rounded-t-xl shadow-[0_0_9px_rgba(187,20,98,0.3)] flex justify-around items-center h-20 z-50" suppressHydrationWarning>
     {links.map(({ href, icon: Icon }) => (
       <Link
         key={href}

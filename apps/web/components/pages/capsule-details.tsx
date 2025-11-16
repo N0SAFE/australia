@@ -64,8 +64,8 @@ export function CapsuleDetails({
     }
   };
 
-  return <div>
-    {/* Admin Preview Mode Banner */}
+  return <div suppressHydrationWarning>
+    {/* Admin Preview Mode Banner - Rendered client-side only to avoid hydration mismatch */}
     {isAdmin && (
       <div className="sticky top-0 z-50 bg-amber-500 text-white px-4 py-2 shadow-md">
         <div className="flex items-center justify-center gap-2 text-sm font-medium">

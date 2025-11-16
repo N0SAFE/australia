@@ -127,6 +127,7 @@ export const CapsuleCard: FC<{
             "hover:bg-pink-medium focus:bg-pink-medium opacity-75",
             className
           )}
+          suppressHydrationWarning
           {...props}
         >
           {isAdmin && (isHovered || dropdownOpen) && (

@@ -5,7 +5,7 @@ import type { Value } from 'platejs';
 import Image from 'next/image';
 import { Download, ZoomIn, ZoomOut, Maximize2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 
 interface PlateContentRendererProps {
   content: string; // JSON string containing Plate.js Value

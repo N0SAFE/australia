@@ -42,12 +42,20 @@ export default function LoginPage() {
                 password: values.password,
             })
         },
-        onSuccess: ({data, error}) => {
+        onSuccess: async ({data, error}) => {
             if (error) {
                 toast.error(error.message ?? 'Authentication failed')
             } else {
               toast.success('Connexion réussie');
-              router.push(redirectUrl || UserAppLayoutHome({}));
+              
+              // Add small delay for cookie propagation on mobile networks
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // Navigate to target page
+              await router.push(redirectUrl || UserAppLayoutHome({}));
+              
+              // Refresh router to update middleware state for mobile browsers
+              router.refresh();
             }
         }
     })

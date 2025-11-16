@@ -39,7 +39,12 @@ export default function PresentationPage() {
 
   const handleGoToHome = () => {
     // Set cookie to mark presentation as seen
-    document.cookie = 'presentation_seen=true; path=/; max-age=31536000' // 1 year
+    // Use SameSite=None with Secure in production (HTTPS), SameSite=Lax in development
+    const isProduction = process.env.NODE_ENV === 'production'
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:'
+    const sameSite = (isProduction || isHttps) ? 'None; Secure' : 'Lax'
+    
+    document.cookie = `presentation_seen=true; path=/; max-age=31536000; SameSite=${sameSite}` // 1 year
     
     // Navigate to redirectUrl or home
     router.push(redirectUrl || UserAppLayoutHome({}))

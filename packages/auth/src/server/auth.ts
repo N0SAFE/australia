@@ -66,6 +66,9 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
                 // In Docker without HTTPS termination, use non-secure cookies even in production
                 // This ensures cookie names match between API and Web
                 useSecureCookies: BASE_URL?.startsWith('https://') ?? false,
+                cookieOptions: {
+                    sameSite: BASE_URL?.startsWith('https://') ? 'none' : 'lax',
+                },
             },
             database: drizzleAdapter(dbInstance, {
                 provider: "pg",

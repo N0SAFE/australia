@@ -7,10 +7,10 @@ import { CodeUnlock } from './CodeUnlock';
 import { VoiceUnlock } from './VoiceUnlock';
 import { DeviceUnlock } from './DeviceUnlock';
 import { TimeBasedUnlock } from './TimeBasedUnlock';
-import { getApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/auth';
 import { Shield } from 'lucide-react';
+import { useUnlockCapsule } from '@/hooks/useCapsules';
 
 export const UnlockModal: FC<{
   capsule: Capsule;
@@ -20,17 +20,25 @@ export const UnlockModal: FC<{
   const [error, setError] = useState('');
   const router = useRouter();
   const { data: session } = useSession();
+  const { mutateAsync: unlockCapsule } = useUnlockCapsule();
   
   // Check if user is admin
   const isAdmin = session?.user?.role === 'admin' || session?.user?.role?.includes('admin');
 
   const handleUnlock = async (unlockData: LockConfig) => {
     try {
-      const response = await getApi().capsule.unlock(capsule.id, unlockData);
-      const data = await response.json();
+      const result = await unlockCapsule({
+        id: capsule.id,
+        code: 'code' in unlockData ? unlockData.code : undefined,
+        voiceTranscript: 'phrase' in unlockData ? unlockData.phrase : undefined,
+        deviceAction: unlockData.type === 'device_shake' ? 'shake' : 
+                      unlockData.type === 'device_tilt' ? 'tilt' : 
+                      unlockData.type === 'device_tap' ? 'tap' : undefined,
+        apiResponse: 'expectedResponse' in unlockData ? unlockData.expectedResponse : undefined,
+      });
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Échec du déverrouillage');
+      if (!result.success) {
+        throw new Error(result.message || 'Échec du déverrouillage');
       }
 
       // Refresh the page to show unlocked content

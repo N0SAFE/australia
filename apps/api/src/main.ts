@@ -15,9 +15,36 @@ async function bootstrap() {
   const authService = app.get<AuthService>(AuthService);
 
   // Enable CORS for Next.js frontend
+  // Support both public URL and any additional trusted origins
+  const allowedOrigins = [
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  ];
+  
+  // Add trusted origins from environment
+  if (process.env.TRUSTED_ORIGINS) {
+    const additionalOrigins = process.env.TRUSTED_ORIGINS.split(',').map(origin => origin.trim());
+    allowedOrigins.push(...additionalOrigins);
+  }
+
   app.enableCors({
-    origin: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
+      if (!origin) {
+        return callback(null, true);
+      }
+      
+      // Check if origin is in allowed list
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      // Reject other origins
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Set-Cookie'],
   });
 
   app.useLogger(["log", "error", "warn", "debug", "verbose"]);

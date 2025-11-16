@@ -59,6 +59,31 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
 
     const isHttps = BASE_URL?.startsWith('https://') ?? false;
 
+    // Extract domain for cookie sharing between API and Web
+    // Handles various domain patterns:
+    // - Simple subdomain: api.domain.com + domain.com -> .domain.com
+    // - Complex subdomain: api-service.domain.com + service.domain.com -> .domain.com
+    // - Different subdomains: api-the-gossip-club.sebille.net + the-gossip-club.sebille.net -> .sebille.net
+    let cookieDomain: string | undefined;
+    if (isHttps && BASE_URL) {
+        try {
+            const url = new URL(BASE_URL);
+            const hostname = url.hostname;
+            const parts = hostname.split('.');
+            
+            // For domains like "api-the-gossip-club.sebille.net", we want ".sebille.net"
+            // For domains like "api.domain.com", we want ".domain.com"
+            // Strategy: Always use the last 2 parts (TLD + domain)
+            if (parts.length >= 2) {
+                // Extract last 2 parts: sebille.net, domain.com, etc.
+                cookieDomain = `.${parts.slice(-2).join('.')}`;
+            }
+            // Don't set domain for localhost (parts.length === 1)
+        } catch (err) {
+            console.warn('Failed to extract cookie domain from BASE_URL:', err);
+        }
+    }
+
     return {
         auth: betterAuth({
             secret: BETTER_AUTH_SECRET ?? process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET,
@@ -73,6 +98,12 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
                     enabled: isHttps,
                 },
             },
+            // CRITICAL: Set cookie domain to allow sharing between api.domain.com and domain.com
+            ...(cookieDomain ? {
+                cookieOptions: {
+                    domain: cookieDomain,
+                },
+            } : {}),
             database: drizzleAdapter(dbInstance, {
                 provider: "pg",
             }),

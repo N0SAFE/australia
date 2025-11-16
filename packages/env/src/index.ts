@@ -46,9 +46,9 @@ export const apiEnvSchema = zod.object({
     TRUSTED_ORIGINS: zod.string().optional(),
     
     // Passkey
-    PASSKEY_RPID: zod.string().default(DEFAULT_PASSKEY_RPID),
-    PASSKEY_RPNAME: zod.string().default(DEFAULT_PASSKEY_RPNAME),
-    PASSKEY_ORIGIN: zod.url().default(LOCAL_APP_FALLBACK),
+    PASSKEY_RPID: zod.string().default(DEFAULT_PASSKEY_RPID).optional(),
+    PASSKEY_RPNAME: zod.string().default(DEFAULT_PASSKEY_RPNAME).optional(),
+    PASSKEY_ORIGIN: zod.url().default(LOCAL_APP_FALLBACK).optional(),
     
     // Uploads
     UPLOADS_DIR: zod.string().default('/app/apps/api/uploads'),

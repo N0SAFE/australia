@@ -223,6 +223,7 @@ function ImageNode({ node }: { node: PlateNode }) {
       {/* Fullscreen Modal */}
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
         <DialogContent className="w-screen h-screen max-w-none! p-0 bg-black border-none m-0" showCloseButton={false}>
+          <DialogTitle className="sr-only">Image fullscreen viewer</DialogTitle>
           <Button
             variant="ghost"
             size="icon"
@@ -294,6 +295,7 @@ function VideoNode({ node }: { node: PlateNode }) {
       {/* Fullscreen Modal */}
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
         <DialogContent className="w-screen h-screen max-w-none! p-0 bg-black border-none m-0" showCloseButton={false}>
+          <DialogTitle className="sr-only">Video fullscreen player</DialogTitle>
           <Button
             variant="ghost"
             size="icon"
@@ -376,6 +378,7 @@ function AudioNode({ node }: { node: PlateNode }) {
       {/* Fullscreen Modal */}
       <Dialog open={fullscreen} onOpenChange={setFullscreen}>
         <DialogContent className="w-screen h-screen max-w-none! p-0 bg-linear-to-br from-pink-50 via-pink-100 to-pink-50 border-none m-0" showCloseButton={false}>
+          <DialogTitle className="sr-only">Audio fullscreen player</DialogTitle>
           <div className="relative w-full h-full flex flex-col items-center justify-center p-8">
             <Button
               variant="ghost"

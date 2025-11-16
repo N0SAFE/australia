@@ -20,6 +20,7 @@ export function useSignInEmailMutation() {
         toast.error(error.message ?? 'Authentication failed')
       } else {
         toast.success('Signed in successfully')
+        // Invalidate session - using generic key for Better Auth
         queryClient.invalidateQueries({ queryKey: ['session'] })
       }
     },
@@ -41,6 +42,7 @@ export function useSignOutMutation() {
     },
     onSuccess: () => {
       toast.success('Signed out successfully')
+      // Invalidate session - using generic key for Better Auth
       queryClient.invalidateQueries({ queryKey: ['session'] })
       queryClient.clear()
     },
@@ -69,6 +71,7 @@ export function useSignUpEmailMutation() {
         toast.error(error.message ?? 'Sign up failed')
       } else {
         toast.success('Account created successfully')
+        // Invalidate session - using generic key for Better Auth
         queryClient.invalidateQueries({ queryKey: ['session'] })
       }
     },
@@ -119,6 +122,7 @@ export function useResetPasswordMutation() {
         toast.error(error.message ?? 'Failed to reset password')
       } else {
         toast.success('Password reset successfully')
+        // Invalidate session - using generic key for Better Auth
         queryClient.invalidateQueries({ queryKey: ['session'] })
       }
     },

@@ -55,14 +55,9 @@ export function useCreateUser() {
   
   return useMutation(orpc.user.create.mutationOptions({
     onSuccess: (newUser) => {
-      // Invalidate affected queries
+      // Invalidate all user list queries
       queryClient.invalidateQueries({ 
-        queryKey: orpc.user.list.queryKey({ 
-          input: { 
-            pagination: { limit: 20, offset: 0 },
-            sort: { field: 'name', direction: 'asc' }
-          }
-        })
+        queryKey: orpc.user.list.key()
       })
       
       toast.success(`User "${newUser.name}" created successfully`)
@@ -83,17 +78,12 @@ export function useUpdateUser() {
     onSuccess: (updatedUser, variables) => {
       // Invalidate the specific user query
       queryClient.invalidateQueries({ 
-        queryKey: orpc.user.findById.queryKey({ input: { id: variables.id } }) 
+        queryKey: orpc.user.findById.key({ input: { id: variables.id } }) 
       })
       
-      // Invalidate list cache (user may affect sort order)
+      // Invalidate all user list queries (user may affect sort order)
       queryClient.invalidateQueries({ 
-        queryKey: orpc.user.list.queryKey({ 
-          input: { 
-            pagination: { limit: 20, offset: 0 },
-            sort: { field: 'name', direction: 'asc' }
-          }
-        })
+        queryKey: orpc.user.list.key()
       })
       
       toast.success(`User "${updatedUser.name}" updated successfully`)
@@ -112,19 +102,14 @@ export function useDeleteUser() {
   
   return useMutation(orpc.user.delete.mutationOptions({
     onSuccess: (_, variables) => {
-      // Remove from specific cache
+      // Remove the specific user from cache
       queryClient.removeQueries({ 
-        queryKey: orpc.user.findById.queryKey({ input: { id: variables.id } }) 
+        queryKey: orpc.user.findById.key({ input: { id: variables.id } }) 
       })
       
-      // Invalidate list cache
+      // Invalidate all user list queries
       queryClient.invalidateQueries({ 
-        queryKey: orpc.user.list.queryKey({ 
-          input: { 
-            pagination: { limit: 20, offset: 0 },
-            sort: { field: 'name', direction: 'asc' }
-          }
-        })
+        queryKey: orpc.user.list.key()
       })
       
       toast.success('User deleted successfully')

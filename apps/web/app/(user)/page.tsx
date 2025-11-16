@@ -10,7 +10,7 @@ interface HomeProps {
 export default async function Home({ searchParams }: HomeProps) {
   const params = await searchParams;
   const loginUrl = params.redirectUrl 
-    ? UserLogin({ search: { redirectUrl: params.redirectUrl } }) 
+    ? UserLogin({  }, { redirectUrl: params.redirectUrl }) 
     : UserLogin({});
   
   return <div className="w-full h-dvh flex flex-col justify-between items-center">

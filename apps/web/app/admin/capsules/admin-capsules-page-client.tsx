@@ -51,7 +51,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+} from '@repo/ui/components/shadcn/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';

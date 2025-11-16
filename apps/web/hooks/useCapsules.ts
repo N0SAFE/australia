@@ -89,27 +89,23 @@ export function useCreateCapsule() {
   
   return useMutation(orpc.capsule.create.mutationOptions({
     onSuccess: (newCapsule) => {
-      // Invalidate affected queries
+      // Invalidate all capsule list queries
       queryClient.invalidateQueries({ 
-        queryKey: orpc.capsule.list.queryKey({ 
-          input: { 
-            pagination: { limit: 20, offset: 0 },
-            sort: { field: 'openingDate', direction: 'asc' }
-          }
-        })
+        queryKey: orpc.capsule.list.key()
       })
       
-      // Invalidate month/day queries that might contain this capsule
-      if (newCapsule.openingDate) {
-        const date = new Date(newCapsule.openingDate)
-        const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-        queryClient.invalidateQueries({ 
-          queryKey: orpc.capsule.findByMonth.queryKey({ input: { month } })
-        })
-        queryClient.invalidateQueries({ 
-          queryKey: orpc.capsule.findByDay.queryKey({ input: { day: newCapsule.openingDate } })
-        })
-      }
+      // Invalidate all month/day queries
+      queryClient.invalidateQueries({ 
+        queryKey: orpc.capsule.findByMonth.key()
+      })
+      queryClient.invalidateQueries({ 
+        queryKey: orpc.capsule.findByDay.key()
+      })
+      
+      // Invalidate recent capsules query
+      queryClient.invalidateQueries({ 
+        queryKey: orpc.capsule.getRecent.key()
+      })
       
       toast.success('Capsule created successfully')
     },
@@ -129,30 +125,26 @@ export function useUpdateCapsule() {
     onSuccess: (updatedCapsule, variables) => {
       // Invalidate the specific capsule query
       queryClient.invalidateQueries({ 
-        queryKey: orpc.capsule.findById.queryKey({ input: { id: variables.id } }) 
+        queryKey: orpc.capsule.findById.key({ input: { id: variables.id } }) 
       })
       
-      // Invalidate list cache
+      // Invalidate all capsule list queries
       queryClient.invalidateQueries({ 
-        queryKey: orpc.capsule.list.queryKey({ 
-          input: { 
-            pagination: { limit: 20, offset: 0 },
-            sort: { field: 'openingDate', direction: 'asc' }
-          }
-        })
+        queryKey: orpc.capsule.list.key()
       })
       
-      // Invalidate month/day queries
-      if (updatedCapsule.openingDate) {
-        const date = new Date(updatedCapsule.openingDate)
-        const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-        queryClient.invalidateQueries({ 
-          queryKey: orpc.capsule.findByMonth.queryKey({ input: { month } })
-        })
-        queryClient.invalidateQueries({ 
-          queryKey: orpc.capsule.findByDay.queryKey({ input: { day: updatedCapsule.openingDate } })
-        })
-      }
+      // Invalidate all month/day queries
+      queryClient.invalidateQueries({ 
+        queryKey: orpc.capsule.findByMonth.key()
+      })
+      queryClient.invalidateQueries({ 
+        queryKey: orpc.capsule.findByDay.key()
+      })
+      
+      // Invalidate recent capsules query
+      queryClient.invalidateQueries({ 
+        queryKey: orpc.capsule.getRecent.key()
+      })
       
       toast.success('Capsule updated successfully')
     },
@@ -170,27 +162,27 @@ export function useDeleteCapsule() {
   
   return useMutation(orpc.capsule.delete.mutationOptions({
     onSuccess: (_, variables) => {
-      // Remove from specific cache
+      // Remove the specific capsule from cache
       queryClient.removeQueries({ 
-        queryKey: orpc.capsule.findById.queryKey({ input: { id: variables.id } }) 
+        queryKey: orpc.capsule.findById.key({ input: { id: variables.id } }) 
       })
       
-      // Invalidate list cache
+      // Invalidate all capsule list queries
       queryClient.invalidateQueries({ 
-        queryKey: orpc.capsule.list.queryKey({ 
-          input: { 
-            pagination: { limit: 20, offset: 0 },
-            sort: { field: 'openingDate', direction: 'asc' }
-          }
-        })
+        queryKey: orpc.capsule.list.key()
       })
       
-      // Invalidate all month and day queries (we don't know which ones contained this capsule)
+      // Invalidate all month and day queries
       queryClient.invalidateQueries({ 
-        predicate: (query) => {
-          const key = query.queryKey as string[]
-          return key[0] === 'capsule.findByMonth' || key[0] === 'capsule.findByDay'
-        }
+        queryKey: orpc.capsule.findByMonth.key()
+      })
+      queryClient.invalidateQueries({ 
+        queryKey: orpc.capsule.findByDay.key()
+      })
+      
+      // Invalidate recent capsules query
+      queryClient.invalidateQueries({ 
+        queryKey: orpc.capsule.getRecent.key()
       })
       
       toast.success('Capsule deleted successfully')
@@ -212,10 +204,7 @@ export function useUnlockCapsule() {
       if (result.success) {
         // Invalidate ALL capsule queries to update the unlocked status everywhere
         queryClient.invalidateQueries({ 
-          predicate: (query) => {
-            const key = query.queryKey as string[]
-            return key[0]?.toString().startsWith('capsule.')
-          }
+          queryKey: orpc.capsule.key()
         })
         
         // Don't show toast for admin preview mode
@@ -243,10 +232,7 @@ export function useMarkCapsuleAsOpened() {
       if (result.success) {
         // Invalidate ALL capsule queries to update the openedAt status everywhere
         queryClient.invalidateQueries({ 
-          predicate: (query) => {
-            const key = query.queryKey as string[]
-            return key[0]?.toString().startsWith('capsule.')
-          }
+          queryKey: orpc.capsule.key()
         })
         
         // Don't show toast for admin preview mode

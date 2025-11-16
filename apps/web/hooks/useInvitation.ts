@@ -20,6 +20,13 @@ export function useCheckInvitation(token: string, options?: { enabled?: boolean 
  */
 export function useCheckInvitationMutation() {
   return useMutation(orpc.invitation.check.mutationOptions({
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success('Invitation is valid')
+      } else {
+        toast.error(result.message || 'Invalid invitation')
+      }
+    },
     onError: (error: Error) => {
       toast.error(`Failed to check invitation: ${error.message}`)
     },
@@ -36,8 +43,8 @@ export function useValidateInvitation() {
     onSuccess: (result) => {
       if (result.success) {
         toast.success(result.message || 'Account created successfully!')
-        // Invalidate user queries if needed
-        queryClient.invalidateQueries({ queryKey: ['user'] })
+        // Invalidate all user queries
+        queryClient.invalidateQueries({ queryKey: orpc.user.key() })
       } else {
         toast.error(result.message || 'Failed to create account')
       }
@@ -57,7 +64,8 @@ export function useCreateInvitation() {
   return useMutation(orpc.invitation.create.mutationOptions({
     onSuccess: () => {
       toast.success('Invitation created successfully')
-      queryClient.invalidateQueries({ queryKey: ['invitations'] })
+      // Invalidate all invitation queries
+      queryClient.invalidateQueries({ queryKey: orpc.invitation.key() })
     },
     onError: (error: Error) => {
       toast.error(`Failed to create invitation: ${error.message}`)

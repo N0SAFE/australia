@@ -1,10 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { LoginDTO } from '@/actions/login';
 import toast from 'react-hot-toast';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';

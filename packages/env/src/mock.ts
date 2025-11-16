@@ -16,8 +16,9 @@ export const mockEnv = {
         PASSKEY_RPID: 'localhost',
         PASSKEY_RPNAME: 'NestJS Directus Turborepo Template',
         PASSKEY_ORIGIN: 'http://localhost:3000',
-        NODE_ENV: 'development',
         NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
+        DEFAULT_ADMIN_EMAIL: 'admin@admin.com',
+        DEFAULT_ADMIN_PASSWORD: 'adminadmin',
     },
 
     // ============================================================================
@@ -26,11 +27,15 @@ export const mockEnv = {
     web: {
         NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
         API_URL: 'http://localhost:3001',
+        NEXT_PUBLIC_API_URL: 'http://localhost:3001',
+        NEXT_PUBLIC_API_PORT: '3001',
+        NEXT_PUBLIC_APP_PORT: '3000',
+        AUTH_SECRET: 'mock-auth-secret-key-for-development-only-change-in-production',
+        BETTER_AUTH_SECRET: 'mock-auth-secret-key-for-development-only-change-in-production',
         NEXT_PUBLIC_SHOW_AUTH_LOGS: 'false',
         NEXT_PUBLIC_DEBUG: '',
         NEXT_PUBLIC_DOC_URL: 'http://localhost:3020',
         NEXT_PUBLIC_DOC_PORT: '3020',
-        NODE_ENV: 'development',
         REACT_SCAN: 'false',
         MILLION_LINT: 'false',
         // React Scan (optional)
@@ -42,9 +47,7 @@ export const mockEnv = {
     // ============================================================================
     // Doc Mock Environment
     // ============================================================================
-    doc: {
-        NODE_ENV: 'development',
-    },
+    doc: {},
 }
 
 /**

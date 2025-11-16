@@ -1,15 +1,13 @@
 import { BetterAuthClientOptions } from 'better-auth'
 import { createAuthClientFactory } from '@repo/auth/client'
-import { validateEnvPath } from '#/env'
+import { getBaseApiUrl } from '../api-url'
 
-const appUrl = validateEnvPath(
-    process.env.NEXT_PUBLIC_APP_URL ?? '',
-    'NEXT_PUBLIC_APP_URL'
-)
-
+// Use direct API URLs, bypassing Next.js proxy
+// Browser: NEXT_PUBLIC_API_URL (public endpoint)
+// Server: API_URL (private Docker network endpoint)
 export const authClient = createAuthClientFactory({
     basePath: '/api/auth',
-    baseURL: appUrl,
+    baseURL: getBaseApiUrl(),
     fetchOptions: {
         credentials: 'include',
     },

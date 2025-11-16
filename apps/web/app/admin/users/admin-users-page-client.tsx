@@ -371,7 +371,7 @@ const RowActions = ({
     </div>
   )
 }
-export function AdminUsersPage() {
+export function AdminUsersPageClient() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [pagination, setPagination] = useState({

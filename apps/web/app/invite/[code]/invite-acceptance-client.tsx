@@ -1,150 +1,126 @@
-'use client'
+"use client";
 
-import { type FormEvent, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
-import { toast } from 'sonner'
-import { authClient } from '@/lib/auth'
-import { orpc } from '@/lib/orpc'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@repo/ui/components/shadcn/card'
-import { User, UserLogin, UserAppLayoutHome } from '@/routes'
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  useCheckInvitation,
+  useValidateInvitation,
+} from "@/hooks/useInvitation";
+import { useSignInEmailMutation, useSignOutMutation } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@repo/ui/components/shadcn/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@repo/ui/components/shadcn/form";
+import { User, UserLogin, UserAppLayoutHome } from "@/routes";
+
+const inviteFormSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z
+      .string()
+      .min(8, "Password must be at least 8 characters"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 interface InviteAcceptanceClientProps {
   token: string;
   redirectUrl?: string;
 }
 
-export function InviteAcceptanceClient({ token, redirectUrl }: InviteAcceptanceClientProps) {
-  const router = useRouter()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isValidating, setIsValidating] = useState(true)
-  const [isValidToken, setIsValidToken] = useState(false)
-  const [validationError, setValidationError] = useState<string | null>(null)
-  const [invitationEmail, setInvitationEmail] = useState("")
-  const [formData, setFormData] = useState({
-    name: "",
-    password: "",
-    confirmPassword: "",
-  })
+export function InviteAcceptanceClient({
+  token,
+  redirectUrl,
+}: InviteAcceptanceClientProps) {
+  const router = useRouter();
 
+  const checkInvitation = useCheckInvitation(token);
+  const validateInvitation = useValidateInvitation();
+  const signOut = useSignOutMutation();
+  const signInEmail = useSignInEmailMutation();
+
+  const form = useForm<z.infer<typeof inviteFormSchema>>({
+    resolver: zodResolver(inviteFormSchema),
+    defaultValues: {
+      name: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  // Show invitation email when available
   useEffect(() => {
-    if (!token) {
-      setIsValidToken(false)
-      setValidationError('Invitation token is missing')
-      setIsValidating(false)
-      return
+    if (checkInvitation.data?.success) {
+      toast.info(`Creating account for: ${checkInvitation.data.email}`);
+    }
+  }, [checkInvitation.data]);
+
+  const handleSubmit = async (values: z.infer<typeof inviteFormSchema>) => {
+    const invitationData = checkInvitation.data;
+    if (!invitationData?.success) {
+      toast.error("Invalid invitation");
+      return;
     }
 
-    const validateToken = async () => {
-      try {
-        const result = await orpc.invitation.check.call({
-          token,
-        })
+    // First, sign out any existing session
+    await signOut.mutateAsync().catch((error) => {
+      console.error("Error logging out:", error);
+    });
 
-        if (result.success) {
-          setIsValidToken(true)
-          setInvitationEmail(result.email) // Store email for auto-login
-          toast.info(`Creating account for: ${result.email}`)
-        } else {
-          setValidationError(result.message)
-        }
-      } catch (error) {
-        console.error("Token validation error:", error)
-        setValidationError(
-          "Failed to validate invitation token. Please try again."
-        )
-      } finally {
-        setIsValidating(false)
-      }
-    }
-    
-    void validateToken()
-  }, [token])
+    // Validate invitation and create account
+    const result = await validateInvitation.mutateAsync({
+      token,
+      password: values.password,
+      name: values.name,
+    });
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-
-    if (!formData.name.trim()) {
-      toast.error('Name is required')
-      return
-    }
-    if (!formData.password) {
-      toast.error('Password is required')
-      return
-    }
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match')
-      return
-    }
-    if (formData.password.length < 8) {
-      toast.error('Password must be at least 8 characters')
-      return
-    }
-
-    try {
-      setIsSubmitting(true)
-
-      await authClient.signOut({
-        fetchOptions: {
-          onSuccess: () => {
-            console.log('Logged out current session')
-          },
-          onError: (ctx) => {
-            console.error('Error logging out:', ctx.error)
+    if (result.success) {
+      // Auto-login after successful account creation
+      const { data, error } = await signInEmail.mutateAsync(
+        {
+          email: invitationData.email,
+          password: values.password,
+        },
+        {
+          onError: (error) => {
+            console.error("Auto-login error:", error);
+            toast.error("An error occurred. Please try logging in manually.");
+            router.push(UserLogin({}));
           },
         },
-      })
-
-      const result = await orpc.invitation.validate.call({
-        token,
-        password: formData.password,
-        name: formData.name,
-      })
-
-      if (result.success) {
-        toast.success('Account created successfully! Logging you in...')
-        
-        try {
-          // Auto-login the user
-          await authClient.signIn.email({
-            email: invitationEmail,
-            password: formData.password,
-            fetchOptions: {
-              onSuccess: () => {
-                const destination = redirectUrl || UserAppLayoutHome({})
-                router.push(destination)
-              },
-              onError: (ctx) => {
-                console.error('Auto-login failed:', ctx.error)
-                toast.error('Login failed. Please try logging in manually.')
-                router.push(UserLogin({}))
-              }
-            }
-          })
-        } catch (error) {
-          console.error('Auto-login error:', error)
-          toast.error('An error occurred. Please try logging in manually.')
-          router.push(UserLogin({}))
-        }
+      );
+      if (error) {
+        console.error("Auto-login failed:", error);
       } else {
-        toast.error(result.message || 'Failed to create account')
+        const destination = redirectUrl || UserAppLayoutHome({});
+        router.push(destination);
       }
-    } catch (error: unknown) {
-      console.error('Error creating account:', error)
-      if (error instanceof Error) {
-        toast.error(error.message || 'Failed to create account')
-      } else {
-        toast.error('Failed to create account')
-      }
-    } finally {
-      setIsSubmitting(false)
     }
-  }
+  };
 
-  if (isValidating) {
+  if (checkInvitation.isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
         <Card className="w-full max-w-md">
@@ -157,19 +133,22 @@ export function InviteAcceptanceClient({ token, redirectUrl }: InviteAcceptanceC
           </CardHeader>
         </Card>
       </div>
-    )
+    );
   }
 
-  if (!isValidToken) {
+  if (checkInvitation.isError || !checkInvitation.data?.success) {
+    const errorMessage = checkInvitation.isError
+      ? "Failed to validate invitation token. Please try again."
+      : (!checkInvitation.data?.success && checkInvitation.data?.message) ||
+        "This invitation link is invalid or has expired.";
+
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <XCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <CardTitle>Invalid Invitation</CardTitle>
-            <CardDescription>
-              {validationError || 'This invitation link is invalid or has expired.'}
-            </CardDescription>
+            <CardDescription>{errorMessage}</CardDescription>
           </CardHeader>
           <CardFooter>
             <Button
@@ -182,7 +161,7 @@ export function InviteAcceptanceClient({ token, redirectUrl }: InviteAcceptanceC
           </CardFooter>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
@@ -198,72 +177,90 @@ export function InviteAcceptanceClient({ token, redirectUrl }: InviteAcceptanceC
           </CardDescription>
         </CardHeader>
 
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name *</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="John Doe"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
+            <CardContent className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John Doe" type="text" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="At least 8 characters"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                required
-                minLength={8}
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="At least 8 characters"
+                        type="password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password *</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="Re-enter your password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                required
-                minLength={8}
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm Password *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Re-enter your password"
+                        type="password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <p className="text-xs text-muted-foreground">* Required fields</p>
-          </CardContent>
+              <p className="text-xs text-muted-foreground">* Required fields</p>
+            </CardContent>
 
-          <CardFooter className="flex flex-col gap-2">
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Account...
-                </>
-              ) : (
-                'Create Account'
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => router.push(User({}))}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-          </CardFooter>
-        </form>
+            <CardFooter className="flex flex-col gap-2">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={validateInvitation.isPending || signInEmail.isPending}
+              >
+                {validateInvitation.isPending || signInEmail.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => router.push(User({}))}
+                disabled={validateInvitation.isPending || signInEmail.isPending}
+              >
+                Cancel
+              </Button>
+            </CardFooter>
+          </form>
+        </Form>
       </Card>
     </div>
-  )
+  );
 }

@@ -19,47 +19,67 @@ import Link from 'next/link';
 import { Capsule, LockType } from '@/types/capsule';
 import { PlateEditor } from '@/components/blocks/editor-00/plate-editor';
 import { type Value } from 'platejs';
-import { Calendar } from './ui/calendar';
-import { useUpdateCapsule } from '@/hooks/useCapsules';
+import { Calendar } from '@/components/ui/calendar';
+import { useCapsule, useUpdateCapsule } from '@/hooks/useCapsules';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Lock, Unlock } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
-export const AdminCapsuleDetailsPage: FC<{
-  data: Capsule,
+export const AdminCapsuleDetailsPageClient: FC<{
+  capsuleId: string,
   update?: boolean,
 }> = ({
-  data,
+  capsuleId,
   update = false,
 }) => {
-  const [state, setState] = useState<Capsule>({
-    ...data,
-    isLocked: data.isLocked || false,
-    lockType: data.lockType || null,
-    lockConfig: data.lockConfig || null,
-  });
+  const { data: capsule } = useCapsule(capsuleId);
+  
+  const [state, setState] = useState<Capsule>(
+    capsule || {
+      isLocked: false,
+      lockType: null,
+      lockConfig: null,
+    } as Capsule
+  );
   
   // Default empty Plate value (empty paragraph)
   const getEmptyValue = (): Value => [{ type: 'p', children: [{ text: '' }] }];
   
   const [editorValue, setEditorValue] = useState<Value>(getEmptyValue());
   const [date, setDate] = useState<Date | undefined>(
-    data.openingDate ? new Date(data.openingDate) : new Date()
+    capsule?.openingDate ? new Date(capsule.openingDate) : new Date()
   );
-  const [isLocked, setIsLocked] = useState<boolean>(data.isLocked || false);
-  const [lockType, setLockType] = useState<LockType | null>(data.lockType || null);
+  const [isLocked, setIsLocked] = useState<boolean>(capsule?.isLocked || false);
+  const [lockType, setLockType] = useState<LockType | null>(capsule?.lockType || null);
   
   const { mutate: updateCapsule, isPending: isUpdating } = useUpdateCapsule();
   const router = useRouter();
 
+  // Update local state when capsule data loads
+  useEffect(() => {
+    if (capsule && !state.id) {
+      setState({
+        ...capsule,
+        isLocked: capsule.isLocked || false,
+        lockType: capsule.lockType || null,
+        lockConfig: capsule.lockConfig || null,
+      });
+      setIsLocked(capsule.isLocked || false);
+      setLockType(capsule.lockType || null);
+      if (capsule.openingDate) {
+        setDate(new Date(capsule.openingDate));
+      }
+    }
+  }, [capsule]);
+
   // Load content from JSON when capsule data changes
   useEffect(() => {
-    console.log('🔍 [AdminCapsule] Loading content, data.content exists:', !!data.content);
-    if (data.content) {
+    console.log('🔍 [AdminCapsule] Loading content, capsule?.content exists:', !!capsule?.content);
+    if (capsule?.content) {
       try {
         // Parse Plate.js JSON content
-        console.log('📄 [AdminCapsule] Raw content string:', data.content.substring(0, 200));
-        const parsed = JSON.parse(data.content);
+        console.log('📄 [AdminCapsule] Raw content string:', capsule.content.substring(0, 200));
+        const parsed = JSON.parse(capsule.content);
         console.log('✅ [AdminCapsule] Parsed content:', JSON.stringify(parsed, null, 2));
         
         if (Array.isArray(parsed)) {
@@ -102,19 +122,19 @@ export const AdminCapsuleDetailsPage: FC<{
         setEditorValue(getEmptyValue());
       }
     }
-  }, [data.content]);
+  }, [capsule?.content]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!update) return;
+    if (!update || !capsule) return;
     
     try {
       // Always store Plate.js content as JSON string
       // Plate.js content can contain text, images, videos, audio, and more
       const updateData: any = {
-        id: data.id,
+        id: capsule.id,
         openingDate: date?.toISOString() || state.openingDate,
         content: JSON.stringify(editorValue),
         openingMessage: state.openingMessage,
@@ -128,7 +148,7 @@ export const AdminCapsuleDetailsPage: FC<{
       updateCapsule(updateData, {
         onSuccess: (result) => {
           console.log('✅ Capsule update successful:', result);
-          router.push(`/admin/capsules/${data.id}`);
+          router.push(`/admin/capsules/${capsuleId}`);
         },
         onError: (error) => {
           console.error('❌ Capsule update failed:', error);
@@ -140,36 +160,41 @@ export const AdminCapsuleDetailsPage: FC<{
     }
   };
 
-  return <div className="p-6 max-w-6xl mx-auto space-y-6">
-    {/* Header */}
-    <div className="flex items-center justify-between">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Link 
-            href="/admin/capsules"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux capsules
-          </Link>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {update ? 'Modifier la capsule' : 'Détails de la capsule'}
-        </h1>
-        <p className="text-muted-foreground">
-          {update ? 'Modifiez les paramètres de la capsule temporelle' : 'Consultez les détails de la capsule'}
-        </p>
-      </div>
-      {!update && (
-        <Button asChild>
-          <Link href={`/admin/capsules/${data.id}/edit`}>
-            Modifier
-          </Link>
-        </Button>
-      )}
-    </div>
+  if (!capsule) {
+    return <div>Loading...</div>;
+  }
 
-    <Separator />
+  return (
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Link 
+              href="/admin/capsules"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour aux capsules
+            </Link>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {update ? 'Modifier la capsule' : 'Détails de la capsule'}
+          </h1>
+          <p className="text-muted-foreground">
+            {update ? 'Modifiez les paramètres de la capsule temporelle' : 'Consultez les détails de la capsule'}
+          </p>
+        </div>
+        {!update && (
+          <Button asChild>
+            <Link href={`/admin/capsules/${capsuleId}/edit`}>
+              Modifier
+            </Link>
+          </Button>
+        )}
+      </div>
+
+      <Separator />
 
     <form onSubmit={handleSubmit} className="space-y-6">
       <Field>
@@ -469,5 +494,6 @@ export const AdminCapsuleDetailsPage: FC<{
         </Button>
       </Field>}
     </form>
-  </div>
+    </div>
+  );
 }

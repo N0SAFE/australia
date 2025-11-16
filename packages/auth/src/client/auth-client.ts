@@ -1,7 +1,6 @@
 import { createAuthClient } from 'better-auth/react'
 import type { BetterAuthClientOptions, BetterAuthClientPlugin } from 'better-auth/client'
 import { passkeyClient } from 'better-auth/client/plugins'
-import { nextCookies } from "better-auth/next-js"
 import masterTokenClient from './plugins/masterToken'
 import { loginAsClientPlugin } from './plugins/loginAs'
 
@@ -48,7 +47,6 @@ export const createAuthClientFactory = (options: CreateAuthClientFactoryOptions)
       passkeyClient(),
       masterTokenClient(),
       loginAsClientPlugin(),
-      nextCookies(),
       ...additionalPlugins,
     ],
   } satisfies BetterAuthClientOptions

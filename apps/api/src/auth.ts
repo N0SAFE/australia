@@ -9,4 +9,9 @@ export const auth = createBetterAuth(null, {
   PASSKEY_ORIGIN: process.env.PASSKEY_ORIGIN ?? '',
   PASSKEY_RPID: process.env.PASSKEY_RPID ?? '',
   PASSKEY_RPNAME: process.env.PASSKEY_RPNAME ?? '',
+  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET,
+  BASE_URL: process.env.NEXT_PUBLIC_API_URL,
+  APP_URL: process.env.APP_URL,
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  TRUSTED_ORIGINS: process.env.TRUSTED_ORIGINS,
 }).auth;

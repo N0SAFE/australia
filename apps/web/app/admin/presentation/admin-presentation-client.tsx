@@ -7,6 +7,7 @@ import { Upload, Video, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { orpc } from '@/lib/orpc';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { getApiUrl } from '@/lib/api-url';
 
 export function AdminPresentationClient() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -222,7 +223,7 @@ export function AdminPresentationClient() {
                   controls
                   muted
                   className="w-full rounded-lg shadow-lg"
-                  src="/api/nest/presentation/video"
+                  src={getApiUrl('/presentation/video')}
                 >
                   Your browser does not support the video tag.
                 </video>

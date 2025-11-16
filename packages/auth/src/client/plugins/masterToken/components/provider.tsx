@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState, useContext } from 'react'
+import React, { useEffect, useState, useContext, useRef } from 'react'
 import { toast } from 'sonner'
 import {
     getMasterTokenEnabled,
@@ -20,6 +20,13 @@ export const MasterTokenProvider: React.FC<MasterTokenProviderProps> = ({
         if (typeof window === 'undefined') return false
         return getMasterTokenEnabled()
     })
+    
+    // Use ref to store refetch so it doesn't trigger useEffect when it changes
+    const refetchRef = useRef(refetch)
+    refetchRef.current = refetch
+    
+    // Track previous enabled value to only refetch when it actually changes
+    const prevEnabledRef = useRef(enabled)
 
     useEffect(() => {
         const onStorage = (e: StorageEvent) => {
@@ -59,8 +66,13 @@ export const MasterTokenProvider: React.FC<MasterTokenProviderProps> = ({
     }, [])
 
     useEffect(() => {
-        void refetch()
-    }, [enabled, refetch])
+        // Only refetch if enabled actually changed value, not on every re-render
+        if (prevEnabledRef.current !== enabled) {
+            console.log('enabled changed from', prevEnabledRef.current, 'to', enabled, '- refetching')
+            prevEnabledRef.current = enabled
+            void refetchRef.current()
+        }
+    }, [enabled])
 
     return (
         <MasterTokenContext.Provider

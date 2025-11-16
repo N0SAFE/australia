@@ -16,6 +16,11 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
         PASSKEY_RPNAME: string;
         PASSKEY_ORIGIN: string;
         NODE_ENV: string;
+        BETTER_AUTH_SECRET?: string;
+        BASE_URL?: string;
+        APP_URL?: string;
+        NEXT_PUBLIC_APP_URL?: string;
+        TRUSTED_ORIGINS?: string;
     }
 ) => {
     const dbInstance = database as NodePgDatabase<TSchema>;
@@ -26,10 +31,42 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
         PASSKEY_RPNAME,
         PASSKEY_ORIGIN,
         NODE_ENV,
+        BETTER_AUTH_SECRET,
+        BASE_URL,
+        APP_URL,
+        NEXT_PUBLIC_APP_URL,
+        TRUSTED_ORIGINS,
     } = env
+
+    // Build trusted origins: both public and private web app URLs + additional origins
+    const origins: string[] = [];
+    
+    // Trust the private Docker network URL (APP_URL)
+    if (APP_URL) {
+        origins.push(APP_URL);
+    }
+    
+    // Trust the public web app URL (NEXT_PUBLIC_APP_URL)
+    if (NEXT_PUBLIC_APP_URL) {
+        origins.push(NEXT_PUBLIC_APP_URL);
+    }
+    
+    // Add additional trusted origins if provided
+    if (TRUSTED_ORIGINS) {
+        const additionalOrigins = TRUSTED_ORIGINS.split(',').map(origin => origin.trim());
+        origins.push(...additionalOrigins);
+    }
 
     return {
         auth: betterAuth({
+            secret: BETTER_AUTH_SECRET ?? process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET,
+            baseURL: BASE_URL ?? process.env.NEXT_PUBLIC_API_URL,
+            trustedOrigins: origins.length > 0 ? origins : undefined,
+            advanced: {
+                // In Docker without HTTPS termination, use non-secure cookies even in production
+                // This ensures cookie names match between API and Web
+                useSecureCookies: BASE_URL?.startsWith('https://') ?? false,
+            },
             database: drizzleAdapter(dbInstance, {
                 provider: "pg",
             }),

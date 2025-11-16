@@ -11,6 +11,11 @@ export const createBetterAuth = <TSchema extends Record<string, unknown>>(
         NODE_ENV: envService.get('NODE_ENV'),
         PASSKEY_ORIGIN: envService.get('PASSKEY_ORIGIN'),
         PASSKEY_RPID: envService.get('PASSKEY_RPID'),
-        PASSKEY_RPNAME: envService.get('PASSKEY_RPNAME')
+        PASSKEY_RPNAME: envService.get('PASSKEY_RPNAME'),
+        BETTER_AUTH_SECRET: envService.get('BETTER_AUTH_SECRET'),
+        BASE_URL: envService.get('NEXT_PUBLIC_API_URL'),
+        TRUSTED_ORIGINS: envService.get('TRUSTED_ORIGINS'),
+        NEXT_PUBLIC_APP_URL: envService.get('NEXT_PUBLIC_APP_URL'),
+        APP_URL: envService.get('APP_URL'),
     }: envService);
 };

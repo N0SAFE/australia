@@ -57,6 +57,7 @@ services:
       
       # URLs - Server-side (internal Docker network)
       - API_URL=http://api-prod:${API_PORT:-3001}
+      - APP_URL=${APP_URL:-http://web-prod:3000}
       
       # URLs - Client-side (external access)
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
@@ -65,9 +66,9 @@ services:
       - NEXT_PUBLIC_APP_PORT=${NEXT_PUBLIC_APP_PORT:-3000}
 
       # Authentication
-      - AUTH_SECRET=${AUTH_SECRET}
-      - BETTER_AUTH_SECRET=${AUTH_SECRET}
-      - DEV_AUTH_KEY=${DEV_AUTH_KEY:-dev-auth-key}
+      - AUTH_SECRET=${AUTH_SECRET:-fallback-auth-secret}
+      - BETTER_AUTH_SECRET=${AUTH_SECRET:-fallback-auth-secret}
+      - DEV_AUTH_KEY=${DEV_AUTH_KEY:-dev-fallback-key}
     networks:
       - app_network_prod
     volumes:

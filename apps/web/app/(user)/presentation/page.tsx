@@ -6,6 +6,7 @@ import { useRef, useState, useEffect } from 'react'
 import { UserAppLayoutHome } from '@/routes'
 import { useQuery } from '@tanstack/react-query'
 import { orpc } from '@/lib/orpc'
+import { getApiUrl } from '@/lib/api-url'
 
 export default function PresentationPage() {
   const router = useRouter()
@@ -15,7 +16,7 @@ export default function PresentationPage() {
   const [showButton, setShowButton] = useState(false)
 
   // Fetch the current video from the database
-  const { data: video } = useQuery(orpc.presentation.getCurrent.queryOptions({
+  const { data: video, isLoading } = useQuery(orpc.presentation.getCurrent.queryOptions({
     input: {}
   }))
 
@@ -44,8 +45,26 @@ export default function PresentationPage() {
     router.push(redirectUrl || UserAppLayoutHome({}))
   }
 
-  // Show loading or error state if no video
-  if (!video) {
+  // Show error state if no video is configured
+  if (!isLoading && !video) {
+    return (
+      <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-center space-y-4">
+          <p className="text-2xl font-semibold">No presentation setup yet</p>
+          <p className="text-gray-400">Please contact an administrator to configure the presentation</p>
+          <Button
+            onClick={handleGoToHome}
+            className="mt-4"
+          >
+            Go to Homepage
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading state while fetching
+  if (isLoading) {
     return (
       <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
         <div className="text-white text-center">
@@ -66,7 +85,7 @@ export default function PresentationPage() {
         playsInline
         onEnded={handleVideoEnd}
         controls={true}
-        src="/api/nest/presentation/video"
+        src={getApiUrl('/presentation/video')}
       >
         Your browser does not support the video tag.
       </video>

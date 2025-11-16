@@ -21,11 +21,14 @@ const debugAuthError = console.log
 const env = validateEnvSafe(process.env).data
 
 const adminRegexpAndChildren = /^\/admin(\/.*)?$/
-const userRegexpAndChildren = /^(?!\/($|login(\/.*)?$|register(\/.*)?$|admin(\/.*)?$|presentation$|unlock$|invite$))\/.*$/
+const userRegexpAndChildren = /^(?!\/($|login(\/.*)?$|register(\/.*)$|invite(\/.*)?$|admin(\/.*)?$|presentation$|unlock$))\/.*$/
 
 const withAuth: MiddlewareFactory = (next: NextProxy) => {
     if (!env) {
-        debugAuthError('Environment variables are not valid')
+        debugAuthError('Environment variables are not valid', {
+            env: process.env,
+            error: validateEnvSafe(process.env).error
+        })
         throw new Error('env is not valid')
     }
     return async (request: NextRequest, _next: NextFetchEvent) => {
@@ -55,12 +58,16 @@ const withAuth: MiddlewareFactory = (next: NextProxy) => {
             
             sessionCookie = getSessionCookie(request);
             
-            const s = await getCookieCache<Session>(request)
-            
-            console.log("s", s)
+            const s = await getCookieCache<Session>(request, {
+                secret: env.BETTER_AUTH_SECRET,
+                // Match the cookie security setting from the API
+                // In Docker without HTTPS termination, use non-secure cookies
+                isSecure: env.NEXT_PUBLIC_API_URL?.startsWith('https://') ?? false
+            })
             
             debugAuth('Session processed:', {
                 hasSession: !!sessionCookie,
+                hasCachedSession: !!s,
             })
             
         } catch (error) {

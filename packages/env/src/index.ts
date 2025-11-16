@@ -34,11 +34,16 @@ export const apiEnvSchema = zod.object({
     
     // API
     API_PORT: zod.coerce.number().int().min(1).max(65535).default(DEFAULT_API_PORT),
+    NEXT_PUBLIC_API_URL: guardedUrl('NEXT_PUBLIC_API_URL', LOCAL_API_FALLBACK),
+    
+    // Web App URLs (for trusted origins)
+    APP_URL: zod.url().optional(), // Private Docker network URL
     
     // Authentication
     AUTH_SECRET: zod.string().min(1, 'AUTH_SECRET is required'),
     BETTER_AUTH_SECRET: zod.string().min(1, 'BETTER_AUTH_SECRET is required'),
     DEV_AUTH_KEY: zod.string().optional(),
+    TRUSTED_ORIGINS: zod.string().optional(),
     
     // Passkey
     PASSKEY_RPID: zod.string().default(DEFAULT_PASSKEY_RPID),
@@ -72,7 +77,15 @@ export const webEnvSchema = zod.object({
 
     API_URL: guardedUrl('API_URL', LOCAL_API_FALLBACK),
     
+    // Public API Configuration
+    NEXT_PUBLIC_API_URL: guardedUrl('NEXT_PUBLIC_API_URL', LOCAL_API_FALLBACK),
+    NEXT_PUBLIC_API_PORT: zod.coerce.number().int().min(1).max(65535).optional(),
+    NEXT_PUBLIC_APP_PORT: zod.coerce.number().int().min(1).max(65535).optional(),
+    
     // Authentication
+    AUTH_SECRET: zod.string().min(1, 'AUTH_SECRET is required'),
+    BETTER_AUTH_SECRET: zod.string().min(1, 'BETTER_AUTH_SECRET is required'),
+    DEV_AUTH_KEY: zod.string().optional(),
     NEXT_PUBLIC_SHOW_AUTH_LOGS: zod.coerce.boolean().optional().default(false),
     
     // Debug configuration - supports advanced patterns:
@@ -101,6 +114,14 @@ export const webEnvSchema = zod.object({
     MILLION_LINT: zod.coerce.boolean().optional().default(false),
     
     ...sharedEnvVars,
+}).refine((data) => {
+    if (data.BETTER_AUTH_SECRET && data.BETTER_AUTH_SECRET !== data.AUTH_SECRET) {
+        return false
+    }
+    return true
+}, {
+    message: 'BETTER_AUTH_SECRET must match AUTH_SECRET when provided',
+    path: ['BETTER_AUTH_SECRET'],
 })
 
 /**

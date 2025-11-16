@@ -96,10 +96,13 @@ export function createORPCClientWithCookies() {
                 })
             },
         ],
+        // Use direct API URLs, bypassing Next.js proxy
+        // Server: API_URL (private Docker network endpoint)
+        // Browser: NEXT_PUBLIC_API_URL (public endpoint)
         url:
             typeof window === 'undefined'
                 ? validateEnvPath(process.env.API_URL ?? '', 'API_URL')
-                : `${APP_URL}/api/nest`,
+                : validateEnvPath(process.env.NEXT_PUBLIC_API_URL ?? '', 'NEXT_PUBLIC_API_URL'),
         fetch(request, init, options) {
             return fetch(request, {
                 ...init,

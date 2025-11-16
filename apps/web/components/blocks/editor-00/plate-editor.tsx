@@ -36,6 +36,7 @@ import { KbdLeaf } from '@repo/ui/components/shadcn/kbd-node';
 import { ImageElement } from '@repo/ui/components/shadcn/media-image-node';
 import { VideoElement } from '@repo/ui/components/shadcn/media-video-node';
 import { AudioElement } from '@repo/ui/components/shadcn/media-audio-node';
+import { getStorageUrl } from '@/lib/api-url';
 
 const defaultValue: Value = [
   {
@@ -148,7 +149,7 @@ export function PlateEditor({ value, onChange, placeholder = 'Type your content 
 
     try {
       const result = await storage.uploadImageAsync({ file });
-      const imageUrl = `/storage/files/${result.filename}`;
+      const imageUrl = getStorageUrl(`files/${result.filename}`);
       
       // Insert image node using Slate's insertNodes API
       (editor as any).insertNodes({
@@ -174,7 +175,7 @@ export function PlateEditor({ value, onChange, placeholder = 'Type your content 
 
     try {
       const result = await storage.uploadVideoAsync({ file });
-      const videoUrl = `/storage/files/${result.filename}`;
+      const videoUrl = getStorageUrl(`files/${result.filename}`);
       
       // Insert video node using Slate's insertNodes API
       (editor as any).insertNodes({
@@ -201,7 +202,7 @@ export function PlateEditor({ value, onChange, placeholder = 'Type your content 
 
     try {
       const result = await storage.uploadAudioAsync({ file });
-      const audioUrl = `/storage/files/${result.filename}`;
+      const audioUrl = getStorageUrl(`files/${result.filename}`);
       
       // Insert audio node using Slate's insertNodes API
       (editor as any).insertNodes({

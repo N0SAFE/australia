@@ -420,7 +420,7 @@ const RowActions = ({
     </div>
   )
 }
-export function AdminCapsulesPage() {
+export function AdminCapsulesPageClient() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [pagination, setPagination] = useState({

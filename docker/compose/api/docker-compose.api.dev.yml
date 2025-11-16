@@ -135,17 +135,30 @@ services:
       
       # URLs
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - APP_URL=${APP_URL:-http://web-dev:3000}
       - API_URL=http://api-dev:${API_PORT:-3005}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3005}
       
       # Authentication
       - AUTH_SECRET=${AUTH_SECRET:-fallback-auth-secret}
       - BETTER_AUTH_SECRET=${AUTH_SECRET:-fallback-auth-secret}
       - DEV_AUTH_KEY=${DEV_AUTH_KEY:-dev-fallback-key}
+      - TRUSTED_ORIGINS=${TRUSTED_ORIGINS:-}
       
       # Passkey Configuration
       - PASSKEY_RPID=${PASSKEY_RPID:-localhost}
       - PASSKEY_RPNAME=${PASSKEY_RPNAME:-NestJS App}
       - PASSKEY_ORIGIN=${PASSKEY_ORIGIN:-http://localhost:3000}
+      
+      # Uploads directory path (absolute path in container)
+      - UPLOADS_DIR=${UPLOADS_DIR:-/app/apps/api/uploads}
+
+      # Default Admin Credentials (for seeding)
+      - DEFAULT_ADMIN_EMAIL=${DEFAULT_ADMIN_EMAIL:-admin@admin.com}
+      - DEFAULT_ADMIN_PASSWORD=${DEFAULT_ADMIN_PASSWORD:-adminadmin}
+
+      # Enable seeding for mock data (development mode)
+      - ENABLE_SEEDING=true
       
       # Development Tools
       - CHOKIDAR_USEPOLLING=true
@@ -153,9 +166,6 @@ services:
       # Turbo Remote Cache
       - TURBO_TOKEN=${TURBO_TOKEN}
       - TURBO_TEAM=${TURBO_TEAM}
-      
-      # Uploads directory path (absolute path in container)
-      - UPLOADS_DIR=${UPLOADS_DIR:-/app/apps/api/uploads}
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://127.0.0.1:${API_PORT:-3005}/health || exit 1
       start_period: 15s

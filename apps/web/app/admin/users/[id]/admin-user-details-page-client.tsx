@@ -14,29 +14,36 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui/components/shadcn/card';
 import Link from 'next/link';
-import { useUpdateUser } from '@/hooks/useUsers';
+import { useUser, useUpdateUser } from '@/hooks/useUsers';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save, User as UserIcon, Lock } from 'lucide-react';
 
-export const AdminUserDetailsPage: FC<{
-  data: User,
+export const AdminUserDetailsPageClient: FC<{
+  userId: string,
   update?: boolean,
 }> = ({
-  data,
+  userId,
   update = false,
 }) => {
+  const { data: user } = useUser(userId);
+  
   const [state, setState] = useState<User & {
     password?: string,
     confirmPassword?: string,
-  }>(data);
+  }>(user || {} as User);
   
   const { mutate: updateUser, isPending } = useUpdateUser();
   const router = useRouter();
 
+  // Update local state when user data loads
+  if (user && !state.id) {
+    setState(user);
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!update) return;
+    if (!update || !user) return;
     
     if (state.password && state.password !== state.confirmPassword) {
       alert('Passwords do not match');
@@ -44,7 +51,7 @@ export const AdminUserDetailsPage: FC<{
     }
     
     const updateData: any = {
-      id: data.id,
+      id: user.id,
       name: state.name,
       email: state.email,
       emailVerified: state.emailVerified,
@@ -59,7 +66,7 @@ export const AdminUserDetailsPage: FC<{
     updateUser(updateData, {
       onSuccess: (result) => {
         console.log('✅ User update successful:', result);
-        router.push(`/admin/users/${data.id}`);
+        router.push(`/admin/users/${userId}`);
       },
       onError: (error) => {
         console.error('❌ User update failed:', error);
@@ -68,36 +75,41 @@ export const AdminUserDetailsPage: FC<{
     console.log('📤 Mutation called');
   };
 
-  return <div className="p-6 max-w-4xl mx-auto space-y-6">
-    {/* Header */}
-    <div className="flex items-center justify-between">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <Link 
-            href="/admin/users"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Retour aux utilisateurs
-          </Link>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {update ? 'Modifier l\'utilisateur' : 'Détails de l\'utilisateur'}
-        </h1>
-        <p className="text-muted-foreground">
-          {update ? 'Modifiez les informations de l\'utilisateur' : 'Consultez les informations de l\'utilisateur'}
-        </p>
-      </div>
-      {!update && (
-        <Button asChild>
-          <Link href={`/admin/users/${data.id}/edit`}>
-            Modifier
-          </Link>
-        </Button>
-      )}
-    </div>
+  if (!user) {
+    return <div>Loading...</div>;
+  }
 
-    <Separator />
+  return (
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Link 
+              href="/admin/users"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour aux utilisateurs
+            </Link>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {update ? 'Modifier l\'utilisateur' : 'Détails de l\'utilisateur'}
+          </h1>
+          <p className="text-muted-foreground">
+            {update ? 'Modifiez les informations de l\'utilisateur' : 'Consultez les informations de l\'utilisateur'}
+          </p>
+        </div>
+        {!update && (
+          <Button asChild>
+            <Link href={`/admin/users/${userId}/edit`}>
+              Modifier
+            </Link>
+          </Button>
+        )}
+      </div>
+
+      <Separator />
 
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* User Information Card */}
@@ -151,7 +163,7 @@ export const AdminUserDetailsPage: FC<{
               <div className="space-y-1">
                 <p className="text-sm font-medium">Date de création</p>
                 <p className="text-sm text-muted-foreground">
-                  {new Date(data.createdAt).toLocaleDateString('fr-FR', {
+                  {new Date(user.createdAt).toLocaleDateString('fr-FR', {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric',
@@ -163,7 +175,7 @@ export const AdminUserDetailsPage: FC<{
               <div className="space-y-1">
                 <p className="text-sm font-medium">Dernière modification</p>
                 <p className="text-sm text-muted-foreground">
-                  {new Date(data.updatedAt).toLocaleDateString('fr-FR', {
+                  {new Date(user.updatedAt).toLocaleDateString('fr-FR', {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric',
@@ -233,7 +245,7 @@ export const AdminUserDetailsPage: FC<{
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push(`/admin/users/${data.id}`)}
+            onClick={() => router.push(`/admin/users/${userId}`)}
             disabled={isPending}
           >
             Annuler
@@ -258,5 +270,6 @@ export const AdminUserDetailsPage: FC<{
         </div>
       )}
     </form>
-  </div>
+    </div>
+  );
 }

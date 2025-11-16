@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { createColumnHelper, getCoreRowModel, Row, getSortedRowModel, getPaginationRowModel, getFilteredRowModel, SortingState, ColumnFiltersState } from '@tanstack/react-table';
 import { flexRender, useReactTable } from '@tanstack/react-table';
 import { useState, useMemo } from 'react';
@@ -28,9 +29,20 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
-import { Eye, Pencil, Search, Plus, Copy, CheckCircle2, MoreHorizontal, ExternalLink } from 'lucide-react';
+import { Eye, Pencil, Search, Plus, Copy, CheckCircle2, MoreHorizontal, ExternalLink, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@repo/ui/components/shadcn/alert-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +52,7 @@ import {
 import { authClient } from '@/lib/auth';
 import { toast } from 'sonner';
 import { orpc } from '@/lib/orpc';
+import { useDeleteUser } from '@/hooks/useUsers';
 
 const columnHelper = createColumnHelper<User>()
 
@@ -251,10 +264,11 @@ const columns = [
     enableSorting: false,
   }),
   columnHelper.accessor('invitationStatus', {
-    header: 'Invitation Status',
+    header: 'Status',
     cell: info => {
       const status = info.getValue();
       const token = info.row.original.invitationToken;
+      const emailVerified = info.row.original.emailVerified;
       
       const copyInviteLink = async () => {
         if (!token) return;
@@ -267,37 +281,56 @@ const columns = [
         }
       };
 
-      if (!status) {
-        return <span className="text-muted-foreground italic text-xs">Not invited</span>;
+      // Active user (email verified and accepted invitation)
+      if (emailVerified && status === 'accepted') {
+        return (
+          <div className="flex items-center gap-2">
+            <span className="py-1 px-2.5 text-xs rounded-md font-semibold bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200">
+              ✓ Active
+            </span>
+          </div>
+        );
       }
 
-      return (
-        <div className="flex items-center gap-2">
-          <span className={cn(
-            "py-1 px-2.5 text-xs rounded-md font-semibold",
-            status === 'accepted' && 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200',
-            status === 'pending' && 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200',
-            status === 'expired' && 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-200',
-          )}>
-            {status.charAt(0).toUpperCase() + status.slice(1)}
-          </span>
-          {status === 'pending' && token && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={copyInviteLink} className="gap-2">
-                  <ExternalLink className="h-4 w-4" />
-                  Show invitation link
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      );
+      // Pending invitation
+      if (status === 'pending' && !emailVerified) {
+        return (
+          <div className="flex items-center gap-2">
+            <span className="py-1 px-2.5 text-xs rounded-md font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200">
+              ⏳ Pending Invitation
+            </span>
+            {token && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={copyInviteLink} className="gap-2">
+                    <Copy className="h-4 w-4" />
+                    Copy invitation link
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        );
+      }
+
+      // Expired invitation
+      if (status === 'expired') {
+        return (
+          <div className="flex items-center gap-2">
+            <span className="py-1 px-2.5 text-xs rounded-md font-semibold bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200">
+              ✕ Expired
+            </span>
+          </div>
+        );
+      }
+
+      // No invitation status
+      return <span className="text-muted-foreground italic text-xs">No status</span>;
     },
     enableSorting: false,
   }),
@@ -341,35 +374,79 @@ const RowActions = ({
 }: {
   row: Row<User>,
 }) => {
+  const { mutate: deleteUser, isPending: isDeleting } = useDeleteUser();
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  
   const status = row.original.invitationStatus;
   const isPendingInvitation = (status === 'pending' || status === 'expired') && !row.original.emailVerified;
+  const userId = row.getValue('id') as string;
+  const userName = row.original.name;
   
-  if (isPendingInvitation) {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground italic">No actions available</span>
-      </div>
+  const handleDelete = () => {
+    deleteUser(
+      { id: userId },
+      {
+        onSuccess: () => {
+          setShowDeleteDialog(false);
+        },
+      }
     );
-  }
+  };
   
   return (
     <div className="flex items-center gap-2">
-      <Link
-        href={`/admin/users/${row.getValue('id')}`}
-        className="p-2 hover:bg-accent rounded-md transition-colors"
-        title="View details"
-      >
-        <Eye className="h-4 w-4" />
-      </Link>
-      <Link
-        href={`/admin/users/${row.getValue('id')}/edit`}
-        className="p-2 hover:bg-accent rounded-md transition-colors"
-        title="Edit user"
-      >
-        <Pencil className="h-4 w-4" />
-      </Link>
+      {!isPendingInvitation && (
+        <>
+          <Link
+            href={`/admin/users/${userId}`}
+            className="p-2 hover:bg-accent rounded-md transition-colors"
+            title="View details"
+          >
+            <Eye className="h-4 w-4" />
+          </Link>
+          <Link
+            href={`/admin/users/${userId}/edit`}
+            className="p-2 hover:bg-accent rounded-md transition-colors"
+            title="Edit user"
+          >
+            <Pencil className="h-4 w-4" />
+          </Link>
+        </>
+      )}
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+            title="Delete user"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{userName}</strong>? This action cannot be undone.
+              {isPendingInvitation && ' This will delete the pending invitation.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-  )
+  );
 }
 export function AdminUsersPageClient() {
   const [sorting, setSorting] = useState<SortingState>([])

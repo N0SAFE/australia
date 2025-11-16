@@ -1,10 +1,11 @@
 'use client';
 
+import React from 'react';
 import { createColumnHelper, getCoreRowModel, Row, getSortedRowModel, getPaginationRowModel, getFilteredRowModel, SortingState, ColumnFiltersState } from '@tanstack/react-table';
 import { flexRender, useReactTable } from '@tanstack/react-table';
 import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { useCapsules } from '@/hooks/useCapsules';
+import { useCapsules, useDeleteCapsule } from '@/hooks/useCapsules';
 import { Capsule } from '@/types/capsule';
 import { toast } from 'sonner';
 import {
@@ -29,7 +30,7 @@ import {
 import { Input } from '@repo/ui/components/shadcn/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
-import { Eye, Pencil, Search, Filter, Calendar, MessageSquare, Lock, Unlock, Sparkles } from 'lucide-react';
+import { Eye, Pencil, Search, Filter, Calendar, MessageSquare, Lock, Unlock, Sparkles, Trash2 } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -40,6 +41,17 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Plus } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -384,6 +396,23 @@ const RowActions = ({
 }: {
   row: Row<Capsule>,
 }) => {
+  const { mutate: deleteCapsule, isPending: isDeleting } = useDeleteCapsule();
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  
+  const capsuleId = row.getValue('id') as string;
+  const openingDate = new Date(row.original.openingDate).toLocaleDateString();
+  
+  const handleDelete = () => {
+    deleteCapsule(
+      { id: capsuleId },
+      {
+        onSuccess: () => {
+          setShowDeleteDialog(false);
+        },
+      }
+    );
+  };
+  
   return (
     <div className="flex items-center gap-2">
       <Sheet>
@@ -397,28 +426,59 @@ const RowActions = ({
           <SheetHeader>
             <SheetTitle>Capsule Preview</SheetTitle>
             <SheetDescription>
-              Opening: {new Date(row.original.openingDate).toLocaleDateString()}
+              Opening: {openingDate}
             </SheetDescription>
           </SheetHeader>
           <CapsuleContent data={row.original} />
         </SheetContent>
       </Sheet>
       <Link
-        href={`/admin/capsules/${row.getValue('id')}`}
+        href={`/admin/capsules/${capsuleId}`}
         className="p-2 hover:bg-accent rounded-md transition-colors"
         title="View details"
       >
         <Eye className="h-4 w-4" />
       </Link>
       <Link
-        href={`/admin/capsules/${row.getValue('id')}/edit`}
+        href={`/admin/capsules/${capsuleId}/edit`}
         className="p-2 hover:bg-accent rounded-md transition-colors"
         title="Edit capsule"
       >
         <Pencil className="h-4 w-4" />
       </Link>
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+            title="Delete capsule"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Capsule</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this capsule (opening: <strong>{openingDate}</strong>)? This action cannot be undone and all associated content will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-  )
+  );
 }
 export function AdminCapsulesPageClient() {
   const [sorting, setSorting] = useState<SortingState>([])

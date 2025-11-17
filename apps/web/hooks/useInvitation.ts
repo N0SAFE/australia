@@ -1,36 +1,30 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { orpc } from '@/lib/orpc'
+import { authClient } from '@/lib/auth'
 
 /**
- * Query hook to check invitation token validity
+ * Hook to check invitation token validity
  */
-export function useCheckInvitation(token: string, options?: { enabled?: boolean }) {
-  return useQuery(orpc.invitation.check.queryOptions({
-    input: { token },
-    enabled: (options?.enabled ?? true) && !!token,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 10, // 10 minutes
-    retry: false, // Don't retry failed invitation checks
-  }))
-}
-
-/**
- * Mutation hook to check invitation token validity
- */
-export function useCheckInvitationMutation() {
-  return useMutation(orpc.invitation.check.mutationOptions({
+export function useCheckInvitation() {
+  return useMutation({
+    mutationFn: async (token: string) => {
+      const result = await authClient.invite.check({ token })
+      if (result.error) {
+        throw new Error(result.error.message ?? 'Failed to check invitation')
+      }
+      return result.data
+    },
     onSuccess: (result) => {
-      if (result.success) {
+      if (result?.valid) {
         toast.success('Invitation is valid')
       } else {
-        toast.error(result.message || 'Invalid invitation')
+        toast.error(result?.message || 'Invalid invitation')
       }
     },
     onError: (error: Error) => {
       toast.error(`Failed to check invitation: ${error.message}`)
     },
-  }))
+  })
 }
 
 /**
@@ -39,52 +33,58 @@ export function useCheckInvitationMutation() {
 export function useValidateInvitation() {
   const queryClient = useQueryClient()
   
-  return useMutation(orpc.invitation.validate.mutationOptions({
-    onSuccess: (result) => {
-      if (result.success) {
-        toast.success(result.message || 'Account created successfully!')
-        // Invalidate all user queries
-        queryClient.invalidateQueries({ queryKey: orpc.user.key() })
-      } else {
-        toast.error(result.message || 'Failed to create account')
+  return useMutation({
+    mutationFn: async ({ token, password, name }: { token: string; password: string; name: string }) => {
+      const result = await authClient.invite.validate({ token, password, name })
+      if (result.error) {
+        throw new Error(result.error.message ?? 'Failed to validate invitation')
       }
+      return result.data
+    },
+    onSuccess: () => {
+      toast.success('Account created successfully!')
+      // Invalidate session to refetch user data
+      queryClient.invalidateQueries({ queryKey: ['better-auth'] })
     },
     onError: (error: Error) => {
       toast.error(`Failed to validate invitation: ${error.message}`)
     },
-  }))
+  })
 }
 
 /**
  * Hook to create invitation (admin only)
  */
 export function useCreateInvitation() {
-  const queryClient = useQueryClient()
-  
-  return useMutation(orpc.invitation.create.mutationOptions({
+  return useMutation({
+    mutationFn: async ({ email, role }: { email: string; role: string }) => {
+      const result = await authClient.invite.create({ email, role })
+      if (result.error) {
+        throw new Error(result.error.message ?? 'Failed to create invitation')
+      }
+      return result.data
+    },
     onSuccess: () => {
       toast.success('Invitation created successfully')
-      // Invalidate all invitation queries
-      queryClient.invalidateQueries({ queryKey: orpc.invitation.key() })
     },
     onError: (error: Error) => {
       toast.error(`Failed to create invitation: ${error.message}`)
     },
-  }))
+  })
 }
 
 /**
  * Composite hook for invitation actions
  */
 export function useInvitationActions() {
-  const checkInvitationMutation = useCheckInvitationMutation()
+  const checkInvitation = useCheckInvitation()
   const validateInvitation = useValidateInvitation()
   const createInvitation = useCreateInvitation()
 
   return {
     // Convenience methods
-    checkInvitation: checkInvitationMutation.mutate,
-    checkInvitationAsync: checkInvitationMutation.mutateAsync,
+    checkInvitation: checkInvitation.mutate,
+    checkInvitationAsync: checkInvitation.mutateAsync,
     validateInvitation: validateInvitation.mutate,
     validateInvitationAsync: validateInvitation.mutateAsync,
     createInvitation: createInvitation.mutate,
@@ -92,14 +92,14 @@ export function useInvitationActions() {
     
     // Grouped loading states
     isLoading: {
-      check: checkInvitationMutation.isPending,
+      check: checkInvitation.isPending,
       validate: validateInvitation.isPending,
       create: createInvitation.isPending,
     },
     
     // Grouped error states
     errors: {
-      check: checkInvitationMutation.error,
+      check: checkInvitation.error,
       validate: validateInvitation.error,
       create: createInvitation.error,
     },

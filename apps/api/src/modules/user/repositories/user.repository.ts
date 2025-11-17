@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { DatabaseService } from "../../../core/modules/database/services/database.service";
-import { user, invitation } from "@/config/drizzle/schema/auth";
+import { user, invite } from "@/config/drizzle/schema/auth";
 import { eq, desc, asc, like, count, and, SQL, sql } from "drizzle-orm";
 import { userCreateInput, userUpdateInput, userListInput, userFindByIdOutput } from "@repo/api-contracts";
 import { z } from "zod";
@@ -100,7 +100,7 @@ export class UserRepository {
 
         if (input.filter?.email) {
             userConditions.push(like(user.email, `%${input.filter.email}%`));
-            invitationConditions.push(like(invitation.email, `%${input.filter.email}%`));
+            invitationConditions.push(like(invite.email, `%${input.filter.email}%`));
         }
 
         if (input.filter?.id) {
@@ -144,7 +144,7 @@ export class UserRepository {
             }
         }
 
-        // First, get all existing users with their invitation status
+        // First, get all existing users with their invite status
         const existingUsersQuery = this.databaseService.db
             .select({
                 id: user.id,
@@ -156,36 +156,36 @@ export class UserRepository {
                 updatedAt: user.updatedAt,
                 invitationStatus: sql<string | null>`
                     CASE 
-                        WHEN ${invitation.usedAt} IS NOT NULL THEN 'accepted'
-                        WHEN ${invitation.expiresAt} < NOW() THEN 'expired'
-                        WHEN ${invitation.token} IS NOT NULL THEN 'pending'
+                        WHEN ${invite.usedAt} IS NOT NULL THEN 'accepted'
+                        WHEN ${invite.expiresAt} < NOW() THEN 'expired'
+                        WHEN ${invite.token} IS NOT NULL THEN 'pending'
                         ELSE NULL
                     END
                 `.as('invitation_status'),
-                invitationToken: invitation.token,
+                invitationToken: invite.token,
             })
             .from(user)
-            .leftJoin(invitation, eq(user.email, invitation.email))
+            .leftJoin(invite, eq(user.email, invite.email))
             .orderBy(orderByCondition);
 
         const existingUsers = userWhereCondition
             ? await existingUsersQuery.where(userWhereCondition)
             : await existingUsersQuery;
 
-        // Get all invitation emails that have users (to exclude them from pending invitations)
+        // Get all invite emails that have users (to exclude them from pending invitations)
         const existingUserEmails = new Set(existingUsers.map(u => u.email));
 
         // Second, get pending invitations for emails that don't have user accounts yet
         const pendingInvitationsQuery = this.databaseService.db
             .select({
-                id: invitation.id,
-                email: invitation.email,
-                token: invitation.token,
-                createdAt: invitation.createdAt,
-                expiresAt: invitation.expiresAt,
-                usedAt: invitation.usedAt,
+                id: invite.id,
+                email: invite.email,
+                token: invite.token,
+                createdAt: invite.createdAt,
+                expiresAt: invite.expiresAt,
+                usedAt: invite.usedAt,
             })
-            .from(invitation);
+            .from(invite);
 
         const allInvitations = invitationWhereCondition
             ? await pendingInvitationsQuery.where(invitationWhereCondition)
@@ -205,7 +205,7 @@ export class UserRepository {
                 }
 
                 return {
-                    id: inv.id, // Use invitation ID for pending invitations
+                    id: inv.id, // Use invite ID for pending invitations
                     name: inv.email.split('@')[0], // Generate name from email
                     email: inv.email,
                     emailVerified: false,

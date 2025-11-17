@@ -4,7 +4,7 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '@/core/modules/database/services/database.service';
 import { eq } from 'drizzle-orm';
-import { invitation } from '@/config/drizzle/schema/auth';
+import { invite } from '@/config/drizzle/schema/auth';
 import * as crypto from 'crypto';
 
 export interface CreateInvitationInput {
@@ -27,7 +27,7 @@ export class InvitationRepository {
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
 
     const results = await this.databaseService.db
-      .insert(invitation)
+      .insert(invite)
       .values({
         id,
         email: input.email,
@@ -39,6 +39,7 @@ export class InvitationRepository {
       .returning();
 
     const newInvitation = results[0];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!newInvitation) {
       throw new Error('Failed to create invitation');
     }
@@ -52,8 +53,8 @@ export class InvitationRepository {
   async findByToken(token: string) {
     const results = await this.databaseService.db
       .select()
-      .from(invitation)
-      .where(eq(invitation.token, token))
+      .from(invite)
+      .where(eq(invite.token, token))
       .limit(1);
 
     return results[0] ?? null;
@@ -64,9 +65,9 @@ export class InvitationRepository {
    */
   async markAsUsed(token: string) {
     const results = await this.databaseService.db
-      .update(invitation)
+      .update(invite)
       .set({ usedAt: new Date() })
-      .where(eq(invitation.token, token))
+      .where(eq(invite.token, token))
       .returning();
 
     return results[0] ?? null;
@@ -78,7 +79,7 @@ export class InvitationRepository {
   async isValid(token: string): Promise<boolean> {
     const inv = await this.findByToken(token);
     
-    if (!inv) {
+    if (!inv as boolean) {
       return false;
     }
 

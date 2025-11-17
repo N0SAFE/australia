@@ -28,5 +28,4 @@ export type {
   AllRoleNames,
   PermissionTypes,
   AccessControlInstance,
-  AccessControlRoles,
 } from './types';

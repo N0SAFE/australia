@@ -5,6 +5,8 @@ export type { CreateAuthClientFactoryOptions } from "./auth-client";
 // Export client plugins
 export { default as masterTokenClient } from "./plugins/masterToken";
 export { loginAsClientPlugin } from "./plugins/loginAs";
+export { inviteClient } from "./plugins/invite";
+export type { InviteClientPlugin } from "./plugins/invite";
 
 // Export guards
 export * from "./plugins/guards";

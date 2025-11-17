@@ -2,7 +2,7 @@ import type { Resource, Permission, RoleName } from "./system/types";
 import { permissionConfig } from "./config";
 
 const statement = permissionConfig.statement;
-const roles = permissionConfig.getRoles();
+const roles = permissionConfig.roles;
 
 export class PermissionChecker {
   static validatePermission<T extends Resource>(

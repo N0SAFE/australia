@@ -1,9 +1,9 @@
 import type { Statements } from "better-auth/plugins/access";
 import { createAccessControl } from "better-auth/plugins/access";
-import type { AccessControlRoles } from "../types";
 import { BaseConfig } from "./shared/base-config";
 import { StatementsConfig } from "./statements/statements-config";
 import { RolesConfig } from "./roles/roles-config";
+import { createSchemas } from "./schemas";
 
 /**
  * Permission Builder API
@@ -46,7 +46,7 @@ export class ResourceBuilder<
    * @param actions - Array of action names
    * @returns The parent PermissionBuilder for method chaining
    */
-  actions<TActions extends readonly string[]>(
+  actions<const TActions extends readonly string[]>(
     actions: TActions
   ): PermissionBuilder<
     TStatement & Record<TResource, TActions>,
@@ -80,7 +80,7 @@ export class RoleBuilder<
    * @returns The parent PermissionBuilder for method chaining
    */
   permissions<
-    TPermissions extends {
+    const TPermissions extends {
       [K in keyof TStatement]?: readonly (TStatement[K][number])[];
     }
   >(
@@ -115,14 +115,14 @@ export class RoleBuilder<
  * with full type safety and autocomplete support.
  */
 export class PermissionBuilder<
-  TStatement extends Record<string, readonly string[]> = Record<string, readonly string[]>,
-  TRoles extends Record<string, Record<string, readonly string[]>> = Record<string, never>
+  TStatement extends Record<string, readonly string[]>,
+  TRoles extends Record<string, Record<string, readonly string[]>>
 > extends BaseConfig<{
   statementsConfig: StatementsConfig<TStatement>;
   rolesConfig: RolesConfig<TRoles>;
   statement: TStatement & Statements;
   ac: ReturnType<typeof createAccessControl<TStatement>>;
-  roles: TRoles & AccessControlRoles;
+  roles: TRoles;
 }> {
   /** @internal */
   _statement: Record<string, readonly string[]> = {};
@@ -139,14 +139,38 @@ export class PermissionBuilder<
   }
 
   /**
-   * Start building with default Better Auth admin statements
-   * @param defaultStatements - The default Better Auth statements to include
+   * Start building with default Better Auth admin roles
+   * @param defaultRoles - The default Better Auth roles to include (each role has a statements property)
    */
-  static withDefaults<TDefaults extends Record<string, readonly string[]>>(
-    defaultStatements: TDefaults
-  ): PermissionBuilder<TDefaults> {
-    const builder = new PermissionBuilder<TDefaults>();
-    builder._statement = { ...defaultStatements };
+  static withDefaults<
+    TDefaultRoles extends Record<string, { statements: Record<string, readonly string[]> }>,
+    TStatement extends Record<string, readonly string[]> = {
+      [K in keyof TDefaultRoles]: TDefaultRoles[K]['statements']
+    }[keyof TDefaultRoles],
+    TRoles extends Record<string, Record<string, readonly string[]>> = {
+      [K in keyof TDefaultRoles]: TDefaultRoles[K]['statements']
+    }
+  >(
+    defaultRoles: TDefaultRoles
+  ): PermissionBuilder<TStatement, TRoles> {
+    const builder = new PermissionBuilder<TStatement, TRoles>();
+    
+    // Extract and merge all statements from all roles
+    const allStatements: Record<string, readonly string[]> = {};
+    for (const roleName in defaultRoles) {
+      const role = defaultRoles[roleName];
+      Object.assign(allStatements, role.statements);
+    }
+    builder._statement = allStatements;
+    
+    // Extract roles structure - map role names to their statements
+    // This is what _roles expects: { roleName: { resource: [actions] } }
+    const rolesStructure: Record<string, Record<string, readonly string[]>> = {};
+    for (const roleName in defaultRoles) {
+      rolesStructure[roleName] = defaultRoles[roleName].statements;
+    }
+    Object.assign(builder._roles, rolesStructure);
+    
     return builder;
   }
 
@@ -162,16 +186,34 @@ export class PermissionBuilder<
   }
 
   /**
-   * Add multiple resources at once
-   * @param resources - Object mapping resource names to their actions
+   * Add multiple resources at once with a simple actions helper
+   * @param resourcesFactory - Function that receives helpers (actions placeholder) and returns resource definitions
    * @returns The PermissionBuilder for method chaining
    */
   resources<
-    TResources extends Record<string, readonly string[]>
+    const TResources extends Record<string, readonly string[]>
   >(
-    resources: TResources
+    resourcesFactory: (helpers: {
+      actions: <const TActions extends readonly string[]>(
+        actions: TActions
+      ) => TActions;
+    }) => TResources
   ): PermissionBuilder<TStatement & TResources, TRoles> {
-    Object.assign(this._statement, resources);
+    // Create helpers object with identity actions function
+    const helpers = {
+      actions: <const TActions extends readonly string[]>(
+        actions: TActions
+      ): TActions => actions
+    };
+    
+    // Get resource definitions from factory
+    const resourceDefinitions = resourcesFactory(helpers);
+    
+    // Use ResourceBuilder for each resource
+    for (const [resourceName, actions] of Object.entries(resourceDefinitions)) {
+      new ResourceBuilder(this, resourceName).actions(actions);
+    }
+    
     return this as unknown as PermissionBuilder<TStatement & TResources, TRoles>;
   }
 
@@ -180,7 +222,7 @@ export class PermissionBuilder<
    * @param name - The role name
    * @returns A RoleBuilder for defining role permissions
    */
-  role<TRole extends string>(
+  role<const TRole extends string>(
     name: TRole
   ): RoleBuilder<TStatement, TRoles, TRole> {
     this._ac ??= createAccessControl(this._statement as TStatement);
@@ -188,35 +230,64 @@ export class PermissionBuilder<
   }
 
   /**
-   * Add multiple roles at once
-   * @param roles - Function that receives the ac instance and returns roles
+   * Add multiple roles at once with a simple permissions helper
+   * @param rolesFactory - Function that receives helpers (statement and permissions placeholder) and returns role definitions
    * @returns The PermissionBuilder for method chaining
    */
-  roles<TNewRoles extends Record<string, unknown>>(
-    rolesFactory: (ac: ReturnType<typeof createAccessControl<TStatement>>) => TNewRoles
+  roles<
+    const TNewRoles extends Record<string, Record<string, readonly string[]>>
+  >(
+    rolesFactory: (helpers: {
+      statement: TStatement;
+      permissions: <
+        const TPermissions extends {
+          [K in keyof TStatement]?: readonly (TStatement[K][number])[];
+        }
+      >(permissions: TPermissions) => TPermissions;
+    }) => TNewRoles
   ): PermissionBuilder<TStatement, TRoles & TNewRoles> {
+    // Create helpers object with statement and identity permissions function
+    const helpers = {
+      statement: this._statement as TStatement,
+      permissions: <
+        const TPermissions extends {
+          [K in keyof TStatement]?: readonly (TStatement[K][number])[];
+        }
+      >(permissions: TPermissions): TPermissions => permissions
+    };
+    
+    // Get role definitions from factory
+    const roleDefinitions = rolesFactory(helpers);
+    
+    // Initialize access control if not already created
     this._ac ??= createAccessControl(this._statement as TStatement);
-    const newRoles = rolesFactory(this._ac);
-    Object.assign(this._roles, newRoles);
+    
+    // Create RoleBuilder for each role and call permissions
+    for (const [roleName, perms] of Object.entries(roleDefinitions)) {
+      new RoleBuilder(this, roleName, this._ac).permissions(perms);
+    }
+    
     return this as unknown as PermissionBuilder<TStatement, TRoles & TNewRoles>;
   }
 
   /**
-   * Build and return the final statement, access control instance, and roles
-   * @returns Object containing statementsConfig, rolesConfig, statement, ac, and roles
+   * Build and return the final statement, access control instance, roles, and schemas
+   * @returns Object containing statementsConfig, rolesConfig, statement, ac, roles, and schemas
    */
   build() {
     this._ac = createAccessControl(this._statement as TStatement);
     this._statementsConfig = new StatementsConfig(this._statement as TStatement);
     this._rolesConfig = new RolesConfig(this._roles as TRoles);
+    const schemas = createSchemas(this);
 
     return {
       statementsConfig: this._statementsConfig,
       rolesConfig: this._rolesConfig,
-      statement: this._statement as TStatement & Statements,
+      statement: this._statement as TStatement,
        
       ac: this._ac,
-      roles: this._roles as TRoles & AccessControlRoles,
+      roles: this._roles as TRoles,
+      schemas,
     };
   }
 
@@ -317,7 +388,7 @@ export function createPermissionBuilder() {
  * Helper function to create a PermissionBuilder with Better Auth defaults
  */
 export function createPermissionBuilderWithDefaults<
-  TDefaults extends Record<string, readonly string[]>
->(defaultStatements: TDefaults) {
-  return PermissionBuilder.withDefaults(defaultStatements);
+  TDefaultRoles extends Record<string, { statements: Record<string, readonly string[]> }>
+>(defaultRoles: TDefaultRoles) {
+  return PermissionBuilder.withDefaults(defaultRoles);
 }

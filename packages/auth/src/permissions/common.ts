@@ -1,71 +1,66 @@
-import { permissionConfig } from "./config";
+import { schemas } from "./config";
 
+/**
+ * Common permission definitions that can be reused across the application
+ */
 export const commonPermissions = {
-    // projectReadOnly: permissionConfig.createPermission({
-    //     project: ["read"],
-    // }),
+    // Resource-specific read-only permissions
+    capsuleReadOnly: {
+        capsule: ["list", "read"] as const,
+    },
 
-    // organizationReadOnly: permissionConfig.createPermission({
-    //     organization: ["read"],
-    // }),
+    // Resource-specific full access
+    capsuleFullAccess: {
+        capsule: ["list", "read", "create", "update", "delete"] as const,
+    },
 
-    // userManagement: permissionConfig.createPermission(({ statementsConfig }) => ({
-    //     user: statementsConfig.get("user").all(),
-    // })),
+    // Write operations (create, update, delete)
+    capsuleWriteAccess: {
+        capsule: ["create", "update", "delete"] as const,
+    },
 
-    // userViewing: permissionConfig.createPermission(({ statementsConfig }) => ({
-    //     user: statementsConfig.get("user").pick(["list", "get"]),
-    // })),
+    // List-only access
+    capsuleListOnly: {
+        capsule: ["list"] as const,
+    },
+} as const;
 
-    // sessionManagement: permissionConfig.createPermission(({ statementsConfig }) => ({
-    //     session: statementsConfig.get("session").all(),
-    // })),
+/**
+ * Common schema definitions for permission validation
+ */
+export const commonSchemas = {
+    // Schema for read-only actions across all resources
+    readOnlyActions: schemas.actions.only("list", "read"),
 
-    // sessionViewing: permissionConfig.createPermission({
-    //     session: ["list"],
-    // }),
+    // Schema for write actions (create, update, delete)
+    writeActions: schemas.actions.filter((action): action is "create" | "update" | "delete" => new RegExp(/create|update|delete/).exec(action) !== null),
 
-    // billingReadOnly: permissionConfig.createPermission({
-    //     billing: ["read"],
-    // }),
+    // Schema for capsule-specific actions
+    capsuleActions: schemas.actions.forResource("capsule"),
 
-    // analyticsReadOnly: permissionConfig.createPermission({
-    //     analytics: ["read"],
-    // }),
+    // Schema for dangerous/destructive actions
+    destructiveActions: schemas.actions.only("delete"),
 
-    // systemMonitoring: permissionConfig.createPermission({
-    //     system: ["monitor"],
-    // }),
+    // Schema for safe actions (excluding delete)
+    safeActions: schemas.actions.excluding("delete"),
 
-    // // Using collection API to get read-only access across all resources
-    // readOnlyAccess: permissionConfig.createPermission(({ statementsConfig }) => 
-    //     statementsConfig.getAll().readOnly()
-    // ),
+    // Custom permission schemas
+    readOnlyPermission: schemas.actions.customPermission({
+        capsule: ["list", "read"] as const,
+    }),
 
-    // // Using collection API to get all resources with all actions
-    // superAdminAccess: permissionConfig.createPermission(({ statementsConfig }) => 
-    //     statementsConfig.getAll().all()
-    // ),
+    writeOnlyPermission: schemas.actions.customPermission({
+        capsule: ["create", "update", "delete"] as const,
+    }),
 
-    // // Using collection API to get only CRUD operations across all resources
-    // crudAccess: permissionConfig.createPermission(({ statementsConfig }) => 
-    //     statementsConfig.getAll().crudOnly()
-    // ),
+    // Schema for admin permissions on capsule
+    adminCapsulePermission: schemas.actions.forRoleOnResource("admin", "capsule"),
 
-    // // Using collection API to get write operations (create, update, delete) across all resources
-    // writeAccess: permissionConfig.createPermission(({ statementsConfig }) => 
-    //     statementsConfig.getAll().writeOnly()
-    // ),
+    // Schema for all admin actions
+    adminAllActions: schemas.actions.forRole("admin"),
 
-    // // Using collection API to pick specific actions across all resources
-    // listAndReadAccess: permissionConfig.createPermission(({ statementsConfig }) => 
-    //     statementsConfig.getAll().pick(["list"])
-    // ),
-
-    // // Using collection API to omit dangerous actions across all resources
-    // safeModeAccess: permissionConfig.createPermission(({ statementsConfig }) => 
-    //     statementsConfig.getAll().omit(["delete"])
-    // ),
+    // Schema for Sarah's actions
+    sarahAllActions: schemas.actions.forRole("sarah"),
 } as const;
 
 export type CommonPermissionKeys = keyof typeof commonPermissions;

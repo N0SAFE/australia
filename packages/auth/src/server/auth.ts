@@ -5,7 +5,7 @@ import { openAPI } from "better-auth/plugins";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { masterTokenPlugin } from "./plugins/masterTokenAuth";
 import { loginAsPlugin } from "./plugins/loginAs";
-import { useAdmin } from "../permissions/index";
+import { useAdmin, useInvite } from "../permissions/index";
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export const betterAuthFactory = <TSchema extends Record<string, unknown> = Record<string, never>>(
@@ -111,6 +111,9 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
                     devAuthKey: DEV_AUTH_KEY ?? "",
                 }),
                 openAPI(),
+                useInvite({
+                    inviteDurationDays: 7,
+                })
             ],
         }),
     };

@@ -72,20 +72,23 @@ function InviteUserDialog() {
     
     try {
       setIsGenerating(true);
-      const result = await orpc.invitation.create.call({
+      const { authClient } = await import('@/lib/auth');
+      const result = await authClient.invite.create({
         email,
         role,
       });
       
-      if (result.success && result.token) {
-        setInviteCode(result.token);
-        toast.success('Invitation code generated successfully');
+      if (result.data?.token) {
+        setInviteCode(result.data.token);
+        toast.success('Invitation created successfully');
+      } else if (result.error) {
+        toast.error(result.error.message ?? 'Failed to create invitation');
       } else {
-        toast.error('Failed to generate invitation code');
+        toast.error('Failed to create invitation');
       }
     } catch (error) {
       console.error('Error generating invite:', error);
-      toast.error('Failed to generate invitation code');
+      toast.error('Failed to create invitation');
     } finally {
       setIsGenerating(false);
     }

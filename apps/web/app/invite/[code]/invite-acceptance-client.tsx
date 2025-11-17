@@ -31,6 +31,7 @@ import {
   FormMessage,
 } from "@repo/ui/components/shadcn/form";
 import { User, UserLogin, UserAppLayoutHome } from "@/routes";
+import { useQuery } from "@tanstack/react-query";
 
 const inviteFormSchema = z
   .object({
@@ -56,7 +57,11 @@ export function InviteAcceptanceClient({
 }: InviteAcceptanceClientProps) {
   const router = useRouter();
 
-  const checkInvitation = useCheckInvitation(token);
+  const checkInvitationMutation = useCheckInvitation();
+  const checkInvitation = useQuery({
+    queryKey: ["check-invitation", token],
+    queryFn: () => checkInvitationMutation.mutateAsync(token),
+  });
   const validateInvitation = useValidateInvitation();
   const signOut = useSignOutMutation();
   const signInEmail = useSignInEmailMutation();
@@ -72,14 +77,14 @@ export function InviteAcceptanceClient({
 
   // Show invitation email when available
   useEffect(() => {
-    if (checkInvitation.data?.success) {
+    if (checkInvitation.data?.valid && 'email' in checkInvitation.data && checkInvitation.data.email) {
       toast.info(`Creating account for: ${checkInvitation.data.email}`);
     }
   }, [checkInvitation.data]);
 
   const handleSubmit = async (values: z.infer<typeof inviteFormSchema>) => {
     const invitationData = checkInvitation.data;
-    if (!invitationData?.success) {
+    if (!invitationData?.valid || !('email' in invitationData) || !invitationData.email) {
       toast.error("Invalid invitation");
       return;
     }
@@ -90,33 +95,31 @@ export function InviteAcceptanceClient({
     });
 
     // Validate invitation and create account
-    const result = await validateInvitation.mutateAsync({
+    await validateInvitation.mutateAsync({
       token,
       password: values.password,
       name: values.name,
     });
 
-    if (result.success) {
-      // Auto-login after successful account creation
-      const { data, error } = await signInEmail.mutateAsync(
-        {
-          email: invitationData.email,
-          password: values.password,
+    // Auto-login after successful account creation
+    const { data, error } = await signInEmail.mutateAsync(
+      {
+        email: invitationData.email,
+        password: values.password,
+      },
+      {
+        onError: (error) => {
+          console.error("Auto-login error:", error);
+          toast.error("An error occurred. Please try logging in manually.");
+          router.push(UserLogin({}));
         },
-        {
-          onError: (error) => {
-            console.error("Auto-login error:", error);
-            toast.error("An error occurred. Please try logging in manually.");
-            router.push(UserLogin({}));
-          },
-        },
-      );
-      if (error) {
-        console.error("Auto-login failed:", error);
-      } else {
-        const destination = redirectUrl || UserAppLayoutHome({});
-        router.push(destination);
-      }
+      },
+    );
+    if (error) {
+      console.error("Auto-login failed:", error);
+    } else {
+      const destination = redirectUrl || UserAppLayoutHome({});
+      router.push(destination);
     }
   };
 
@@ -136,10 +139,10 @@ export function InviteAcceptanceClient({
     );
   }
 
-  if (checkInvitation.isError || !checkInvitation.data?.success) {
+  if (checkInvitation.isError || (checkInvitation.data && !checkInvitation.data.valid)) {
     const errorMessage = checkInvitation.isError
       ? "Failed to validate invitation token. Please try again."
-      : (!checkInvitation.data?.success && checkInvitation.data?.message) ||
+      : (checkInvitation.data && 'message' in checkInvitation.data ? checkInvitation.data.message : null) ||
         "This invitation link is invalid or has expired.";
 
     return (
@@ -184,7 +187,7 @@ export function InviteAcceptanceClient({
                 <FormLabel>Email</FormLabel>
                 <Input
                   type="email"
-                  value={checkInvitation.data?.email || ""}
+                  value={checkInvitation.data && 'email' in checkInvitation.data ? checkInvitation.data.email : ""}
                   disabled
                   className="bg-muted"
                 />

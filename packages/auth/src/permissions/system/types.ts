@@ -1,10 +1,5 @@
 import type { createAccessControl } from 'better-auth/plugins/access';
 
-export type AccessControlRoles = Record<
-  string,
-  ReturnType<ReturnType<typeof createAccessControl>['newRole']>
->;
-
 export type Resource = string;
 
 export type ResourceActions = Record<Resource, string[]>;

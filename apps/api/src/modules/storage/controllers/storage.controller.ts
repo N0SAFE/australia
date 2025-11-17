@@ -3,6 +3,7 @@ import { Implement, implement } from '@orpc/nest';
 import { ORPCError } from '@orpc/server';
 import { StorageService } from '../services/storage.service';
 import { FileMetadataService } from '../services/file-metadata.service';
+import { VideoProcessingService } from '../services/video-processing.service';
 import { storageContract } from '@repo/api-contracts';
 import { readFile } from 'fs/promises';
 
@@ -11,6 +12,7 @@ export class StorageController {
   constructor(
     private readonly storageService: StorageService,
     private readonly fileMetadataService: FileMetadataService,
+    private readonly videoProcessingService: VideoProcessingService,
   ) {}
 
   /**
@@ -124,12 +126,21 @@ export class StorageController {
         uploadedBy: context.user?.id,
       });
 
+      // Start async video processing (non-blocking)
+      // Client can subscribe to WebSocket for progress updates
+      this.videoProcessingService.startProcessing(
+        dbResult.videoMetadata.id,
+        absoluteFilePath
+      );
+
       console.log('[StorageController] uploadVideo successful:', {
         originalName: input.file.name,
         serverFilename: multerMetadata.filename,
         size: input.file.size,
         mimeType: input.file.type,
         dbFileId: dbResult.file.id,
+        videoMetadataId: dbResult.videoMetadata.id,
+        processingStarted: true,
       });
 
       return {
@@ -137,6 +148,10 @@ export class StorageController {
         path: `/storage/files/${multerMetadata.filename}`,
         size: input.file.size,
         mimeType: input.file.type,
+        fileId: dbResult.file.id,
+        videoId: dbResult.videoMetadata.id,
+        isProcessed: false,
+        message: 'Video uploaded. Processing started. Subscribe to WebSocket for progress updates.',
       };
     });
   }

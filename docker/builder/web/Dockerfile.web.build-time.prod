@@ -29,7 +29,7 @@ ENV NEXT_PUBLIC_DOC_PORT=$NEXT_PUBLIC_DOC_PORT
 ENV AUTH_SECRET=$AUTH_SECRET
 
 # Install system dependencies and Turbo
-RUN apk add --no-cache libc6-compat dumb-init
+RUN apk add --no-cache libc6-compat dumb-init tar
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install -g turbo@^2
 WORKDIR /app
 
@@ -109,7 +109,7 @@ RUN apk add --no-cache \
 COPY --from=source-copier /app/ /app/
 
 # Copy all node_modules using bind mount to avoid --parents issues
-# Use tar to preserve all symlinks correctly (cp can follow symlinks in bind mounts)
+# Use tar to preserve all symlinks correctly and set ownership to root (builder stage)
 RUN --mount=type=bind,from=installer,source=/app,target=/mnt/installer \
     cd /mnt/installer && tar cf - node_modules | tar xf - -C /app && \
     find /mnt/installer/apps -name node_modules -type d | while read dir; do \

@@ -17,7 +17,8 @@ RUN apk add --no-cache \
     make \
     g++ \
     gcc \
-    musl-dev
+    musl-dev \
+    tar
 
 # Install Turbo globally with cache mount
 RUN --mount=type=cache,target=/root/.bun \
@@ -105,18 +106,18 @@ ENV LOG_LEVEL=debug
 COPY --from=source-copier /app/ /app/
 
 # Copy all node_modules using bind mount to avoid --parents issues
-# Use tar to preserve all symlinks correctly (cp can follow symlinks in bind mounts)
+# Use tar to preserve all symlinks correctly and set ownership to root
 RUN --mount=type=bind,from=installer,source=/app,target=/mnt/installer \
-    cd /mnt/installer && tar cf - node_modules | tar xf - -C /app && \
+    cd /mnt/installer && tar cf - node_modules | tar xf - -C /app --owner=root --group=root && \
     find /mnt/installer/apps -name node_modules -type d | while read dir; do \
         target_dir=$(echo "$dir" | sed 's|/mnt/installer/||'); \
         mkdir -p "$(dirname "$target_dir")"; \
-        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app; \
+        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=root --group=root; \
     done && \
     find /mnt/installer/packages -name node_modules -type d | while read dir; do \
         target_dir=$(echo "$dir" | sed 's|/mnt/installer/||'); \
         mkdir -p "$(dirname "$target_dir")"; \
-        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app; \
+        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=root --group=root; \
     done
 
 COPY --parents --chmod=a+w .turbo/ **/.turbo/ ./

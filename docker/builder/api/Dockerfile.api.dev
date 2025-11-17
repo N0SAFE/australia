@@ -9,7 +9,7 @@
 FROM oven/bun:1.3.1-alpine AS base
 
 # Install system dependencies
-RUN apk add --no-cache curl wget bash git python3 make g++
+RUN apk add --no-cache curl wget bash git python3 make g++ tar
 
 # Copy Node.js 22 installation from the Node.js image (binaries + libraries)
 COPY --from=node:22-alpine /usr/local /usr/local
@@ -110,18 +110,18 @@ ENV LOG_LEVEL=debug
 COPY --from=source-copier /app/ /app/
 
 # Copy all node_modules using bind mount to avoid --parents issues
-# Use tar to preserve all symlinks correctly (cp can follow symlinks in bind mounts)
+# Use tar to preserve all symlinks correctly and set ownership to root
 RUN --mount=type=bind,from=installer,source=/app,target=/mnt/installer \
-    cd /mnt/installer && tar cf - node_modules | tar xf - -C /app && \
+    cd /mnt/installer && tar cf - node_modules | tar xf - -C /app --owner=root --group=root && \
     find /mnt/installer/apps -name node_modules -type d | while read dir; do \
         target_dir=$(echo "$dir" | sed 's|/mnt/installer/||'); \
         mkdir -p "$(dirname "$target_dir")"; \
-        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app; \
+        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=root --group=root; \
     done && \
     find /mnt/installer/packages -name node_modules -type d | while read dir; do \
         target_dir=$(echo "$dir" | sed 's|/mnt/installer/||'); \
         mkdir -p "$(dirname "$target_dir")"; \
-        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app; \
+        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=root --group=root; \
     done
 
 COPY --parents --chmod=a+w .turbo/ **/.turbo/ ./

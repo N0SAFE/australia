@@ -1,8 +1,10 @@
 import { HomePage } from '@/components/pages/home';
 import { Capsule } from '@/types/capsule';
 import { getRecentCapsules } from '@/hooks/useCapsules';
+import { connection } from 'next/server';
 
 export default async function Home() {
+  await connection();
   let capsules: Capsule[] = [];
   try {
     const result = await getRecentCapsules();

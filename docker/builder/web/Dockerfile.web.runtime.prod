@@ -90,7 +90,8 @@ RUN apk add --no-cache \
     make \
     g++ \
     gcc \
-    musl-dev
+    musl-dev \
+    tar
 
 # Install Node.js for Next.js production
 RUN apk add --no-cache nodejs
@@ -117,22 +118,19 @@ RUN --mount=type=bind,source=.,target=/mnt/source \
     chown -R nextjs:nodejs /app
 
 # Copy all node_modules using bind mount to avoid --parents issues
-# Use tar to preserve all symlinks correctly (cp can follow symlinks in bind mounts)
+# Use tar to preserve all symlinks correctly and set ownership to nextjs:nodejs
 RUN --mount=type=bind,from=installer,source=/app,target=/mnt/installer \
-    cd /mnt/installer && tar cf - node_modules | tar xf - -C /app && \
+    cd /mnt/installer && tar cf - node_modules | tar xf - -C /app --owner=nextjs --group=nodejs && \
     find /mnt/installer/apps -name node_modules -type d | while read dir; do \
         target_dir=$(echo "$dir" | sed 's|/mnt/installer/||'); \
         mkdir -p "$(dirname "$target_dir")"; \
-        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app; \
+        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=nextjs --group=nodejs; \
     done && \
     find /mnt/installer/packages -name node_modules -type d | while read dir; do \
         target_dir=$(echo "$dir" | sed 's|/mnt/installer/||'); \
         mkdir -p "$(dirname "$target_dir")"; \
-        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app; \
+        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=nextjs --group=nodejs; \
     done
-
-# Change ownership of copied node_modules (must be separate RUN after bind mount is unmounted)
-RUN chown -R nextjs:nodejs /app/node_modules /app/apps/*/node_modules /app/packages/*/node_modules 2>/dev/null || true
 
 COPY --chown=nextjs:nodejs --parents --chmod=a+w .turbo/ **/.turbo/ ./
 

@@ -23,12 +23,14 @@ import { REQUEST } from '@nestjs/core'
 import { StorageModule } from "./modules/storage/storage.module";
 import { FileStorageModule } from "./core/modules/file-storage/file-storage.module";
 import { PresentationModule } from "./modules/presentation/presentation.module";
+import { FfmpegModule } from "./core/modules/ffmpeg/ffmpeg.module";
 
 @Module({
   imports: [
     EnvModule,
     DatabaseModule,
     FileStorageModule,
+    FfmpegModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, EnvModule],
       useFactory: createBetterAuth,

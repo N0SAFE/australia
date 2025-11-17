@@ -113,8 +113,8 @@ RUN --mount=type=cache,target=/root/.bun --mount=type=cache,target=/root/.cache 
 FROM base AS runner
 WORKDIR /app
 
-# Install runtime dependencies for NestJS
-RUN apk add --no-cache curl wget bash python3 make g++
+# Install runtime dependencies for NestJS including FFmpeg
+RUN apk add --no-cache curl wget bash python3 make g++ ffmpeg
 
 # Create app user
 RUN addgroup --system --gid 1001 nodejs

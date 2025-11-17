@@ -50,14 +50,22 @@ export const multerConfig = {
   },
   fileFilter: (req: any, file: Express.Multer.File, cb: any) => {
     const allowedMimes = [
+      // Images
       'image/jpeg',
       'image/jpg',
       'image/png',
       'image/gif',
       'image/webp',
+      // Videos - will be converted to H.264
       'video/mp4',
       'video/webm',
       'video/ogg',
+      'video/quicktime', // MOV files
+      'video/x-msvideo', // AVI files
+      'video/x-matroska', // MKV files
+      'video/mpeg',
+      'video/x-flv',
+      // Audio
       'audio/mpeg',
       'audio/mp3',
       'audio/wav',

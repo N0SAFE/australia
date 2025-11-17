@@ -51,37 +51,6 @@ async function bootstrap() {
 
   // Debug middleware to log cookies and session
   const http = app.getHttpAdapter().getInstance() as Express;
-  
-  http.use((req, res, next) => {
-    // Only log non-health check requests
-    if (req.path !== '/health' && !req.path.startsWith('/_next')) {
-      console.log('\n🔍 [Cookie Debug] Incoming Request:', {
-        method: req.method,
-        path: req.path,
-        origin: req.headers.origin,
-        cookies: req.headers.cookie,
-        hasAuthHeader: !!req.headers.authorization,
-        allHeaders: Object.keys(req.headers),
-      });
-      
-      // Parse and log individual cookies
-      if (req.headers.cookie) {
-        const cookies = req.headers.cookie.split(';').map(c => c.trim());
-        console.log('🍪 [Cookie Debug] Parsed Cookies:', cookies);
-        
-        // Check for Better Auth session tokens
-        const sessionTokens = cookies.filter(c => c.includes('better-auth.session'));
-        console.log('🔐 [Cookie Debug] Session Tokens Found:', sessionTokens.length);
-        sessionTokens.forEach(token => {
-          const [name] = token.split('=');
-          console.log(`  - ${name}`);
-        });
-      } else {
-        console.log('❌ [Cookie Debug] No cookies in request');
-      }
-    }
-    next();
-  });
 
   // Serve OpenAPI JSON generated from the oRPC app contract
    

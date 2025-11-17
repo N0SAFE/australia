@@ -67,6 +67,20 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
     // - api-the-gossip-club.sebille.net + the-gossip-club.sebille.net
     const cookieDomain: string | undefined = isHttps && AUTH_BASE_DOMAIN ? AUTH_BASE_DOMAIN : undefined;
 
+    // Debug log the auth configuration
+    console.log('\n🔧 [Better Auth Config]', {
+        NODE_ENV,
+        BASE_URL,
+        APP_URL,
+        NEXT_PUBLIC_APP_URL,
+        AUTH_BASE_DOMAIN,
+        isHttps,
+        cookieDomain,
+        trustedOrigins: origins,
+        useSecureCookies: isHttps,
+        crossSubDomainEnabled: isHttps && !!cookieDomain,
+    });
+
     return {
         auth: betterAuth({
             secret: BETTER_AUTH_SECRET ?? process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET,

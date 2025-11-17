@@ -167,32 +167,45 @@ else
     print_success "Certbot already installed ($(certbot --version))"
 fi
 
-# Configure environment file
-print_header "⚙️  Configuring Environment Variables"
+# Configure environment file and secrets
+print_header "⚙️  Configuring Environment Variables and Secrets"
 
-if [ ! -f "$PROJECT_DIR/.env.prod" ]; then
-    print_warning ".env.prod not found. Creating from example..."
+# Function to validate secrets file
+validate_secrets() {
+    local secrets_file="$1"
     
-    if [ -f "$PROJECT_DIR/.env.prod.example" ]; then
-        cp "$PROJECT_DIR/.env.prod.example" "$PROJECT_DIR/.env.prod"
-        
-        # Generate secure secrets
-        print_info "Generating secure secrets..."
-        DB_USER="gossip_club"
-        DB_NAME="gossip_club"
-        DB_PASSWORD=$(openssl rand -hex 32)
-        AUTH_SECRET=$(openssl rand -hex 32)
-        
-        # Construct database URL
-        DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@host.docker.internal:5432/${DB_NAME}"
-        
-        # Update .env.prod with generated values
-        sed -i "s|DATABASE_URL=.*|DATABASE_URL=${DATABASE_URL}|g" "$PROJECT_DIR/.env.prod"
-        sed -i "s|AUTH_SECRET=.*|AUTH_SECRET=${AUTH_SECRET}|g" "$PROJECT_DIR/.env.prod"
-        sed -i "s|BETTER_AUTH_SECRET=.*|BETTER_AUTH_SECRET=${AUTH_SECRET}|g" "$PROJECT_DIR/.env.prod"
-        
-        # Save secrets to a file
-        cat > "$PROJECT_DIR/.secrets.txt" << EOF
+    if [ ! -f "$secrets_file" ]; then
+        return 1
+    fi
+    
+    # Source the secrets file
+    source "$secrets_file"
+    
+    # Check if all required variables are set and non-empty
+    if [ -z "$DB_USER" ] || [ -z "$DB_NAME" ] || [ -z "$DB_PASSWORD" ] || [ -z "$AUTH_SECRET" ]; then
+        return 1
+    fi
+    
+    # Validate DATABASE_URL format
+    if [ -z "$DATABASE_URL" ] || ! echo "$DATABASE_URL" | grep -q "postgresql://.*:.*@.*:.*/."; then
+        return 1
+    fi
+    
+    return 0
+}
+
+# Function to generate secrets
+generate_secrets() {
+    print_info "Generating new secure secrets..."
+    
+    DB_USER="gossip_club"
+    DB_NAME="gossip_club"
+    DB_PASSWORD=$(openssl rand -hex 32)
+    AUTH_SECRET=$(openssl rand -hex 32)
+    DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@host.docker.internal:5432/${DB_NAME}"
+    
+    # Save secrets to file
+    cat > "$PROJECT_DIR/.secrets.txt" << EOF
 # Generated Secrets - Keep this file secure!
 # Generated on: $(date)
 
@@ -203,19 +216,67 @@ DATABASE_URL=$DATABASE_URL
 AUTH_SECRET=$AUTH_SECRET
 BETTER_AUTH_SECRET=$AUTH_SECRET
 EOF
+    
+    chmod 600 "$PROJECT_DIR/.secrets.txt"
+    chown "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_DIR/.secrets.txt"
+    
+    print_success "New secrets generated and saved to .secrets.txt"
+}
+
+# Check if secrets file exists and is valid
+if [ -f "$PROJECT_DIR/.secrets.txt" ]; then
+    print_info "Checking existing secrets file..."
+    
+    if validate_secrets "$PROJECT_DIR/.secrets.txt"; then
+        print_info "Loading existing secrets from .secrets.txt..."
+        source "$PROJECT_DIR/.secrets.txt"
         
-        chmod 600 "$PROJECT_DIR/.secrets.txt"
-        chown "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_DIR/.secrets.txt"
+        print_success "Loaded existing secrets"
+        print_info "  User: $DB_USER"
+        print_info "  Database: $DB_NAME"
+        print_info "  Password: [REUSING EXISTING]"
+        print_info "  Database URL: postgresql://$DB_USER:****@host.docker.internal:5432/$DB_NAME"
+    else
+        print_warning ".secrets.txt is malformed or incomplete. Regenerating..."
         
-        print_success "Environment file created with secure secrets"
-        print_warning "Secrets saved to .secrets.txt - KEEP THIS FILE SECURE!"
+        # Backup the malformed file
+        if [ -f "$PROJECT_DIR/.secrets.txt" ]; then
+            mv "$PROJECT_DIR/.secrets.txt" "$PROJECT_DIR/.temp/.secrets/.secrets.txt.backup.$(date +%Y%m%d_%H%M%S)"
+            print_info "Backed up malformed secrets to .temp/.secrets/.secrets.txt.backup"
+        fi
+        
+        # Generate new secrets
+        generate_secrets
+        source "$PROJECT_DIR/.secrets.txt"
+    fi
+else
+    print_info "No secrets file found. Generating new secrets..."
+    generate_secrets
+    source "$PROJECT_DIR/.secrets.txt"
+fi
+
+# Ensure .env.prod exists
+if [ ! -f "$PROJECT_DIR/.env.prod" ]; then
+    print_warning ".env.prod not found. Creating from example..."
+    
+    if [ -f "$PROJECT_DIR/.env.prod.example" ]; then
+        cp "$PROJECT_DIR/.env.prod.example" "$PROJECT_DIR/.env.prod"
+        print_success ".env.prod created from example"
     else
         print_error ".env.prod.example not found!"
         exit 1
     fi
-else
-    print_success ".env.prod already exists"
 fi
+
+# Always update .env.prod with secrets from .secrets.txt (source of truth)
+print_info "Updating .env.prod with secrets from .secrets.txt..."
+
+sed -i "s|DATABASE_URL=.*|DATABASE_URL=${DATABASE_URL}|g" "$PROJECT_DIR/.env.prod"
+sed -i "s|AUTH_SECRET=.*|AUTH_SECRET=${AUTH_SECRET}|g" "$PROJECT_DIR/.env.prod"
+sed -i "s|BETTER_AUTH_SECRET=.*|BETTER_AUTH_SECRET=${AUTH_SECRET}|g" "$PROJECT_DIR/.env.prod"
+
+print_success "✓ .env.prod updated with secrets from .secrets.txt"
+print_info "  Database URL: postgresql://$DB_USER:****@host.docker.internal:5432/$DB_NAME"
 
 # Set proper ownership for project files
 chown -R "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_DIR"
@@ -387,15 +448,18 @@ print_header "🐘 Configuring PostgreSQL Database and User"
 if command -v psql &> /dev/null; then
     print_info "PostgreSQL found. Setting up database and user..."
     
-    # Extract database credentials from .env.prod
-    DB_USER=$(grep DATABASE_URL "$PROJECT_DIR/.env.prod" | grep -oP 'postgresql://\K[^:]+')
-    DB_PASSWORD=$(grep DATABASE_URL "$PROJECT_DIR/.env.prod" | grep -oP 'postgresql://[^:]+:\K[^@]+')
-    DB_NAME=$(grep DATABASE_URL "$PROJECT_DIR/.env.prod" | grep -oP '/[^/]+$' | tr -d '/')
-    
-    print_info "Database credentials from .env.prod:"
+    # Use credentials from .secrets.txt (already loaded and validated)
+    print_info "Using database credentials from .secrets.txt:"
     print_info "  User: $DB_USER"
     print_info "  Database: $DB_NAME"
     print_info "  Password: [HIDDEN]"
+    
+    # Validate that we have the required credentials
+    if [ -z "$DB_USER" ] || [ -z "$DB_PASSWORD" ] || [ -z "$DB_NAME" ]; then
+        print_error "Database credentials are missing from .secrets.txt!"
+        print_error "This should not happen. Please check the secrets generation logic."
+        exit 1
+    fi
     
     # Check if user exists
     USER_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER';")
@@ -586,29 +650,6 @@ sleep 10
 # Check container status
 print_header "📊 Container Status"
 su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && docker-compose -f docker/compose/docker-compose.prod.yml --env-file .env.prod ps"
-
-# Configure firewall (if UFW is available)
-print_header "🔥 Configuring Firewall"
-if command -v ufw &> /dev/null; then
-    print_info "Configuring UFW firewall..."
-    
-    ufw allow 22/tcp    # SSH
-    ufw allow 80/tcp    # HTTP
-    ufw allow 443/tcp   # HTTPS
-    
-    # Enable UFW if not already enabled
-    print_info "Do you want to enable UFW firewall? (y/n)"
-    read -r ENABLE_UFW
-    
-    if [[ "$ENABLE_UFW" =~ ^[Yy]$ ]]; then
-        echo "y" | ufw enable
-        print_success "Firewall configured and enabled"
-    else
-        print_warning "Firewall rules added but not enabled"
-    fi
-else
-    print_warning "UFW not found, skipping firewall configuration"
-fi
 
 # Final summary
 print_header "🎉 Deployment Complete!"

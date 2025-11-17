@@ -59,9 +59,24 @@ export class AuthGuard implements CanActivate {
 	 */
 	async canActivate(context: ExecutionContext): Promise<boolean> {
 		const request = getRequestFromContext(context);
+		
+		// DEBUG: Log all headers
+		console.log('🔍 [AuthGuard] All request headers:', JSON.stringify(request.headers, null, 2));
+		console.log('🔍 [AuthGuard] Cookie header:', request.headers.cookie);
+		
+		// DEBUG: Log what fromNodeHeaders extracts
+		const nodeHeaders = fromNodeHeaders(request.headers as unknown as IncomingHttpHeaders);
+		console.log('🔍 [AuthGuard] fromNodeHeaders result:', JSON.stringify(nodeHeaders, null, 2));
+		
 		const session = await this.options.auth.api.getSession({
-			headers: fromNodeHeaders(request.headers as unknown as IncomingHttpHeaders),
+			headers: nodeHeaders,
 		});
+		
+		// DEBUG: Log session result
+		console.log('🔍 [AuthGuard] Session result:', session ? 'Found' : 'Not found');
+		if (session) {
+			console.log('🔍 [AuthGuard] Session user:', session.user?.email);
+		}
 
 		request.session = session;
 		request.user = session?.user; // useful for observability tools like Sentry

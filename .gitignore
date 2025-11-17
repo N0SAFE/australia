@@ -49,3 +49,4 @@ _experiment
 !/.env*.example
 
 /.secrets.txt
+/.temp

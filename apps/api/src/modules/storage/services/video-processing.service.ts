@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { FileProcessingGateway } from '../gateways/file-processing.gateway';
 import { FileMetadataRepository } from '../repositories/file-metadata.repository';
+import { EventBridgeService } from '@/core/modules/events/event-bridge.service';
+import { createVideoProcessingEvent } from '@/core/modules/events/event-factories';
 
 /**
  * Service for async video processing
@@ -9,11 +11,16 @@ import { FileMetadataRepository } from '../repositories/file-metadata.repository
 @Injectable()
 export class VideoProcessingService {
   private readonly logger = new Logger(VideoProcessingService.name);
+  private readonly videoProcessingEvent: ReturnType<typeof createVideoProcessingEvent>;
 
   constructor(
     private readonly fileProcessingGateway: FileProcessingGateway,
     private readonly fileMetadataRepository: FileMetadataRepository,
-  ) {}
+    private readonly eventBridgeService: EventBridgeService,
+  ) {
+    // Initialize event factory
+    this.videoProcessingEvent = createVideoProcessingEvent(eventBridgeService);
+  }
 
   /**
    * Start async video processing
@@ -45,7 +52,16 @@ export class VideoProcessingService {
         processingProgress: 0,
       });
 
-      // Emit initial progress
+      // Emit initial progress via event bridge
+      const event = this.videoProcessingEvent(videoId);
+      this.eventBridgeService.emit(event, {
+        progress: 0,
+        status: 'processing',
+        message: 'Starting video analysis...',
+        timestamp: new Date().toISOString(),
+      });
+
+      // Also emit via WebSocket for backwards compatibility
       this.fileProcessingGateway.emitProcessingProgress(videoId, {
         progress: 0,
         status: 'processing',
@@ -54,35 +70,19 @@ export class VideoProcessingService {
 
       // TODO: Step 1 - Extract video metadata (ffprobe)
       await this.sleep(1000); // Simulated delay
-      this.fileProcessingGateway.emitProcessingProgress(videoId, {
-        progress: 20,
-        status: 'processing',
-        message: 'Extracting video metadata...',
-      });
+      this.emitProgress(videoId, 20, 'Extracting video metadata...');
 
       // TODO: Step 2 - Generate thumbnail
       await this.sleep(1000); // Simulated delay
-      this.fileProcessingGateway.emitProcessingProgress(videoId, {
-        progress: 40,
-        status: 'processing',
-        message: 'Generating thumbnail...',
-      });
+      this.emitProgress(videoId, 40, 'Generating thumbnail...');
 
       // TODO: Step 3 - Extract audio info
       await this.sleep(1000); // Simulated delay
-      this.fileProcessingGateway.emitProcessingProgress(videoId, {
-        progress: 60,
-        status: 'processing',
-        message: 'Analyzing audio track...',
-      });
+      this.emitProgress(videoId, 60, 'Analyzing audio track...');
 
       // TODO: Step 4 - Check if transcoding needed
       await this.sleep(1000); // Simulated delay
-      this.fileProcessingGateway.emitProcessingProgress(videoId, {
-        progress: 80,
-        status: 'processing',
-        message: 'Finalizing...',
-      });
+      this.emitProgress(videoId, 80, 'Finalizing...');
 
       // Update database: mark as complete
       await this.fileMetadataRepository.updateVideoProcessingStatus(videoId, {
@@ -113,10 +113,41 @@ export class VideoProcessingService {
         processingError: error.message,
       });
 
-      // Emit failure
+      // Emit failure via event bridge
+      const failureEvent = this.videoProcessingEvent(videoId);
+      this.eventBridgeService.emit(failureEvent, {
+        progress: 0,
+        status: 'failed',
+        message: error.message,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Also emit via WebSocket for backwards compatibility
       this.fileProcessingGateway.emitProcessingFailed(videoId, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Helper method to emit progress to both event bridge and WebSocket
+   */
+  private emitProgress(videoId: string, progress: number, message: string): void {
+    const event = this.videoProcessingEvent(videoId);
+    
+    // Emit via event bridge
+    this.eventBridgeService.emit(event, {
+      progress,
+      status: 'processing',
+      message,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Also emit via WebSocket for backwards compatibility
+    this.fileProcessingGateway.emitProcessingProgress(videoId, {
+      progress,
+      status: 'processing',
+      message,
+    });
   }
 
   /**

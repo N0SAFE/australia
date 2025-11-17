@@ -24,11 +24,13 @@ import { StorageModule } from "./modules/storage/storage.module";
 import { FileStorageModule } from "./core/modules/file-storage/file-storage.module";
 import { PresentationModule } from "./modules/presentation/presentation.module";
 import { FfmpegModule } from "./core/modules/ffmpeg/ffmpeg.module";
+import { EventsModule } from "./core/modules/events/events.module";
 
 @Module({
   imports: [
     EnvModule,
     DatabaseModule,
+    EventsModule,
     FileStorageModule,
     FfmpegModule,
     AuthModule.forRootAsync({

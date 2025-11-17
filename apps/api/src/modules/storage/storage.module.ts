@@ -6,9 +6,10 @@ import { FileMetadataRepository } from './repositories/file-metadata.repository'
 import { VideoProcessingService } from './services/video-processing.service';
 import { FileProcessingGateway } from './gateways/file-processing.gateway';
 import { DatabaseModule } from '@/core/modules/database/database.module';
+import { EventsModule } from '@/core/modules/events/events.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, EventsModule],
   controllers: [StorageController],
   providers: [
     StorageService,

@@ -4,16 +4,24 @@ import { ORPCError } from '@orpc/server';
 import { StorageService } from '../services/storage.service';
 import { FileMetadataService } from '../services/file-metadata.service';
 import { VideoProcessingService } from '../services/video-processing.service';
+import { EventBridgeService } from '@/core/modules/events/event-bridge.service';
+import { createVideoProcessingEvent } from '@/core/modules/events/event-factories';
 import { storageContract } from '@repo/api-contracts';
 import { readFile } from 'fs/promises';
 
 @Controller()
 export class StorageController {
+  private readonly videoProcessingEvent: ReturnType<typeof createVideoProcessingEvent>;
+
   constructor(
     private readonly storageService: StorageService,
     private readonly fileMetadataService: FileMetadataService,
     private readonly videoProcessingService: VideoProcessingService,
-  ) {}
+    private readonly eventBridgeService: EventBridgeService,
+  ) {
+    // Initialize event factory
+    this.videoProcessingEvent = createVideoProcessingEvent(eventBridgeService);
+  }
 
   /**
    * Upload image endpoint - implements ORPC contract with file upload
@@ -241,5 +249,32 @@ export class StorageController {
       
       return new File([buffer], filename, { type: metadata.mimeType });
     });
+  }
+}
+
+  /**
+   * Subscribe to video processing events
+   * 
+   * Implements ORPC event iterator for real-time SSE updates
+   * Client receives processing progress as events are emitted
+   */
+  @Implement(storageContract.subscribeVideoProcessing)
+  subscribeVideoProcessing() {
+    return implement(storageContract.subscribeVideoProcessing).handler(async function* ({ input }) {
+      const { videoId } = input;
+      
+      // Get event from factory
+      const event = this.videoProcessingEvent(videoId);
+      
+      // Subscribe to event bridge and yield events
+      for await (const eventData of this.eventBridgeService.subscribe(event)) {
+        yield eventData;
+        
+        // Break the loop when processing is complete or failed
+        if (eventData.status === 'completed' || eventData.status === 'failed') {
+          break;
+        }
+      }
+    }.bind(this));
   }
 }

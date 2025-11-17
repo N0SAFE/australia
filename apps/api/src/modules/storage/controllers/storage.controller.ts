@@ -2,12 +2,16 @@ import { Controller } from '@nestjs/common';
 import { Implement, implement } from '@orpc/nest';
 import { ORPCError } from '@orpc/server';
 import { StorageService } from '../services/storage.service';
+import { FileMetadataService } from '../services/file-metadata.service';
 import { storageContract } from '@repo/api-contracts';
 import { readFile } from 'fs/promises';
 
 @Controller()
 export class StorageController {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(
+    private readonly storageService: StorageService,
+    private readonly fileMetadataService: FileMetadataService,
+  ) {}
 
   /**
    * Upload image endpoint - implements ORPC contract with file upload
@@ -17,7 +21,7 @@ export class StorageController {
    */
   @Implement(storageContract.uploadImage)
   uploadImage() {
-    return implement(storageContract.uploadImage).handler(({ input }) => {
+    return implement(storageContract.uploadImage).handler(async ({ input, context }) => {
       try {
         console.log('[StorageController] uploadImage handler called');
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
@@ -45,11 +49,30 @@ export class StorageController {
           });
         }
 
+        // Determine subdirectory based on mimetype
+        const subdir = input.file.type.startsWith('image/') ? 'images' : 'files';
+        const relativePath = `${subdir}/${multerMetadata.filename}`;
+
+        // Insert into database
+        const dbResult = await this.fileMetadataService.createImageFile({
+          filePath: relativePath,
+          filename: input.file.name,
+          storedFilename: multerMetadata.filename,
+          mimeType: input.file.type,
+          size: input.file.size,
+          uploadedBy: context.user?.id,
+          imageMetadata: {
+            // These would be populated by image processing
+            // For now, we just create the entry with defaults
+          },
+        });
+
         console.log('[StorageController] uploadImage successful:', {
           originalName: input.file.name,
           serverFilename: multerMetadata.filename,
           size: input.file.size,
           mimeType: input.file.type,
+          dbFileId: dbResult.file.id,
         });
 
         return {
@@ -73,7 +96,7 @@ export class StorageController {
    */
   @Implement(storageContract.uploadVideo)
   uploadVideo() {
-    return implement(storageContract.uploadVideo).handler(({ input }) => {
+    return implement(storageContract.uploadVideo).handler(async ({ input, context }) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const multerMetadata = (input as any)._multerFiles?.file as { filename: string; originalname: string; path: string; size: number; mimetype: string } | undefined;
       
@@ -83,11 +106,31 @@ export class StorageController {
         });
       }
 
+      // Determine subdirectory based on mimetype
+      const subdir = input.file.type.startsWith('video/') ? 'videos' : 'files';
+      const relativePath = `${subdir}/${multerMetadata.filename}`;
+
+      // Insert into database
+      const dbResult = await this.fileMetadataService.createVideoFile({
+        filePath: relativePath,
+        filename: input.file.name,
+        storedFilename: multerMetadata.filename,
+        mimeType: input.file.type,
+        size: input.file.size,
+        uploadedBy: context.user?.id,
+        videoMetadata: {
+          // These would be populated by video processing (ffmpeg)
+          // For now, we just create the entry with defaults
+          // Video processing can update these later
+        },
+      });
+
       console.log('[StorageController] uploadVideo successful:', {
         originalName: input.file.name,
         serverFilename: multerMetadata.filename,
         size: input.file.size,
         mimeType: input.file.type,
+        dbFileId: dbResult.file.id,
       });
 
       return {
@@ -107,7 +150,7 @@ export class StorageController {
    */
   @Implement(storageContract.uploadAudio)
   uploadAudio() {
-    return implement(storageContract.uploadAudio).handler(({ input }) => {
+    return implement(storageContract.uploadAudio).handler(async ({ input, context }) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const multerMetadata = (input as any)._multerFiles?.file as { filename: string; originalname: string; path: string; size: number; mimetype: string } | undefined;
       
@@ -117,11 +160,30 @@ export class StorageController {
         });
       }
 
+      // Determine subdirectory based on mimetype
+      const subdir = input.file.type.startsWith('audio/') ? 'audio' : 'files';
+      const relativePath = `${subdir}/${multerMetadata.filename}`;
+
+      // Insert into database
+      const dbResult = await this.fileMetadataService.createAudioFile({
+        filePath: relativePath,
+        filename: input.file.name,
+        storedFilename: multerMetadata.filename,
+        mimeType: input.file.type,
+        size: input.file.size,
+        uploadedBy: context.user?.id,
+        audioMetadata: {
+          // These would be populated by audio processing
+          // For now, we just create the entry with defaults
+        },
+      });
+
       console.log('[StorageController] uploadAudio successful:', {
         originalName: input.file.name,
         serverFilename: multerMetadata.filename,
         size: input.file.size,
         mimeType: input.file.type,
+        dbFileId: dbResult.file.id,
       });
 
       return {

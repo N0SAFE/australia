@@ -65,10 +65,13 @@ RUN --mount=type=bind,source=.,target=/mnt/source \
 # Stage 3: Installer - Install dependencies from pruned lockfile
 # ===================================
 FROM base AS installer
+WORKDIR /app
+
+# Install additional build tools needed for native dependencies (tar already in base)
 RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
+  python3 \
+  make \
+  g++ \
     gcc \
     musl-dev
 
@@ -108,6 +111,9 @@ RUN apk add --no-cache \
 
 COPY --from=source-copier /app/ /app/
 
+# Ensure routes directory exists and is writable for generate command
+RUN mkdir -p /app/apps/web/routes && chmod -R 755 /app/apps/web/routes
+
 # Copy all node_modules using bind mount to avoid --parents issues
 # Use tar to preserve all symlinks correctly and set ownership to root (builder stage)
 RUN --mount=type=bind,from=installer,source=/app,target=/mnt/installer \
@@ -137,7 +143,7 @@ RUN --mount=type=cache,target=/root/.bun --mount=type=cache,target=/root/.cache 
 FROM base AS runner
 
 # Install Node.js and other production runtime dependencies
-RUN apk add --no-cache nodejs
+RUN apk add --no-cache nodejs tar
 ENV PATH="/usr/bin:${PATH}"
 RUN ln -sf $(which bun) /usr/local/bin/npm
 

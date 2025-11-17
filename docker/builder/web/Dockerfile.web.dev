@@ -105,6 +105,9 @@ ENV LOG_LEVEL=debug
 
 COPY --from=source-copier /app/ /app/
 
+# Ensure routes directory exists and is writable
+RUN mkdir -p /app/apps/web/routes && chmod -R 755 /app/apps/web/routes
+
 # Copy all node_modules using bind mount to avoid --parents issues
 # Use tar to preserve all symlinks correctly and set ownership to root
 RUN --mount=type=bind,from=installer,source=/app,target=/mnt/installer \

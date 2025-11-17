@@ -123,9 +123,9 @@ RUN adduser --system --uid 1001 nestjs
 # Copy built application from builder stage
 COPY --from=builder --chown=nestjs:nodejs /app ./
 
-# Ensure writable directories exist and are owned by the app user
+# Create writable directories (will be owned by nestjs user automatically)
 RUN mkdir -p /app/apps/api/uploads /app/extracted /app/static-files && \
-  chown -R nestjs:nodejs /app
+    chown -R nestjs:nodejs /app/apps/api/uploads /app/extracted /app/static-files
 
 # Switch to non-root user
 USER nestjs

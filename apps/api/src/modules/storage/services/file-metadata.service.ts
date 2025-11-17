@@ -1,259 +1,252 @@
 import { Injectable } from '@nestjs/common';
-import { DatabaseService } from '@/core/modules/database/services/database.service';
-import { file, imageFile, videoFile, audioFile, textFile } from '@/config/drizzle/schema';
-import { eq } from 'drizzle-orm';
+import { FileMetadataRepository } from '../repositories/file-metadata.repository';
 
 /**
- * Service for managing file metadata in the database
+ * Service for file metadata management
+ * Handles business logic for file operations
+ * Uses FileMetadataRepository for database operations
  */
 @Injectable()
 export class FileMetadataService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly fileMetadataRepository: FileMetadataRepository) {}
 
   /**
-   * Create a video file entry in the database
+   * Extract video file metadata
+   * TODO: Implement actual metadata extraction using ffprobe or similar
+   */
+  async extractVideoMetadata(filePath: string): Promise<{
+    width?: number;
+    height?: number;
+    duration?: number;
+    videoCodec?: string;
+    videoBitrate?: number;
+    hasAudio?: boolean;
+    audioCodec?: string;
+    frameRate?: number;
+    aspectRatio?: string;
+  }> {
+    // TODO: Use ffprobe or similar library to extract real metadata
+    // For now, return empty metadata (will be populated by processing)
+    return {
+      width: undefined,
+      height: undefined,
+      duration: undefined,
+      videoCodec: undefined,
+      videoBitrate: undefined,
+      hasAudio: true,
+      audioCodec: undefined,
+      frameRate: undefined,
+      aspectRatio: undefined,
+    };
+  }
+
+  /**
+   * Extract image file metadata
+   * TODO: Implement actual metadata extraction using sharp or similar
+   */
+  async extractImageMetadata(filePath: string): Promise<{
+    width?: number;
+    height?: number;
+    aspectRatio?: number;
+    format?: string;
+    hasAlpha?: boolean;
+  }> {
+    // TODO: Use sharp or similar library to extract real metadata
+    // For now, return empty metadata (will be populated by processing)
+    return {
+      width: undefined,
+      height: undefined,
+      aspectRatio: undefined,
+      format: undefined,
+      hasAlpha: undefined,
+    };
+  }
+
+  /**
+   * Extract audio file metadata
+   * TODO: Implement actual metadata extraction using ffprobe or similar
+   */
+  async extractAudioMetadata(filePath: string): Promise<{
+    duration?: number;
+    sampleRate?: number;
+    channels?: number;
+    bitrate?: number;
+    audioCodec?: string;
+  }> {
+    // TODO: Use ffprobe or similar library to extract real metadata
+    // For now, return defaults
+    return {
+      duration: undefined,
+      sampleRate: 44100,
+      channels: 2,
+      bitrate: undefined,
+      audioCodec: undefined,
+    };
+  }
+
+  /**
+   * Extract text file metadata
+   * TODO: Implement actual metadata extraction (encoding detection, counting, etc.)
+   */
+  async extractTextMetadata(filePath: string): Promise<{
+    encoding?: string;
+    lineCount?: number;
+    wordCount?: number;
+    characterCount?: number;
+  }> {
+    // TODO: Read file and extract real metadata
+    // For now, return defaults
+    return {
+      encoding: 'utf-8',
+      lineCount: undefined,
+      wordCount: undefined,
+      characterCount: undefined,
+    };
+  }
+
+  /**
+   * Determine file subdirectory based on mime type
+   */
+  getSubdirectory(mimeType: string): string {
+    if (mimeType.startsWith('image/')) return 'images';
+    if (mimeType.startsWith('video/')) return 'videos';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    return 'files';
+  }
+
+  /**
+   * Build relative file path
+   */
+  buildRelativePath(mimeType: string, filename: string): string {
+    const subdir = this.getSubdirectory(mimeType);
+    return `${subdir}/${filename}`;
+  }
+
+  /**
+   * Create video file record with metadata extraction
    */
   async createVideoFile(data: {
     filePath: string;
+    absoluteFilePath: string;
     filename: string;
     storedFilename: string;
     mimeType: string;
     size: number;
     uploadedBy?: string;
-    videoMetadata: {
-      width?: number;
-      height?: number;
-      duration?: number;
-      videoCodec?: string;
-      videoBitrate?: number;
-      hasAudio?: boolean;
-      audioCodec?: string;
-      frameRate?: number;
-    };
   }) {
-    const db = this.databaseService.db;
+    // Extract metadata from the file
+    const videoMetadata = await this.extractVideoMetadata(data.absoluteFilePath);
+    
+    // Calculate aspect ratio if dimensions are available
+    if (videoMetadata.width && videoMetadata.height) {
+      videoMetadata.aspectRatio = `${videoMetadata.width}:${videoMetadata.height}`;
+    }
 
-    // 1. Create video metadata entry
-    const [videoMetadata] = await db
-      .insert(videoFile)
-      .values({
-        width: data.videoMetadata.width || 0,
-        height: data.videoMetadata.height || 0,
-        duration: data.videoMetadata.duration || 0,
-        videoCodec: data.videoMetadata.videoCodec,
-        videoBitrate: data.videoMetadata.videoBitrate,
-        hasAudio: data.videoMetadata.hasAudio ?? true,
-        audioCodec: data.videoMetadata.audioCodec,
-        frameRate: data.videoMetadata.frameRate,
-        aspectRatio: data.videoMetadata.width && data.videoMetadata.height 
-          ? `${data.videoMetadata.width}:${data.videoMetadata.height}`
-          : undefined,
-        isProcessed: false,
-      })
-      .returning();
-
-    // 2. Create file entry
-    const [fileEntry] = await db
-      .insert(file)
-      .values({
-        type: 'video',
-        contentId: videoMetadata.id,
-        filePath: data.filePath,
-        filename: data.filename,
-        storedFilename: data.storedFilename,
-        mimeType: data.mimeType,
-        size: data.size,
-        extension: data.filename.split('.').pop() || '',
-        uploadedBy: data.uploadedBy,
-        isPublic: false,
-      })
-      .returning();
-
-    return { file: fileEntry, videoMetadata };
+    // Save to database via repository
+    return this.fileMetadataRepository.createVideoFile({
+      filePath: data.filePath,
+      filename: data.filename,
+      storedFilename: data.storedFilename,
+      mimeType: data.mimeType,
+      size: data.size,
+      uploadedBy: data.uploadedBy,
+      videoMetadata,
+    });
   }
 
   /**
-   * Create an image file entry in the database
+   * Create image file record with metadata extraction
    */
   async createImageFile(data: {
     filePath: string;
+    absoluteFilePath: string;
     filename: string;
     storedFilename: string;
     mimeType: string;
     size: number;
     uploadedBy?: string;
-    imageMetadata?: {
-      width?: number;
-      height?: number;
-      format?: string;
-      hasAlpha?: boolean;
-    };
   }) {
-    const db = this.databaseService.db;
+    // Extract metadata from the file
+    const imageMetadata = await this.extractImageMetadata(data.absoluteFilePath);
 
-    // 1. Create image metadata entry
-    const [imageMetadata] = await db
-      .insert(imageFile)
-      .values({
-        width: data.imageMetadata?.width || 0,
-        height: data.imageMetadata?.height || 0,
-        aspectRatio: data.imageMetadata?.width && data.imageMetadata?.height
-          ? data.imageMetadata.width / data.imageMetadata.height
-          : undefined,
-        format: data.imageMetadata?.format,
-        hasAlpha: data.imageMetadata?.hasAlpha,
-        isProcessed: false,
-      })
-      .returning();
-
-    // 2. Create file entry
-    const [fileEntry] = await db
-      .insert(file)
-      .values({
-        type: 'image',
-        contentId: imageMetadata.id,
-        filePath: data.filePath,
-        filename: data.filename,
-        storedFilename: data.storedFilename,
-        mimeType: data.mimeType,
-        size: data.size,
-        extension: data.filename.split('.').pop() || '',
-        uploadedBy: data.uploadedBy,
-        isPublic: false,
-      })
-      .returning();
-
-    return { file: fileEntry, imageMetadata };
+    // Save to database via repository
+    return this.fileMetadataRepository.createImageFile({
+      filePath: data.filePath,
+      filename: data.filename,
+      storedFilename: data.storedFilename,
+      mimeType: data.mimeType,
+      size: data.size,
+      uploadedBy: data.uploadedBy,
+      imageMetadata,
+    });
   }
 
   /**
-   * Create an audio file entry in the database
+   * Create audio file record with metadata extraction
    */
   async createAudioFile(data: {
     filePath: string;
+    absoluteFilePath: string;
     filename: string;
     storedFilename: string;
     mimeType: string;
     size: number;
     uploadedBy?: string;
-    audioMetadata?: {
-      duration?: number;
-      sampleRate?: number;
-      channels?: number;
-      bitrate?: number;
-      audioCodec?: string;
-    };
   }) {
-    const db = this.databaseService.db;
+    // Extract metadata from the file
+    const audioMetadata = await this.extractAudioMetadata(data.absoluteFilePath);
 
-    // 1. Create audio metadata entry
-    const [audioMetadata] = await db
-      .insert(audioFile)
-      .values({
-        duration: data.audioMetadata?.duration || 0,
-        sampleRate: data.audioMetadata?.sampleRate || 44100,
-        channels: data.audioMetadata?.channels || 2,
-        bitrate: data.audioMetadata?.bitrate,
-        audioCodec: data.audioMetadata?.audioCodec,
-        isProcessed: false,
-      })
-      .returning();
-
-    // 2. Create file entry
-    const [fileEntry] = await db
-      .insert(file)
-      .values({
-        type: 'audio',
-        contentId: audioMetadata.id,
-        filePath: data.filePath,
-        filename: data.filename,
-        storedFilename: data.storedFilename,
-        mimeType: data.mimeType,
-        size: data.size,
-        extension: data.filename.split('.').pop() || '',
-        uploadedBy: data.uploadedBy,
-        isPublic: false,
-      })
-      .returning();
-
-    return { file: fileEntry, audioMetadata };
+    // Save to database via repository
+    return this.fileMetadataRepository.createAudioFile({
+      filePath: data.filePath,
+      filename: data.filename,
+      storedFilename: data.storedFilename,
+      mimeType: data.mimeType,
+      size: data.size,
+      uploadedBy: data.uploadedBy,
+      audioMetadata,
+    });
   }
 
   /**
-   * Create a text file entry in the database
+   * Create text file record with metadata extraction
    */
   async createTextFile(data: {
     filePath: string;
+    absoluteFilePath: string;
     filename: string;
     storedFilename: string;
     mimeType: string;
     size: number;
     uploadedBy?: string;
-    textMetadata?: {
-      encoding?: string;
-      lineCount?: number;
-      wordCount?: number;
-      characterCount?: number;
-    };
   }) {
-    const db = this.databaseService.db;
+    // Extract metadata from the file
+    const textMetadata = await this.extractTextMetadata(data.absoluteFilePath);
 
-    // 1. Create text metadata entry
-    const [textMetadata] = await db
-      .insert(textFile)
-      .values({
-        encoding: data.textMetadata?.encoding || 'utf-8',
-        lineCount: data.textMetadata?.lineCount,
-        wordCount: data.textMetadata?.wordCount,
-        characterCount: data.textMetadata?.characterCount,
-        isProcessed: false,
-      })
-      .returning();
-
-    // 2. Create file entry
-    const [fileEntry] = await db
-      .insert(file)
-      .values({
-        type: 'text',
-        contentId: textMetadata.id,
-        filePath: data.filePath,
-        filename: data.filename,
-        storedFilename: data.storedFilename,
-        mimeType: data.mimeType,
-        size: data.size,
-        extension: data.filename.split('.').pop() || '',
-        uploadedBy: data.uploadedBy,
-        isPublic: false,
-      })
-      .returning();
-
-    return { file: fileEntry, textMetadata };
+    // Save to database via repository
+    return this.fileMetadataRepository.createTextFile({
+      filePath: data.filePath,
+      filename: data.filename,
+      storedFilename: data.storedFilename,
+      mimeType: data.mimeType,
+      size: data.size,
+      uploadedBy: data.uploadedBy,
+      textMetadata,
+    });
   }
 
   /**
    * Get file by ID
    */
   async getFileById(fileId: string) {
-    const db = this.databaseService.db;
-    const [fileRecord] = await db
-      .select()
-      .from(file)
-      .where(eq(file.id, fileId));
-
-    return fileRecord;
+    return this.fileMetadataRepository.getFileById(fileId);
   }
 
   /**
    * Get file by path
    */
   async getFileByPath(filePath: string) {
-    const db = this.databaseService.db;
-    const [fileRecord] = await db
-      .select()
-      .from(file)
-      .where(eq(file.filePath, filePath));
-
-    return fileRecord;
+    return this.fileMetadataRepository.getFileByPath(filePath);
   }
 
   /**
@@ -267,15 +260,6 @@ export class FileMetadataService {
       processingError?: string;
     }
   ) {
-    const db = this.databaseService.db;
-    await db
-      .update(videoFile)
-      .set({
-        isProcessed: status.isProcessed,
-        processingProgress: status.processingProgress,
-        processingError: status.processingError,
-        processingCompletedAt: status.isProcessed ? new Date() : undefined,
-      })
-      .where(eq(videoFile.id, videoId));
+    return this.fileMetadataRepository.updateVideoProcessingStatus(videoId, status);
   }
 }

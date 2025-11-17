@@ -49,22 +49,22 @@ export class StorageController {
           });
         }
 
-        // Determine subdirectory based on mimetype
-        const subdir = input.file.type.startsWith('image/') ? 'images' : 'files';
-        const relativePath = `${subdir}/${multerMetadata.filename}`;
+        // Build file paths
+        const relativePath = this.fileMetadataService.buildRelativePath(
+          input.file.type,
+          multerMetadata.filename
+        );
+        const absoluteFilePath = multerMetadata.path;
 
-        // Insert into database
+        // Insert into database via service (service will extract metadata and use repository)
         const dbResult = await this.fileMetadataService.createImageFile({
           filePath: relativePath,
+          absoluteFilePath,
           filename: input.file.name,
           storedFilename: multerMetadata.filename,
           mimeType: input.file.type,
           size: input.file.size,
           uploadedBy: context.user?.id,
-          imageMetadata: {
-            // These would be populated by image processing
-            // For now, we just create the entry with defaults
-          },
         });
 
         console.log('[StorageController] uploadImage successful:', {
@@ -106,23 +106,22 @@ export class StorageController {
         });
       }
 
-      // Determine subdirectory based on mimetype
-      const subdir = input.file.type.startsWith('video/') ? 'videos' : 'files';
-      const relativePath = `${subdir}/${multerMetadata.filename}`;
+      // Build file paths
+      const relativePath = this.fileMetadataService.buildRelativePath(
+        input.file.type,
+        multerMetadata.filename
+      );
+      const absoluteFilePath = multerMetadata.path;
 
-      // Insert into database
+      // Insert into database via service (service will extract metadata and use repository)
       const dbResult = await this.fileMetadataService.createVideoFile({
         filePath: relativePath,
+        absoluteFilePath,
         filename: input.file.name,
         storedFilename: multerMetadata.filename,
         mimeType: input.file.type,
         size: input.file.size,
         uploadedBy: context.user?.id,
-        videoMetadata: {
-          // These would be populated by video processing (ffmpeg)
-          // For now, we just create the entry with defaults
-          // Video processing can update these later
-        },
       });
 
       console.log('[StorageController] uploadVideo successful:', {
@@ -160,22 +159,22 @@ export class StorageController {
         });
       }
 
-      // Determine subdirectory based on mimetype
-      const subdir = input.file.type.startsWith('audio/') ? 'audio' : 'files';
-      const relativePath = `${subdir}/${multerMetadata.filename}`;
+      // Build file paths
+      const relativePath = this.fileMetadataService.buildRelativePath(
+        input.file.type,
+        multerMetadata.filename
+      );
+      const absoluteFilePath = multerMetadata.path;
 
-      // Insert into database
+      // Insert into database via service (service will extract metadata and use repository)
       const dbResult = await this.fileMetadataService.createAudioFile({
         filePath: relativePath,
+        absoluteFilePath,
         filename: input.file.name,
         storedFilename: multerMetadata.filename,
         mimeType: input.file.type,
         size: input.file.size,
         uploadedBy: context.user?.id,
-        audioMetadata: {
-          // These would be populated by audio processing
-          // For now, we just create the entry with defaults
-        },
       });
 
       console.log('[StorageController] uploadAudio successful:', {

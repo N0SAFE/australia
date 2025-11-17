@@ -1,30 +1,66 @@
-import { authClient } from "../../auth"
-import { hasMasterTokenPlugin } from "../../auth/plugins/guards"
+import { authClient } from '../../auth'
+import { hasMasterTokenPlugin } from '../../auth/plugins/guards'
+import { parseCookie } from 'next/dist/compiled/@edge-runtime/cookies'
+import { StandardLinkOptions, StandardLinkPlugin } from '@orpc/client/standard'
 
 /**
- * Returns Authorization header object when dev token mode is active and
- * NEXT_PUBLIC_DEV_AUTH_KEY is present. Otherwise returns an empty object.
+ * Master Token Plugin for ORPC Client
+ * 
+ * This plugin adds Authorization headers for development authentication using the master token.
+ * It handles both client-side (browser) and server-side (SSR) scenarios.
+ * 
+ * In development mode, when the master token is enabled:
+ * - Client-side: Checks if MasterTokenManager.state is active and adds Bearer token
+ * - Server-side: Checks for 'master-token-enabled' cookie and adds Bearer token
+ * 
+ * @template TContext - The base context type
  */
-export function getMasterTokenHeader(): Record<string, string> {
-    if (typeof window === 'undefined') return {}
+export class MasterTokenPlugin<T extends never> implements StandardLinkPlugin<T> {
+  init(link: StandardLinkOptions<T>): void {
+    link.clientInterceptors ??= []
 
-    // Only enable in development to avoid leaking secrets in production
-    if (process.env.NODE_ENV !== 'development') return {}
+    link.clientInterceptors.push(async (options: any) => {
+      // Only run in development mode
+      if (process.env.NODE_ENV !== 'development') {
+        return options.next(options)
+      }
 
-    try {
-        if (hasMasterTokenPlugin(authClient) && !authClient.MasterTokenManager.state) return {}
+      // Only proceed if authClient has master token plugin
+      if (!hasMasterTokenPlugin(authClient)) {
+        return options.next(options)
+      }
 
-        const key = process.env.NEXT_PUBLIC_DEV_AUTH_KEY
-        if (!key) return {}
+      const headers = options.request.headers
 
-        return {
-            Authorization: `Bearer ${key}`,
+      if (typeof window !== 'undefined') {
+        // Client-side: Check if master token is enabled
+        const authClientModule = await import('../../auth').then((m) => m.authClient)
+        
+        if (hasMasterTokenPlugin(authClientModule) && authClientModule.MasterTokenManager.state) {
+          const devAuthKey = process.env.NEXT_PUBLIC_DEV_AUTH_KEY
+
+          if (devAuthKey) {
+            headers.Authorization = `Bearer ${devAuthKey}`
+          }
         }
-    } catch (e) {
-        // defensive fallback
-        console.warn('masterTokenClientPlugin: failed to build header', e)
-        return {}
-    }
-}
+      } else {
+        // Server-side: Check for master-token-enabled cookie
+        const cookieHeader = Array.isArray(headers.cookie)
+          ? headers.cookie.join('; ')
+          : headers.cookie ?? ''
+        
+        const cookies = parseCookie(cookieHeader)
+        
+        if (cookies.get('master-token-enabled')) {
+          const devAuthKey = process.env.NEXT_PUBLIC_DEV_AUTH_KEY
 
-export default getMasterTokenHeader
+          if (devAuthKey) {
+            headers.Authorization = `Bearer ${devAuthKey}`
+          }
+        }
+      }
+
+      return options.next(options)
+    })
+  }
+}

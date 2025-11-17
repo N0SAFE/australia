@@ -28,7 +28,7 @@ export function useUsers(options?: {
   }
 
   return useQuery(orpc.user.list.queryOptions({
-    input: params as any,
+    input: params,
     enabled: options?.enabled ?? true,
     staleTime: 1000 * 60, // 1 minute
     gcTime: 1000 * 60 * 5, // 5 minutes

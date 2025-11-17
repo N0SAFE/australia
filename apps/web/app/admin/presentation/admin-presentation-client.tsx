@@ -3,37 +3,25 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@repo/ui/components/shadcn/card';
-import { Upload, Video, Trash2, Loader2 } from 'lucide-react';
+import { Upload, Video, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { orpc } from '@/lib/orpc';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getApiUrl } from '@/lib/api-url';
+import { Progress } from '@repo/ui/components/shadcn/progress';
+import { useUploadPresentation } from '@/hooks/usePresentation';
 
 export function AdminPresentationClient() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const queryClient = useQueryClient();
+  
+  // Use the upload presentation hook with progress tracking
+  const uploadPresentationMutation = useUploadPresentation();
 
   // Fetch current video
   const { data: currentVideo } = useQuery(orpc.presentation.getCurrent.queryOptions({
     input: {},
-  }));
-
-  // Use ORPC mutation for uploading
-  const uploadMutation = useMutation(orpc.presentation.upload.mutationOptions({
-    onSuccess: () => {
-      toast.success('Presentation video uploaded successfully');
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      // Invalidate and refetch current video
-      queryClient.invalidateQueries({ 
-        queryKey: orpc.presentation.getCurrent.queryKey({ input: {} }) 
-      });
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to upload video');
-    },
   }));
 
   // Create preview URL when file is selected
@@ -84,11 +72,14 @@ export function AdminPresentationClient() {
     if (!selectedFile) return;
 
     try {
-      await uploadMutation.mutateAsync({
-        file: selectedFile,
-      });
+      // Use the upload presentation hook - it handles progress and cache invalidation internally
+      await uploadPresentationMutation.mutateAsync({ file: selectedFile });
+      
+      // Success - clean up
+      setSelectedFile(null);
+      setPreviewUrl(null);
     } catch (error) {
-      // Error already handled by onError in mutation options
+      // Error is already handled by the hook with toast
       console.error('Upload error:', error);
     }
   };
@@ -129,7 +120,7 @@ export function AdminPresentationClient() {
               accept="video/*"
               onChange={handleFileSelect}
               className="hidden"
-              disabled={uploadMutation.isPending}
+              disabled={uploadPresentationMutation.isPending}
             />
 
             {!selectedFile ? (
@@ -180,16 +171,43 @@ export function AdminPresentationClient() {
                   </p>
                 </div>
 
+                {/* Upload Progress */}
+                {uploadPresentationMutation.isPending && (
+                  <div className="space-y-3">
+                    <Progress value={uploadPresentationMutation.uploadProgress} className="w-full" />
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {uploadPresentationMutation.uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
+                      </span>
+                      <span className="font-medium">{Math.round(uploadPresentationMutation.uploadProgress)}%</span>
+                    </div>
+                    {uploadPresentationMutation.uploadProgress === 100 && (
+                      <div className="flex items-center gap-2 text-sm text-blue-600">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Processing video on server...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Upload Error */}
+                {uploadPresentationMutation.error && !uploadPresentationMutation.isPending && (
+                  <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>{uploadPresentationMutation.error.message}</span>
+                  </div>
+                )}
+
                 <div className="flex gap-3 justify-center">
                   <Button
                     onClick={handleUpload}
-                    disabled={uploadMutation.isPending}
+                    disabled={uploadPresentationMutation.isPending}
                     size="lg"
                   >
-                    {uploadMutation.isPending ? (
+                    {uploadPresentationMutation.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Uploading...
+                        Uploading... {Math.round(uploadPresentationMutation.uploadProgress)}%
                       </>
                     ) : (
                       <>
@@ -200,8 +218,10 @@ export function AdminPresentationClient() {
                   </Button>
 
                   <Button
-                    onClick={() => setSelectedFile(null)}
-                    disabled={uploadMutation.isPending}
+                    onClick={() => {
+                      setSelectedFile(null);
+                    }}
+                    disabled={uploadPresentationMutation.isPending}
                     variant="outline"
                     size="lg"
                   >
@@ -260,8 +280,10 @@ export function AdminPresentationClient() {
             <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
               <li>Uploading a new video will replace the existing one</li>
               <li>Recommended video format: MP4 (H.264 codec)</li>
-              <li>Maximum file size: Limited by server configuration</li>
+              <li>Maximum file size: 500MB (enforced by server)</li>
+              <li>Upload timeout: 10 minutes for large files</li>
               <li>The video will be available immediately after upload</li>
+              <li>Progress bar shows upload status - do not close this page during upload</li>
             </ul>
           </div>
         </Card>

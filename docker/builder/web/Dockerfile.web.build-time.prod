@@ -89,7 +89,7 @@ RUN --mount=type=bind,source=.,target=/mnt/source \
         relPath=$(echo "$pkgJson" | sed 's|/tmp/prune-structure/||' | sed 's|/package.json||'); \
         if [ -d "/mnt/source/$relPath" ]; then \
             mkdir -p "/app/$relPath"; \
-            tar cf - "$relPath" | tar xf - -C /app/; \
+            tar cf - "$relPath" | tar xf - -C /app/ --owner=root --group=root; \
         fi; \
     done && \
     cp /mnt/source/package.json /mnt/source/turbo.json /app/ 2>/dev/null || true && \
@@ -111,16 +111,16 @@ COPY --from=source-copier /app/ /app/
 # Copy all node_modules using bind mount to avoid --parents issues
 # Use tar to preserve all symlinks correctly and set ownership to root (builder stage)
 RUN --mount=type=bind,from=installer,source=/app,target=/mnt/installer \
-    cd /mnt/installer && tar cf - node_modules | tar xf - -C /app && \
+    cd /mnt/installer && tar cf - node_modules | tar xf - -C /app --owner=root --group=root && \
     find /mnt/installer/apps -name node_modules -type d | while read dir; do \
         target_dir=$(echo "$dir" | sed 's|/mnt/installer/||'); \
         mkdir -p "$(dirname "$target_dir")"; \
-        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app; \
+        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=root --group=root; \
     done && \
     find /mnt/installer/packages -name node_modules -type d | while read dir; do \
         target_dir=$(echo "$dir" | sed 's|/mnt/installer/||'); \
         mkdir -p "$(dirname "$target_dir")"; \
-        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app; \
+        cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=root --group=root; \
     done
 
 COPY --parents --chmod=a+w .turbo/ **/.turbo/ ./

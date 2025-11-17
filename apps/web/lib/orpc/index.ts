@@ -1,157 +1,72 @@
-import { createORPCClient, onError } from '@orpc/client'
-import { type AppContract, appContract } from '@repo/api-contracts'
-import { OpenAPILink } from '@orpc/openapi-client/fetch'
-import { ContractRouterClient } from '@orpc/contract'
-import { validateEnvPath } from '#/env'
-import { toAbsoluteUrl } from '@/lib/utils'
-import clientRedirect from '@/actions/redirect'
-import { hasMasterTokenPlugin } from '../auth/plugins/guards'
-import { parseCookie } from 'next/dist/compiled/@edge-runtime/cookies'
-import { createTanstackQueryUtils } from '@orpc/tanstack-query'
-import { redirect, RedirectType } from 'next/navigation'
-import { authClient } from '../auth'
+import { ClientLink, createORPCClient, InferClientContext } from "@orpc/client";
+import { type AppContract, appContract } from "@repo/api-contracts";
+import { OpenAPILink } from "@orpc/openapi-client/fetch";
+import { ContractRouterClient } from "@orpc/contract";
+import { validateEnvPath } from "#/env";
+import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { ContextPlugin } from "./plugins/context-plugin";
+import { MasterTokenPlugin } from "./plugins/masterTokenClient";
+import { CookieHeadersPlugin } from "./plugins/cookie-headers-plugin";
+import { RedirectOnUnauthorizedPlugin } from "./plugins/redirect-on-unauthorized-plugin";
+import { BatchLinkPlugin } from "@orpc/client/plugins";
+import { StandardLinkPlugin } from "@orpc/client/standard";
 
 const APP_URL = validateEnvPath(
-    process.env.NEXT_PUBLIC_APP_URL ?? '',
-    'NEXT_PUBLIC_APP_URL'
-)
+  process.env.NEXT_PUBLIC_APP_URL ?? "",
+  "NEXT_PUBLIC_APP_URL",
+);
+
+const Plugins = [
+  new CookieHeadersPlugin(),
+  new MasterTokenPlugin(),
+  new RedirectOnUnauthorizedPlugin(),
+  new ContextPlugin(),
+];
+
+type PluginsContext = {
+  [K in keyof typeof Plugins]: (typeof Plugins)[K] extends StandardLinkPlugin<
+    infer C
+  >
+    ? C
+    : never;
+}[number] extends infer U ? (U extends unknown ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never : never;
 
 export function createORPCClientWithCookies() {
-    const link = new OpenAPILink<{
-        cookie?: string | string[]
-        headers?: Record<string, string | string[] | undefined>
-        noRedirectOnUnauthorized?: boolean
-        cache?: RequestCache
-        next?: NextFetchRequestConfig
-    }>(appContract, {
-        clientInterceptors: [
-            async (options) => {
-                options.request.headers = {
-                    ...options.request.headers,
-                    ...options.context.headers,
-                }
-                const headers = options.request.headers
-
-                if (typeof window === 'undefined') {
-                    try {
-                        const nh = await import('next/headers')
-                        headers.cookie = (await nh.cookies()).toString()
-                    } catch {
-                        console.log(
-                            'Warning: next/headers could not be imported. Are you running in a non-Next.js environment?'
-                        )
-                        const existing = Array.isArray(headers.cookie)
-                            ? headers.cookie.filter(Boolean)
-                            : headers.cookie
-                              ? [headers.cookie]
-                              : []
-                        const ctx = Array.isArray(options.context.cookie)
-                            ? options.context.cookie.filter(Boolean)
-                            : options.context.cookie
-                              ? [options.context.cookie]
-                              : []
-                        const merged = [...existing, ...ctx]
-                        headers.cookie = merged.length > 0 ? merged : undefined
-                    }
-
-                    headers['Content-Type'] = 'application/json'
-                }
-
-                if (
-                    process.env.NODE_ENV === 'development' &&
-                    hasMasterTokenPlugin(authClient)
-                ) {
-                    if (typeof window !== 'undefined') {
-                        const authClient = await import('../auth').then(
-                            (m) => m.authClient
-                        )
-                        if (hasMasterTokenPlugin(authClient) && authClient.MasterTokenManager.state) {
-                            const devAuthKey =
-                                process.env.NEXT_PUBLIC_DEV_AUTH_KEY
-
-                            if (devAuthKey) {
-                                headers.Authorization = `Bearer ${devAuthKey}`
-                            }
-                        }
-                    } else {
-                        if (
-                            parseCookie(
-                                Array.isArray(headers.cookie)
-                                    ? headers.cookie.join('; ')
-                                    : headers.cookie ?? ''
-                            ).get('master-token-enabled')
-                        ) {
-                            const devAuthKey =
-                                process.env.NEXT_PUBLIC_DEV_AUTH_KEY
-
-                            if (devAuthKey) {
-                                headers.Authorization = `Bearer ${devAuthKey}`
-                            }
-                        }
-                    }
-                }
-
-                return options.next({
-                    ...options,
-                })
-            },
-        ],
-        // Use direct API URLs, bypassing Next.js proxy
-        // Server: API_URL (private Docker network endpoint)
-        // Browser: NEXT_PUBLIC_API_URL (public endpoint)
-        url:
-            typeof window === 'undefined'
-                ? validateEnvPath(process.env.API_URL ?? '', 'API_URL')
-                : validateEnvPath(process.env.NEXT_PUBLIC_API_URL ?? '', 'NEXT_PUBLIC_API_URL'),
-        fetch(request, init, options) {
-            return fetch(request, {
-                ...init,
-                credentials: 'include',
-                cache: options.context.cache,
-                next: options.context.next
-                    ??
-                     {
-                          revalidate: 60, // Revalidation toutes les 60 secondes
-                      },
-            })
+  const link = new OpenAPILink<PluginsContext>(appContract, {
+    // Use direct API URLs, bypassing Next.js proxy
+    // Server: API_URL (private Docker network endpoint)
+    // Browser: NEXT_PUBLIC_API_URL (public endpoint)
+    url:
+      typeof window === "undefined"
+        ? validateEnvPath(process.env.API_URL ?? "", "API_URL")
+        : validateEnvPath(
+            process.env.NEXT_PUBLIC_API_URL ?? "",
+            "NEXT_PUBLIC_API_URL",
+          ),
+    fetch(request, init, options) {
+      return fetch(request, {
+        ...init,
+        credentials: "include",
+        cache: options.context.cache,
+        next: options.context.next ?? {
+          revalidate: 60, // Revalidation toutes les 60 secondes
         },
-        interceptors: [
-            onError(async (error, options) => {
-                if (
-                    (error as Error | undefined)?.name === 'AbortError' ||
-                    (error &&
-                        typeof error === 'object' &&
-                        'code' in error &&
-                        error.code === 'ABORT_ERR')
-                ) {
-                    return
-                }
+      });
+    },
+    plugins: Plugins
+  });
 
-                if (options.context.noRedirectOnUnauthorized) {
-                    return
-                }
+  const client =
+    createORPCClient<
+      ContractRouterClient<
+        AppContract,
+        typeof link extends OpenAPILink<infer C> ? C : never
+      >
+    >(link);
 
-                // Check if this is a 401 Unauthorized error
-                if (
-                    error &&
-                    typeof error === 'object' &&
-                    'status' in error &&
-                    error.status === 401
-                ) {
-                    console.log('ORPC Unauthorized - redirecting to login')
-                    if (typeof window !== 'undefined') {
-                        const loginUrl = toAbsoluteUrl('/login')
-                        void clientRedirect(loginUrl)
-                    } else {
-                        const loginUrl = toAbsoluteUrl('/login')
-                        redirect(loginUrl, RedirectType.replace)
-                    }
-                }
-            }),
-        ],
-    })
-
-    return createORPCClient<ContractRouterClient<AppContract>>(link)
+  return client;
 }
 
-export const orpc = createTanstackQueryUtils(createORPCClientWithCookies())
+export const orpc = createTanstackQueryUtils(createORPCClientWithCookies());
+
+export type Context = PluginsContext;

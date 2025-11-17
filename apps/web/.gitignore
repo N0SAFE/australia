@@ -53,3 +53,5 @@ redoc-static.html
 src/routes/openapi.ts
 src/routes/index.ts
 analyze
+
+/public/sitemap*

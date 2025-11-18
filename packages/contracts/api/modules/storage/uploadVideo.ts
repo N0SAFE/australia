@@ -50,6 +50,10 @@ export const uploadVideoOutput = z.object({
   path: z.string(),
   size: z.number(),
   mimeType: z.string(),
+  fileId: z.uuid(),
+  videoId: z.uuid(),
+  isProcessed: z.boolean(),
+  message: z.string().optional(),
 });
 
 export const uploadVideoContract = oc

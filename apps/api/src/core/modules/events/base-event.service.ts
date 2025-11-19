@@ -121,7 +121,7 @@ interface ProcessingState {
  * }
  * ```
  */
-export abstract class BaseEventService<TContracts extends EventContracts> {
+export abstract class BaseEventService<TContracts extends EventContracts = EventContracts> {
   protected readonly logger: Logger;
   protected readonly eventPrefix: string;
   private readonly events = new Map<string, EventSubscriptionData<unknown>>();
@@ -238,19 +238,28 @@ export abstract class BaseEventService<TContracts extends EventContracts> {
    * 
    * @param eventName - Name of the event
    * @param input - Input parameters (uses fileId as key)
-   * @param handler - Async function that performs the processing and emits events
+   * @param handler - Function that performs the processing and emits events
    * @returns Promise that resolves when processing is complete (or queued/ignored)
    */
   async startProcessing<K extends keyof TContracts & string>(
     eventName: K,
     input: EventInput<TContracts[K]>,
-    handler: (abortSignal?: AbortSignal) => Promise<void>
+    handler: (params: {
+      abortSignal?: AbortSignal;
+      input: EventInput<TContracts[K]>;
+      emit: (output: EventOutput<TContracts[K]>) => void;
+    }) => void | Promise<void>
   ): Promise<void> {
     const contract = this.contracts[eventName];
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
     
     const strategy = contract.options?.strategy ?? ProcessingStrategy.PARALLEL;
+    
+    // Create emit helper function
+    const emit = (output: EventOutput<TContracts[K]>): void => {
+      this.emit(eventName, validatedInput, output);
+    };
     
     // Get or create processing state for this event
     let state = this.processingStates.get(fullEventName);
@@ -264,7 +273,7 @@ export abstract class BaseEventService<TContracts extends EventContracts> {
 
     // PARALLEL: Run immediately without blocking
     if (strategy === ProcessingStrategy.PARALLEL) {
-      void handler();
+      void Promise.resolve(handler({ input: validatedInput, emit }));
       return;
     }
 
@@ -295,7 +304,11 @@ export abstract class BaseEventService<TContracts extends EventContracts> {
       state.isProcessing = true;
 
       try {
-        await handler(abortController.signal);
+        await Promise.resolve(handler({
+          abortSignal: abortController.signal,
+          input: validatedInput,
+          emit,
+        }));
       } finally {
         state.isProcessing = false;
         state.abortController = undefined;
@@ -308,7 +321,7 @@ export abstract class BaseEventService<TContracts extends EventContracts> {
       const wrappedHandler = async (): Promise<void> => {
         state.isProcessing = true;
         try {
-          await handler();
+          await Promise.resolve(handler({ input: validatedInput, emit }));
         } finally {
           state.isProcessing = false;
           // Process next in queue

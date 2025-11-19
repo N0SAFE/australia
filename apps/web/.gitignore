@@ -55,3 +55,6 @@ src/routes/index.ts
 analyze
 
 /public/sitemap*
+
+# Authentication tokens
+.npmrc

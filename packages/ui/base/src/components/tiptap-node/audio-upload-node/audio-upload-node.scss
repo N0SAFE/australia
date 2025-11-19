@@ -1,0 +1,203 @@
+.tiptap-audio-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  border: 2px dashed var(--tt-border-color);
+  border-radius: 0.75rem;
+  background-color: var(--tt-bg-color);
+  transition: all 0.2s ease;
+  position: relative;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--tt-brand-color-500);
+    background-color: var(--tt-bg-color-hover);
+  }
+
+  &.drag-active {
+    border-color: var(--tt-brand-color-500);
+    background-color: var(--tt-brand-color-50);
+  }
+
+  input[type="file"] {
+    display: none;
+  }
+
+  &-drag-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    width: 100%;
+    height: 100%;
+    min-height: 200px;
+  }
+
+  &-dropzone {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &-rect-primary {
+      color: var(--tt-brand-color-500);
+      opacity: 0.1;
+    }
+
+    &-rect-secondary {
+      position: absolute;
+      top: 0;
+      right: 0;
+      color: var(--tt-brand-color-500);
+    }
+  }
+
+  &-icon-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--tt-brand-color-500);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  &-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    text-align: center;
+  }
+
+  &-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--tt-text-color);
+
+    em {
+      color: var(--tt-brand-color-500);
+      font-style: normal;
+      cursor: pointer;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  &-subtext {
+    font-size: 0.75rem;
+    color: var(--tt-text-muted);
+  }
+
+  &-previews {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  &-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--tt-border-color);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--tt-text-color);
+  }
+
+  &-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    background-color: var(--tt-bg-color-secondary);
+    border: 1px solid var(--tt-border-color);
+    position: relative;
+    overflow: hidden;
+
+    &-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      position: relative;
+      z-index: 1;
+    }
+  }
+
+  &-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background-color: var(--tt-brand-color-50);
+    transition: width 0.2s ease;
+    z-index: 0;
+  }
+
+  &-file-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &-file-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 0.375rem;
+    background-color: var(--tt-bg-color);
+    color: var(--tt-brand-color-500);
+    border: 1px solid var(--tt-border-color);
+    flex-shrink: 0;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  &-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  &-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  &-progress-text {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--tt-brand-color-500);
+  }
+}

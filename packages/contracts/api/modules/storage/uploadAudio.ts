@@ -24,9 +24,6 @@ const fileSchema = z.custom<File>(
 
 export const uploadAudioInput = z.object({
   file: fileSchema
-    .refine(file => file.size <= 50 * 1024 * 1024, {
-      message: 'File size must not exceed 50MB',
-    })
     .refine(
       file => /\.(mp3|wav|ogg|m4a)$/i.test(file.name),
       {

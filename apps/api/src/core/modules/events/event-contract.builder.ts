@@ -187,15 +187,3 @@ class EventContractBuilder<TInput = never, TOutput = never> {
 export function contractBuilder(): EventContractBuilder {
   return new EventContractBuilder();
 }
-
-/**
- * @deprecated Use contractBuilder() instead
- * Legacy helper for creating type-safe event contracts
- */
-export function createContract<TInput, TOutput>(contract: {
-  input: z.ZodType<TInput>;
-  output: z.ZodType<TOutput>;
-  options?: EventContractOptions<TInput>;
-}): EventContract<TInput, TOutput> {
-  return contract;
-}

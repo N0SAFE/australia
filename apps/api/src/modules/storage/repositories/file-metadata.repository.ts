@@ -3,15 +3,13 @@ import { DatabaseService } from '@/core/modules/database/services/database.servi
 import { file, imageFile, videoFile, audioFile, textFile } from '@/config/drizzle/schema';
 import { eq } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
-import type { IVideoProcessingRepository } from '@/core/modules/video-processing';
 
 /**
  * Repository for file metadata database operations
  * Handles all database interactions for file management
- * Implements IVideoProcessingRepository for video processing integration
  */
 @Injectable()
-export class FileMetadataRepository implements IVideoProcessingRepository {
+export class FileMetadataRepository {
   constructor(private readonly databaseService: DatabaseService) {}
 
   /**
@@ -243,6 +241,27 @@ export class FileMetadataRepository implements IVideoProcessingRepository {
       .where(eq(file.id, fileId));
 
     return fileRecord;
+  }
+
+  /**
+   * Get video with file metadata by file ID
+   * Joins file table with videoFile table
+   */
+  async getVideoByFileId(fileId: string): Promise<{
+    file: InferSelectModel<typeof file>;
+    videoMetadata: InferSelectModel<typeof videoFile> | null;
+  } | undefined> {
+    const db = this.databaseService.db;
+    const [result] = await db
+      .select({
+        file: file,
+        videoMetadata: videoFile,
+      })
+      .from(file)
+      .leftJoin(videoFile, eq(file.contentId, videoFile.id))
+      .where(eq(file.id, fileId));
+
+    return result;
   }
 
   /**

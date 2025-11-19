@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { BaseEventService } from '@/core/modules/events/base-event.service';
 import { contractBuilder, ProcessingStrategy } from '@/core/modules/events/event-contract.builder';
 import { z } from 'zod';
-import type { IVideoProcessingEvents } from '@/core/modules/video-processing';
 
 /**
  * Storage Event Contracts
@@ -15,9 +14,13 @@ export const storageEventContracts = {
     }))
     .output(z.object({
       progress: z.number().min(0).max(100),
-      status: z.enum(['processing', 'completed', 'failed']),
-      message: z.string().optional(),
-      metadata: z.any().optional(),
+      message: z.string(),
+      metadata: z.object({
+        duration: z.number(),
+        width: z.number(),
+        height: z.number(),
+        codec: z.string(),
+      }).optional(),
       timestamp: z.string(),
     }))
     .strategy(ProcessingStrategy.ABORT, {
@@ -102,12 +105,11 @@ export const storageEventContracts = {
  *   currentStep: 'Extracting metadata...',
  * });
  * ```
+ * 
+ * - Type-safe event emission and subscription
  */
 @Injectable()
-export class StorageEventService 
-  extends BaseEventService<typeof storageEventContracts>
-  implements IVideoProcessingEvents 
-{
+export class StorageEventService extends BaseEventService<typeof storageEventContracts> {
   constructor() {
     super('storage', storageEventContracts);
   }

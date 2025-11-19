@@ -243,6 +243,14 @@ export class FileMetadataService {
   }
 
   /**
+   * Get video with file metadata by file ID
+   * Returns null if not found or if file is not a video
+   */
+  async getVideoByFileId(fileId: string) {
+    return this.fileMetadataRepository.getVideoByFileId(fileId);
+  }
+
+  /**
    * Get file by path
    */
   async getFileByPath(filePath: string) {

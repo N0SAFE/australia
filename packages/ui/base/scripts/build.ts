@@ -2,6 +2,7 @@ import { build, Options } from "tsup";
 import { existsSync, rmSync } from "fs";
 import { Glob } from "bun";
 import path from "path";
+import { sassPlugin } from "esbuild-sass-plugin";
 
 let chokidar: any = null;
 try {
@@ -45,22 +46,8 @@ async function getFiles(): Promise<string[]> {
     const files: string[] = [];
 
     // Scan components, hooks, and lib directories
-    for await (const file of glob.scan({ cwd: path.join(srcDir, "components") })) {
-        const fullPath = path.join("src/components", file);
-        if (!isTestFile(fullPath)) {
-            files.push(fullPath);
-        }
-    }
-
-    for await (const file of glob.scan({ cwd: path.join(srcDir, "hooks") })) {
+    for await (const file of glob.scan({ cwd: srcDir })) {
         const fullPath = path.join("src", file);
-        if (!isTestFile(fullPath)) {
-            files.push(fullPath);
-        }
-    }
-
-    for await (const file of glob.scan({ cwd: path.join(srcDir, "lib") })) {
-        const fullPath = path.join("src/lib", file);
         if (!isTestFile(fullPath)) {
             files.push(fullPath);
         }
@@ -70,8 +57,6 @@ async function getFiles(): Promise<string[]> {
     if (existsSync(path.join(srcDir, "index.ts")) && !isTestFile("index.ts")) {
         files.push("index.ts");
     }
-    
-    console.log(files)
 
     return files;
 }
@@ -94,7 +79,7 @@ async function runBuild(files: string[], watch: boolean) {
     const entryPoints = files.map((file) => path.join(packageRoot, file));
 
     try {
-        console.log(`🎬 Building ESM and CJS formats concurrently...`);
+        console.log(`🎬 Building ${files.length} files in ESM and CJS formats...`);
 
         await build({
             watch,
@@ -104,9 +89,16 @@ async function runBuild(files: string[], watch: boolean) {
             external: ["react"],
             clean: false,
             entry: entryPoints,
+            esbuildPlugins: [
+                sassPlugin({
+                    type: "style",
+                    cssImports: true,
+                }),
+            ],
             esbuildOptions(options) {
                 options.jsx = "automatic";
             },
+            sourcemap: process.env.NODE_ENV === "production" ? false : true,
         });
 
         console.log(`✅ Successfully built ${files.length} files to ${distDir}`);

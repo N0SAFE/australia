@@ -1,7 +1,8 @@
-import { useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { orpc } from '@/lib/orpc'
 import { toast } from 'sonner'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { validateEnvPath } from '#/env'
 
 /**
  * Progress state for video processing
@@ -15,45 +16,233 @@ export interface VideoProcessingProgress {
 }
 
 /**
+ * Upload progress tracking
+ */
+type UploadProgress = {
+  loaded: number
+  total: number
+  percentage: number
+}
+
+/**
+ * Generic file upload result
+ */
+type FileUploadResult = {
+  filename: string
+  path: string
+  size: number
+  mimeType: string
+  url?: string
+  fileId?: string
+  videoId?: string
+  isProcessed?: boolean
+  message?: string
+}
+
+/**
+ * Upload state for XMLHttpRequest-based uploads
+ */
+type UploadState = {
+  isUploading: boolean
+  progress: UploadProgress | null
+  error: Error | null
+  data: FileUploadResult | null
+}
+
+/**
+ * Generic XMLHttpRequest-based file upload hook
+ */
+function useXHRUpload(endpoint: string, successMessage: string) {
+  const [state, setState] = useState<UploadState>({
+    isUploading: false,
+    progress: null,
+    error: null,
+    data: null,
+  })
+
+  const mutateAsync = useCallback(async (
+    file: File,
+    onProgress?: (event: { progress: number }) => void
+  ) => {
+    return new Promise<FileUploadResult>((resolve, reject) => {
+      // Reset state
+      setState({
+        isUploading: true,
+        progress: null,
+        error: null,
+        data: null,
+      })
+
+      // Create XMLHttpRequest
+      const xhr = new XMLHttpRequest()
+      
+      // Get API URL
+      const apiUrl = typeof window === 'undefined'
+        ? validateEnvPath(process.env.API_URL ?? '', 'API_URL')
+        : validateEnvPath(process.env.NEXT_PUBLIC_API_URL ?? '', 'NEXT_PUBLIC_API_URL')
+      
+      const url = `${apiUrl}${endpoint}`
+      
+      xhr.open('POST', url)
+      
+      // Set headers for credentials
+      xhr.withCredentials = true
+      
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const progress: UploadProgress = {
+            loaded: e.loaded,
+            total: e.total,
+            percentage: (e.loaded / e.total) * 100,
+          }
+          
+          setState(prev => ({
+            ...prev,
+            progress,
+          }))
+          
+          // Call the external progress callback if provided
+          onProgress?.({ progress: progress.percentage })
+          
+          console.log(`[useStorage] Upload progress: ${e.loaded}/${e.total} (${progress.percentage.toFixed(2)}%)`)
+        }
+      })
+      
+      // Handle completion
+      xhr.addEventListener('load', () => {
+        console.log(`[useStorage] Upload complete, status: ${xhr.status}`)
+        
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const result = JSON.parse(xhr.responseText) as FileUploadResult
+            
+            // Add URL if not present - construct full API URL
+            // Server will handle subdirectory lookup based on filename prefix
+            if (!result.url) {
+              result.url = `${apiUrl}/storage/files/${result.filename}`
+            }
+            
+            setState({
+              isUploading: false,
+              progress: { loaded: 100, total: 100, percentage: 100 },
+              error: null,
+              data: result,
+            })
+            
+            toast.success(`${successMessage}: ${result.filename}`)
+            resolve(result)
+          } catch (err) {
+            const error = new Error('Failed to parse server response')
+            setState({
+              isUploading: false,
+              progress: null,
+              error,
+              data: null,
+            })
+            toast.error('Failed to parse server response')
+            reject(error)
+          }
+        } else {
+          let errorMessage = 'Upload failed'
+          try {
+            const errorResponse = JSON.parse(xhr.responseText)
+            errorMessage = errorResponse.message || errorMessage
+          } catch {
+            errorMessage = xhr.statusText || errorMessage
+          }
+          
+          const error = new Error(errorMessage)
+          setState({
+            isUploading: false,
+            progress: null,
+            error,
+            data: null,
+          })
+          toast.error(`Upload failed: ${errorMessage}`)
+          reject(error)
+        }
+      })
+      
+      // Handle errors
+      xhr.addEventListener('error', () => {
+        console.error('[useStorage] Upload error')
+        const error = new Error('Network request failed')
+        setState({
+          isUploading: false,
+          progress: null,
+          error,
+          data: null,
+        })
+        toast.error('Network request failed')
+        reject(error)
+      })
+      
+      // Handle abort
+      xhr.addEventListener('abort', () => {
+        console.log('[useStorage] Upload aborted')
+        const error = new Error('Upload cancelled')
+        setState({
+          isUploading: false,
+          progress: null,
+          error,
+          data: null,
+        })
+        toast.error('Upload cancelled')
+        reject(error)
+      })
+      
+      // Create FormData and append file
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      // Send the request
+      console.log(`[useStorage] Starting upload: ${file.name}`)
+      xhr.send(formData)
+    })
+  }, [endpoint, successMessage])
+
+  const reset = useCallback(() => {
+    setState({
+      isUploading: false,
+      progress: null,
+      error: null,
+      data: null,
+    })
+  }, [])
+
+  return {
+    mutateAsync,
+    mutate: (file: File, onProgress?: (event: { progress: number }) => void) => { 
+      mutateAsync(file, onProgress).catch(() => {}) 
+    },
+    reset,
+    isPending: state.isUploading,
+    uploadProgress: state.progress?.percentage ?? 0,
+    error: state.error,
+    data: state.data,
+  }
+}
+
+/**
  * Mutation hook to upload an image file
  */
 export function useUploadImage() {
-  return useMutation(orpc.storage.uploadImage.mutationOptions({
-    onSuccess: (result) => {
-      toast.success(`Image uploaded successfully: ${result.filename}`)
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to upload image: ${error.message}`)
-    },
-  }))
+  return useXHRUpload('/storage/upload/image', 'Image uploaded successfully')
 }
 
 /**
  * Mutation hook to upload a video file
  */
 export function useUploadVideo() {
-  return useMutation(orpc.storage.uploadVideo.mutationOptions({
-    onSuccess: (result) => {
-      toast.success(`Video uploaded successfully: ${result.filename}`)
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to upload video: ${error.message}`)
-    },
-  }))
+  return useXHRUpload('/storage/upload/video', 'Video uploaded successfully')
 }
 
 /**
  * Mutation hook to upload an audio file
  */
 export function useUploadAudio() {
-  return useMutation(orpc.storage.uploadAudio.mutationOptions({
-    onSuccess: (result) => {
-      toast.success(`Audio uploaded successfully: ${result.filename}`)
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to upload audio: ${error.message}`)
-    },
-  }))
+  return useXHRUpload('/storage/upload/audio', 'Audio uploaded successfully')
 }
 
 /**
@@ -71,79 +260,19 @@ export function useVideoProcessing(
     onError?: (data: VideoProcessingProgress) => void
   } = {}
 ) {
-  const [progress, setProgress] = useState<VideoProcessingProgress | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-
-  useEffect(() => {
-    // Don't connect if videoId is not provided or if explicitly disabled
-    if (!videoId || options.enabled === false) {
-      return
-    }
-
-    let aborted = false
-    let iterator: AsyncIterator<VideoProcessingProgress> | null = null
-
-    const connect = async () => {
-      try {
-        setIsConnected(true)
-        setError(null)
-
-        // Call the ORPC subscription with videoId only
-        // ABORT strategy handles canceling previous operations on same videoId
-        iterator = await orpc.storage.subscribeVideoProcessing.call({ videoId })
-
-        // Process events as they arrive
-        for await (const event of iterator) {
-          if (aborted) break
-
-          setProgress(event)
-
-          // Handle completion
-          if (event.status === 'completed') {
-            options.onComplete?.(event)
-            toast.success(event.message || 'Video processing completed')
-            break
-          }
-
-          // Handle failure
-          if (event.status === 'failed') {
-            options.onError?.(event)
-            toast.error(event.message || 'Video processing failed')
-            break
-          }
+  return useQuery(
+    orpc.storage.subscribeVideoProcessing.experimental_liveOptions({
+      input: { videoId: videoId ?? '' },
+      enabled: options.enabled && !!videoId,
+      onData: (data) => {
+        if (data.status === 'completed') {
+          options.onComplete?.(data)
+        } else if (data.status === 'failed') {
+          options.onError?.(data)
         }
-      } catch (err) {
-        if (!aborted) {
-          const errorObj = err instanceof Error ? err : new Error(String(err))
-          setError(errorObj)
-          toast.error(`Failed to connect to video processing: ${errorObj.message}`)
-        }
-      } finally {
-        if (!aborted) {
-          setIsConnected(false)
-        }
-      }
-    }
-
-    connect()
-
-    // Cleanup function
-    return () => {
-      aborted = true
-      setIsConnected(false)
-      // Note: ORPC async iterators handle cleanup automatically
-    }
-  }, [videoId, options.enabled])
-
-  return {
-    progress,
-    isConnected,
-    error,
-    isProcessing: progress?.status === 'processing',
-    isCompleted: progress?.status === 'completed',
-    isFailed: progress?.status === 'failed',
-  }
+      },
+    })
+  )
 }
 
 /**
@@ -235,6 +364,20 @@ export function useStorage() {
       any: uploadImage.isPending || uploadVideo.isPending || uploadAudio.isPending,
     },
     
+    // Upload progress (0-100 percentage)
+    uploadProgress: {
+      image: uploadImage.uploadProgress,
+      video: uploadVideo.uploadProgress,
+      audio: uploadAudio.uploadProgress,
+    },
+    
+    // Reset functions
+    reset: {
+      image: uploadImage.reset,
+      video: uploadVideo.reset,
+      audio: uploadAudio.reset,
+    },
+    
     // Error states
     errors: {
       image: uploadImage.error,
@@ -242,7 +385,7 @@ export function useStorage() {
       audio: uploadAudio.error,
     },
     
-    // Upload progress (if available)
+    // Upload data (results)
     data: {
       image: uploadImage.data,
       video: uploadVideo.data,

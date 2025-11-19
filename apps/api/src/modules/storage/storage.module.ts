@@ -7,16 +7,14 @@ import { StorageEventService } from './events/storage.event';
 import { DatabaseModule } from '@/core/modules/database/database.module';
 import { EventsModule } from '@/core/modules/events/events.module';
 import { VideoProcessingModule } from '@/core/modules/video-processing';
+import { FileStorageModule } from '@/core/modules/file-storage/file-storage.module';
 
 @Module({
   imports: [
     DatabaseModule,
     EventsModule,
-    // Configure video processing with storage-specific implementations
-    VideoProcessingModule.forFeature({
-      repository: FileMetadataRepository,
-      events: StorageEventService,
-    }),
+    VideoProcessingModule,
+    FileStorageModule,
   ],
   controllers: [StorageController],
   providers: [

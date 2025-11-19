@@ -22,7 +22,7 @@ import { schemas } from "./config";
  * ```
  */
 export function useInvite(
-  options?: Omit<InvitePluginOptions<AllRoleNames>, "roleSchema">
+  options?: Omit<InvitePluginOptions, "roleSchema">
 ): ReturnType<typeof invitePlugin<AllRoleNames>> {
   return invitePlugin({
     inviteDurationDays: 7,

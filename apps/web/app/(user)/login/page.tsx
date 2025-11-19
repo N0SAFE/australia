@@ -1,6 +1,6 @@
 'use client';
 
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Button } from '@/components/ui/button';

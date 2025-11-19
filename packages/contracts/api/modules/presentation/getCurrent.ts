@@ -16,6 +16,9 @@ export const presentationGetCurrentOutput = z.object({
   uploadedAt: z.date(),
   updatedAt: z.date(),
   url: z.string(),
+  isProcessed: z.boolean(),
+  processingProgress: z.number().nullable(),
+  processingError: z.string().nullable(),
 }).nullable();
 
 export const presentationGetCurrentContract = oc

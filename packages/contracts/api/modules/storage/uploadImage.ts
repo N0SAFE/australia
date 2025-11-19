@@ -24,9 +24,6 @@ const fileSchema = z.custom<File>(
 
 export const uploadImageInput = z.object({
   file: fileSchema
-    .refine(file => file.size <= 5 * 1024 * 1024, {
-      message: 'File size must not exceed 5MB',
-    })
     .refine(
       file => /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name),
       {

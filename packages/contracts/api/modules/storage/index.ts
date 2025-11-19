@@ -6,6 +6,7 @@ import { uploadVideoContract } from './uploadVideo';
 import { uploadAudioContract } from './uploadAudio';
 import { getFileContract } from './getFile';
 import { subscribeVideoProcessingContract } from './subscribeVideoProcessing';
+import { getVideoContract } from './getVideo';
 
 // Combine into main storage contract
 export const storageContract = oc.tag('Storage').prefix('/storage').router({
@@ -14,6 +15,7 @@ export const storageContract = oc.tag('Storage').prefix('/storage').router({
   uploadAudio: uploadAudioContract,
   getFile: getFileContract,
   subscribeVideoProcessing: subscribeVideoProcessingContract,
+  getVideo: getVideoContract,
 });
 
 export type StorageContract = typeof storageContract;
@@ -24,3 +26,4 @@ export * from './uploadVideo';
 export * from './uploadAudio';
 export * from './getFile';
 export * from './subscribeVideoProcessing';
+export * from './getVideo';

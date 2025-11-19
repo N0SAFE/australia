@@ -22,11 +22,8 @@ const fileSchema = z.custom<File>(
   }
 );
 
-export const uploadVideoInput = z.object({  
+export const uploadVideoInput = z.object({
   file: fileSchema
-    .refine(file => file.size <= 500 * 1024 * 1024, {
-      message: 'File size must not exceed 500MB',
-    })
     .refine(
       file => /\.(mp4|webm|ogg)$/i.test(file.name),
       {

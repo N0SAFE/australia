@@ -1,0 +1,224 @@
+:root {
+  --tiptap-file-upload-active: var(--tt-brand-color-500);
+  --tiptap-file-upload-progress-bg: var(--tt-brand-color-50);
+  --tiptap-file-upload-icon-bg: var(--tt-brand-color-500);
+
+  --tiptap-file-upload-text-color: var(--tt-gray-light-a-700);
+  --tiptap-file-upload-subtext-color: var(--tt-gray-light-a-400);
+  --tiptap-file-upload-border: var(--tt-gray-light-a-300);
+  --tiptap-file-upload-border-hover: var(--tt-gray-light-a-400);
+  --tiptap-file-upload-border-active: var(--tt-brand-color-500);
+
+  --tiptap-file-upload-icon-doc-bg: var(--tt-gray-light-a-200);
+  --tiptap-file-upload-icon-doc-border: var(--tt-gray-light-300);
+  --tiptap-file-upload-icon-color: var(--white);
+}
+
+.dark {
+  --tiptap-file-upload-active: var(--tt-brand-color-400);
+  --tiptap-file-upload-progress-bg: var(--tt-brand-color-900);
+  --tiptap-file-upload-icon-bg: var(--tt-brand-color-400);
+
+  --tiptap-file-upload-text-color: var(--tt-gray-dark-a-700);
+  --tiptap-file-upload-subtext-color: var(--tt-gray-dark-a-400);
+  --tiptap-file-upload-border: var(--tt-gray-dark-a-300);
+  --tiptap-file-upload-border-hover: var(--tt-gray-dark-a-400);
+  --tiptap-file-upload-border-active: var(--tt-brand-color-400);
+
+  --tiptap-file-upload-icon-doc-bg: var(--tt-gray-dark-a-200);
+  --tiptap-file-upload-icon-doc-border: var(--tt-gray-dark-300);
+  --tiptap-file-upload-icon-color: var(--black);
+}
+
+.tiptap-file-upload {
+  margin: 2rem 0;
+
+  input[type="file"] {
+    display: none;
+  }
+
+  .tiptap-file-upload-dropzone-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.25rem;
+    -webkit-user-select: none; /* Safari */
+    -ms-user-select: none; /* IE 10 and IE 11 */
+    user-select: none;
+  }
+
+  .tiptap-file-upload-icon-container {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .tiptap-file-upload-text-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .tiptap-file-upload-text {
+    color: var(--tiptap-file-upload-text-color);
+    font-weight: 500;
+    font-size: 0.875rem;
+    line-height: normal;
+
+    em {
+      font-style: normal;
+      text-decoration: underline;
+    }
+  }
+
+  .tiptap-file-upload-subtext {
+    color: var(--tiptap-file-upload-subtext-color);
+    font-weight: 600;
+    line-height: normal;
+    font-size: 0.75rem;
+  }
+
+  .tiptap-file-upload-drag-area {
+    padding: 2rem 1.5rem;
+    border: 1.5px dashed var(--tiptap-file-upload-border);
+    border-radius: var(--tt-radius-md, 0.5rem);
+    text-align: center;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: var(--tiptap-file-upload-border-hover);
+    }
+
+    &.drag-active {
+      border-color: var(--tiptap-file-upload-border-active);
+      background-color: rgba(
+        var(--tiptap-file-upload-active-rgb, 0, 123, 255),
+        0.05
+      );
+    }
+
+    &.drag-over {
+      border-color: var(--tiptap-file-upload-border-active);
+      background-color: rgba(
+        var(--tiptap-file-upload-active-rgb, 0, 123, 255),
+        0.1
+      );
+    }
+  }
+
+  .tiptap-file-upload-previews {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .tiptap-file-upload-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--tiptap-file-upload-border);
+    margin-bottom: 0.5rem;
+
+    span {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--tiptap-file-upload-text-color);
+    }
+  }
+
+  // === Individual File Preview Styles ===
+  .tiptap-file-upload-preview {
+    position: relative;
+    border-radius: var(--tt-radius-md, 0.5rem);
+    overflow: hidden;
+
+    .tiptap-file-upload-progress {
+      position: absolute;
+      inset: 0;
+      background-color: var(--tiptap-file-upload-progress-bg);
+      transition: all 300ms ease-out;
+    }
+
+    .tiptap-file-upload-preview-content {
+      position: relative;
+      border: 1px solid var(--tiptap-file-upload-border);
+      border-radius: var(--tt-radius-md, 0.5rem);
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tiptap-file-upload-file-info {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      height: 2rem;
+
+      .tiptap-file-upload-file-icon {
+        padding: 0.5rem;
+        background-color: var(--tiptap-file-upload-icon-bg);
+        border-radius: var(--tt-radius-lg, 0.75rem);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        svg {
+          width: 0.875rem;
+          height: 0.875rem;
+          color: var(--tiptap-file-upload-icon-color);
+        }
+      }
+    }
+
+    .tiptap-file-upload-details {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tiptap-file-upload-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      .tiptap-file-upload-progress-text {
+        font-size: 0.75rem;
+        color: var(--tiptap-file-upload-border-active);
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+.tiptap.ProseMirror.ProseMirror-focused {
+  .ProseMirror-selectednode .tiptap-file-upload-drag-area {
+    border-color: var(--tiptap-file-upload-active);
+  }
+}
+
+@media (max-width: 480px) {
+  .tiptap-file-upload {
+    .tiptap-file-upload-drag-area {
+      padding: 1.5rem 1rem;
+    }
+
+    .tiptap-file-upload-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .tiptap-file-upload-preview-content {
+      padding: 0.75rem;
+    }
+  }
+}

@@ -80,7 +80,7 @@ const ERROR_CODES = {
  * })
  * ```
  */
-export const invitePlugin = <TRoles extends AllRoleNames = AllRoleNames>(
+export const invitePlugin = <TRoles extends string>(
   options: InvitePluginOptions<TRoles>
 ) => {
   const opts = {

@@ -47,8 +47,6 @@ const withFirstLoad: MiddlewareFactory = (next: NextProxy) => {
         // Check if user is authenticated
         const sessionCookie = getSessionCookie(request)
         
-        console.log('Session cookie:', sessionCookie)
-        
         if (!sessionCookie) {
             debugFirstLoad('No session, skipping first load check')
             return next(request, _next)
@@ -64,7 +62,6 @@ const withFirstLoad: MiddlewareFactory = (next: NextProxy) => {
                 // CRITICAL: Must match the server's useSecureCookies setting
                 isSecure: isHttps
             })
-            console.log('session: ', session)
         } catch (error) {
             console.log('session access error:', error)
             debugFirstLoad('Error getting session cache:', error)

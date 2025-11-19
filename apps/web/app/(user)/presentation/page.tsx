@@ -1,18 +1,21 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useRef, useState, useEffect } from 'react'
 import { UserAppLayoutHome } from '@/routes'
 import { useQuery } from '@tanstack/react-query'
 import { orpc } from '@/lib/orpc'
 import { getApiUrl } from '@/lib/api-url'
+import { usePresentationProcessingProgress } from '@/hooks/usePresentationProcessing'
 
 export default function PresentationPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectUrl = searchParams.get('redirectUrl')
   const videoRef = useRef<HTMLVideoElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [showButton, setShowButton] = useState(false)
 
   // Fetch the current video from the database
@@ -20,16 +23,43 @@ export default function PresentationPage() {
     input: {}
   }))
 
+  // Fetch processing progress
+  const { data: progress } = usePresentationProcessingProgress()
+
   useEffect(() => {
-    // Attempt to play the video when component mounts
-    if (videoRef.current) {
-      videoRef.current.play().catch((error) => {
-        console.error('Auto-play failed:', error)
-        // If autoplay fails (browser policy), show controls to allow user to play manually
-        if (videoRef.current) {
-          videoRef.current.controls = true
+    // Attempt to enter fullscreen and play the video when component mounts
+    const enterFullscreenAndPlay = async () => {
+      if (containerRef.current && videoRef.current) {
+        try {
+          // Try to enter fullscreen
+          if (containerRef.current.requestFullscreen) {
+            await containerRef.current.requestFullscreen()
+          } else if ((containerRef.current as any).webkitRequestFullscreen) {
+            await (containerRef.current as any).webkitRequestFullscreen()
+          } else if ((containerRef.current as any).mozRequestFullScreen) {
+            await (containerRef.current as any).mozRequestFullScreen()
+          } else if ((containerRef.current as any).msRequestFullscreen) {
+            await (containerRef.current as any).msRequestFullscreen()
+          }
+        } catch (error) {
+          console.log('Fullscreen request failed:', error)
         }
-      })
+
+        // Try to play the video
+        try {
+          await videoRef.current.play()
+        } catch (error) {
+          console.error('Auto-play failed:', error)
+          // If autoplay fails (browser policy), show controls to allow user to play manually
+          if (videoRef.current) {
+            videoRef.current.controls = true
+          }
+        }
+      }
+    }
+
+    if (video) {
+      enterFullscreenAndPlay()
     }
   }, [video])
 
@@ -56,7 +86,7 @@ export default function PresentationPage() {
   // Show error state if no video is configured
   if (!isLoading && !video) {
     return (
-      <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center" style={{ width: '100dvw', height: '100dvh' }}>
         <div className="text-white text-center space-y-4">
           <p className="text-2xl font-semibold">No presentation setup yet</p>
           <p className="text-gray-400">Please contact an administrator to configure the presentation</p>
@@ -74,7 +104,7 @@ export default function PresentationPage() {
   // Show loading state while fetching
   if (isLoading) {
     return (
-      <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center" style={{ width: '100dvw', height: '100dvh' }}>
         <div className="text-white text-center">
           <p className="text-xl">Loading presentation...</p>
         </div>
@@ -83,11 +113,16 @@ export default function PresentationPage() {
   }
 
   return (
-    <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
+    <div 
+      ref={containerRef}
+      className="fixed inset-0 bg-black flex flex-col items-center justify-center"
+      style={{ width: '100dvw', height: '100dvh' }}
+    >
       {/* Video player */}
       <video
         ref={videoRef}
-        className="w-full h-full object-contain"
+        className="object-contain"
+        style={{ width: '100dvw', height: '100dvh' }}
         autoPlay
         muted
         playsInline
@@ -97,6 +132,24 @@ export default function PresentationPage() {
       >
         Your browser does not support the video tag.
       </video>
+
+      {/* Processing progress bar - shown when video is not fully processed */}
+      {video && !video.isProcessed && progress && (
+        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 w-[90%] max-w-2xl bg-black/80 backdrop-blur-sm p-6 rounded-lg border border-white/20">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-white">
+              <span className="text-sm font-medium">
+                {progress.message}
+              </span>
+              <span className="text-sm font-mono">{Math.round(progress.progress)}%</span>
+            </div>
+            <Progress value={progress.progress} className="h-2" />
+            {progress.error && (
+              <p className="text-red-400 text-xs mt-2">{progress.error}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Button overlay - shown after video ends */}
       {showButton && (

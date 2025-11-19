@@ -5,22 +5,9 @@ import { PresentationService } from '../services/presentation.service';
 import { presentationContract } from '@repo/api-contracts';
 import { readFile } from 'fs/promises';
 
-// Interface for ORPC input with Multer file metadata
-interface MulterFileInput {
-  file: File;
-  _multerFiles?: {
-    file?: {
-      filename: string;
-      originalname: string;
-      path: string;
-      size: number;
-      mimetype: string;
-    };
-  };
-}
-
 @Controller()
 export class PresentationController {
+  
   constructor(private readonly presentationService: PresentationService) {}
 
   /**
@@ -34,7 +21,7 @@ export class PresentationController {
     return implement(presentationContract.upload).handler(async ({ input }) => {
       try {
         // Get Multer file metadata for server-generated filename
-        const multerInput = input as unknown as MulterFileInput;
+        const multerInput = input
         const multerMetadata = multerInput._multerFiles?.file;
         
         if (!multerMetadata) {
@@ -130,6 +117,45 @@ export class PresentationController {
           message: 'Failed to delete presentation video' 
         };
       }
+    });
+  }
+
+  /**
+   * Subscribe to video processing progress (async iterator)
+   */
+  @Implement(presentationContract.subscribeProcessingProgress)
+  subscribeProcessingProgress() {
+    const self = this
+    return implement(presentationContract.subscribeProcessingProgress).handler(async function* () {
+      try {
+        // Subscribe to the event service and yield progress updates
+        const iterator = self.presentationService.subscribeProcessingProgress();
+        
+        try {
+          for await (const event of iterator) {
+            yield event;
+          }
+        } finally {
+          // Always clean up the iterator
+          try {
+            if (iterator.return) {
+              await iterator.return(undefined);
+            }
+          } catch (cleanupError) {
+            console.error('[PresentationController] Error cleaning up iterator:', cleanupError);
+            console.error('[PresentationController] Cleanup error stack:', cleanupError instanceof Error ? cleanupError.stack : 'No stack trace');
+          }
+        }
+      } catch (error) {
+        console.error('[PresentationController] Error in subscribeProcessingProgress:', error);
+        console.error('[PresentationController] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+        
+        throw new ORPCError('INTERNAL_SERVER_ERROR', {
+          message: error instanceof Error ? error.message : 'Failed to subscribe to processing progress',
+        });
+      }
+      
+      console.log('[PresentationController] subscribeProcessingProgress completed')
     });
   }
 }

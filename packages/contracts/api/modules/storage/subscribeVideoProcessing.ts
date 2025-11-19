@@ -30,9 +30,13 @@ export const subscribeVideoProcessingContract = oc
     eventIterator(
       z.object({
         progress: z.number().min(0).max(100),
-        status: z.enum(['processing', 'completed', 'failed']),
-        message: z.string().optional(),
-        metadata: z.any().optional(),
+        message: z.string(),
+        metadata: z.object({
+          duration: z.number(),
+          width: z.number(),
+          height: z.number(),
+          codec: z.string(),
+        }).optional(),
         timestamp: z.string(),
       })
     )

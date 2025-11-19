@@ -13,6 +13,7 @@ export default function PresentationPage() {
   const searchParams = useSearchParams()
   const redirectUrl = searchParams.get('redirectUrl')
   const videoRef = useRef<HTMLVideoElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [showButton, setShowButton] = useState(false)
 
   // Fetch the current video from the database
@@ -21,15 +22,39 @@ export default function PresentationPage() {
   }))
 
   useEffect(() => {
-    // Attempt to play the video when component mounts
-    if (videoRef.current) {
-      videoRef.current.play().catch((error) => {
-        console.error('Auto-play failed:', error)
-        // If autoplay fails (browser policy), show controls to allow user to play manually
-        if (videoRef.current) {
-          videoRef.current.controls = true
+    // Attempt to enter fullscreen and play the video when component mounts
+    const enterFullscreenAndPlay = async () => {
+      if (containerRef.current && videoRef.current) {
+        try {
+          // Try to enter fullscreen
+          if (containerRef.current.requestFullscreen) {
+            await containerRef.current.requestFullscreen()
+          } else if ((containerRef.current as any).webkitRequestFullscreen) {
+            await (containerRef.current as any).webkitRequestFullscreen()
+          } else if ((containerRef.current as any).mozRequestFullScreen) {
+            await (containerRef.current as any).mozRequestFullScreen()
+          } else if ((containerRef.current as any).msRequestFullscreen) {
+            await (containerRef.current as any).msRequestFullscreen()
+          }
+        } catch (error) {
+          console.log('Fullscreen request failed:', error)
         }
-      })
+
+        // Try to play the video
+        try {
+          await videoRef.current.play()
+        } catch (error) {
+          console.error('Auto-play failed:', error)
+          // If autoplay fails (browser policy), show controls to allow user to play manually
+          if (videoRef.current) {
+            videoRef.current.controls = true
+          }
+        }
+      }
+    }
+
+    if (video) {
+      enterFullscreenAndPlay()
     }
   }, [video])
 
@@ -56,7 +81,7 @@ export default function PresentationPage() {
   // Show error state if no video is configured
   if (!isLoading && !video) {
     return (
-      <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center" style={{ width: '100dvw', height: '100dvh' }}>
         <div className="text-white text-center space-y-4">
           <p className="text-2xl font-semibold">No presentation setup yet</p>
           <p className="text-gray-400">Please contact an administrator to configure the presentation</p>
@@ -74,7 +99,7 @@ export default function PresentationPage() {
   // Show loading state while fetching
   if (isLoading) {
     return (
-      <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex items-center justify-center" style={{ width: '100dvw', height: '100dvh' }}>
         <div className="text-white text-center">
           <p className="text-xl">Loading presentation...</p>
         </div>
@@ -83,11 +108,16 @@ export default function PresentationPage() {
   }
 
   return (
-    <div className="fixed inset-0 w-screen h-screen bg-black flex items-center justify-center">
+    <div 
+      ref={containerRef}
+      className="fixed inset-0 bg-black flex flex-col items-center justify-center"
+      style={{ width: '100dvw', height: '100dvh' }}
+    >
       {/* Video player */}
       <video
         ref={videoRef}
-        className="w-full h-full object-contain"
+        className="object-contain"
+        style={{ width: '100dvw', height: '100dvh' }}
         autoPlay
         muted
         playsInline

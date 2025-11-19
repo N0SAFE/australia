@@ -5,6 +5,7 @@ import { presentationUploadContract } from './upload';
 import { presentationGetCurrentContract } from './getCurrent';
 import { presentationGetVideoContract } from './getVideo';
 import { presentationDeleteContract } from './deleteVideo';
+import { presentationSubscribeProcessingProgressContract } from './subscribeProcessingProgress';
 
 // Combine into main presentation contract
 export const presentationContract = oc.tag('Presentation').prefix('/presentation').router({
@@ -12,6 +13,7 @@ export const presentationContract = oc.tag('Presentation').prefix('/presentation
   getCurrent: presentationGetCurrentContract,
   getVideo: presentationGetVideoContract,
   delete: presentationDeleteContract,
+  subscribeProcessingProgress: presentationSubscribeProcessingProgressContract,
 });
 
 export type PresentationContract = typeof presentationContract;
@@ -21,3 +23,4 @@ export * from './upload';
 export * from './getCurrent';
 export * from './getVideo';
 export * from './deleteVideo';
+export * from './subscribeProcessingProgress';

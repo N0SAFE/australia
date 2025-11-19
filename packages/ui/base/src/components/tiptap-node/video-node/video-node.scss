@@ -1,0 +1,68 @@
+.tiptap.ProseMirror {
+  // Video node wrapper - prevent overflow
+  .video-node-wrapper {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0.5rem 0;
+  }
+
+  // Video node container
+  .video-node {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+
+    // Progress bar for video processing
+    .video-processing-progress {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 0.25rem;
+      background-color: #3b82f6;
+      transition: width 0.3s ease;
+      z-index: 10;
+      border-radius: var(--tt-radius-xs, 0.25rem) var(--tt-radius-xs, 0.25rem) 0 0;
+    }
+  }
+
+  video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  > video {
+    margin: 2rem 0;
+    outline: 0.125rem solid transparent;
+    border-radius: var(--tt-radius-xs, 0.25rem);
+  }
+
+  video.ProseMirror-selectednode {
+    outline-color: var(--tt-brand-color-500);
+  }
+
+  // Thread video handling
+  .tiptap-thread:has(> video) {
+    margin: 2rem 0;
+
+    video {
+      outline: 0.125rem solid transparent;
+      border-radius: var(--tt-radius-xs, 0.25rem);
+    }
+  }
+
+  .tiptap-thread video {
+    margin: 0;
+  }
+
+  // Ensure video nodes don't cause horizontal overflow
+  .video-node-wrapper,
+  .video-node {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}

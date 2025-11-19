@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
 import { validateEnvPath } from '#/env'
+import { orpc } from '@/lib/orpc'
+import { useQuery } from '@tanstack/react-query'
 
 type UploadProgress = {
   loaded: number
@@ -189,6 +191,34 @@ export function useUploadPresentation() {
     error: state.error,
     data: state.data,
   }
+}
+
+type ProcessingProgress = {
+  progress: number
+  status: 'processing' | 'completed' | 'failed'
+  message: string
+  metadata?: Record<string, unknown>
+  timestamp: string
+  isProcessed: boolean
+  error: string | null
+}
+
+/**
+ * Hook to subscribe to video processing progress updates
+ * Uses ORPC experimental_liveOptions with TanStack Query for real-time SSE updates
+ */
+export function useSubscribeProcessingProgress(enabled: boolean = false) {
+  const query = useQuery(
+    orpc.presentation.subscribeProcessingProgress.experimental_liveOptions({
+      input: {},
+      enabled,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      retry: false,
+    })
+  )
+  
+  return query
 }
 
 /**

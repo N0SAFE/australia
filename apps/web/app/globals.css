@@ -1,5 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+/* Import Tiptap UI component styles */
+@import "@repo/ui/styles/_variables.scss";
+@import "@repo/ui/styles/_keyframe-animations.scss";
 
 @custom-variant dark (&:is(.dark *));
 

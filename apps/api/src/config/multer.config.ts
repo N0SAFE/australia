@@ -3,7 +3,8 @@ import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 
 // Ensure uploads directory exists
-const uploadsDir = join(process.cwd(), 'uploads');
+// Use UPLOADS_DIR from environment, or fallback to /app/uploads in Docker
+const uploadsDir = process.env.UPLOADS_DIR ?? '/app/uploads';
 if (!existsSync(uploadsDir)) {
   mkdirSync(uploadsDir, { recursive: true });
 }

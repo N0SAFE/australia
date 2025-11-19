@@ -15,8 +15,8 @@ import { createDebug } from '@/lib/debug'
 import { getCookieCache, getSessionCookie } from "better-auth/cookies";
 import type { Session } from '@repo/auth'
 
-const debugAuth = console.log
-const debugAuthError = console.log
+const debugAuth = createDebug('middleware/auth')
+const debugAuthError = createDebug('middleware/auth/error')
 
 const env = validateEnvSafe(process.env).data
 
@@ -87,12 +87,6 @@ const withAuth: MiddlewareFactory = (next: NextProxy) => {
         }
 
         const isAuth = !!sessionCookie
-
-        console.log({
-            isAuth,
-            sessionError,
-            sessionCookie
-        })
 
         debugAuth(`Session result - isAuth: ${String(isAuth)}, hasError: ${String(!!sessionError)}`, {
             path: request.nextUrl.pathname,

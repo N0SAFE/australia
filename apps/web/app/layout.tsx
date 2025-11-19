@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import localFont from "next/font/local";
 import { ReactNode, Suspense } from "react";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@repo/ui/components/shadcn/sonner";
 import ReactQueryProviders from "@/utils/providers/ReactQueryProviders";
 import { DynamicTanstackDevTools } from "@/components/devtools/DynamicTanstackDevTools";
 
@@ -36,7 +36,7 @@ export default async function RootLayout({
 
           <DynamicTanstackDevTools />
         </ReactQueryProviders>
-        <Toaster />
+        <Toaster richColors position="top-center" />
       </body>
     </html>
   );

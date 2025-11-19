@@ -13,11 +13,24 @@ export class StorageService {
   }
 
   /**
-   * Get the full file path
+   * Get the full file path - checks subdirectories
    */
   getFilePath(filename: string): string {
-    const filePath = path.join(this.uploadDir, filename);
-    console.log('[StorageService] getFilePath:', { filename, uploadDir: this.uploadDir, filePath });
+    // Determine subdirectory based on filename prefix
+    let subdir = '';
+    if (filename.startsWith('image-')) {
+      subdir = 'images';
+    } else if (filename.startsWith('video-')) {
+      subdir = 'videos';
+    } else if (filename.startsWith('audio-')) {
+      subdir = 'audio';
+    }
+    
+    const filePath = subdir 
+      ? path.join(this.uploadDir, subdir, filename)
+      : path.join(this.uploadDir, filename);
+    
+    console.log('[StorageService] getFilePath:', { filename, uploadDir: this.uploadDir, subdir, filePath });
     return filePath;
   }
 

@@ -3,21 +3,25 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@repo/ui/components/shadcn/card';
-import { Upload, Video, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, Video, Trash2, Loader2, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { orpc } from '@/lib/orpc';
 import { useQuery } from '@tanstack/react-query';
 import { getApiUrl } from '@/lib/api-url';
 import { Progress } from '@repo/ui/components/shadcn/progress';
-import { useUploadPresentation } from '@/hooks/usePresentation';
+import { useUploadPresentation, useSubscribeProcessingProgress } from '@/hooks/usePresentation';
 
 export function AdminPresentationClient() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Use the upload presentation hook with progress tracking
   const uploadPresentationMutation = useUploadPresentation();
+  
+  // Subscribe to video processing progress
+  const { data: processingProgress, error: processingError } = useSubscribeProcessingProgress(isProcessing);
 
   // Fetch current video
   const { data: currentVideo } = useQuery(orpc.presentation.getCurrent.queryOptions({
@@ -75,7 +79,11 @@ export function AdminPresentationClient() {
       // Use the upload presentation hook - it handles progress and cache invalidation internally
       await uploadPresentationMutation.mutateAsync({ file: selectedFile });
       
-      // Success - clean up
+      // Success - start subscribing to processing progress
+      setIsProcessing(true);
+      toast.success('Upload complete! Video processing started...');
+      
+      // Clean up selection
       setSelectedFile(null);
       setPreviewUrl(null);
     } catch (error) {
@@ -83,6 +91,27 @@ export function AdminPresentationClient() {
       console.error('Upload error:', error);
     }
   };
+  
+  // Stop processing subscription when completed or failed
+  useEffect(() => {
+    if (processingProgress?.status === 'completed') {
+      setIsProcessing(false);
+      toast.success('Video processing completed successfully!');
+    } else if (processingProgress?.status === 'failed') {
+      setIsProcessing(false);
+      toast.error('Video processing failed');
+    }
+  }, [processingProgress?.status]);
+  
+  // Log and display processing errors
+  useEffect(() => {
+    if (processingError) {
+      console.error('Processing progress error:', processingError);
+      console.error('Error details:', JSON.stringify(processingError, null, 2));
+      toast.error(`Processing error: ${processingError.message || 'Unknown error'}`);
+      setIsProcessing(false);
+    }
+  }, [processingError]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -233,6 +262,80 @@ export function AdminPresentationClient() {
             )}
           </div>
         </Card>
+
+        {/* Video Processing Error */}
+        {processingError && (
+          <Card className="p-6 border-destructive">
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-2">
+                  <h3 className="font-semibold text-destructive">Processing Stream Error</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {processingError.message || 'Unknown error occurred'}
+                  </p>
+                  {processingError instanceof Error && processingError.stack && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                        View error details
+                      </summary>
+                      <pre className="mt-2 p-3 bg-muted rounded-lg overflow-auto max-h-64">
+                        {JSON.stringify(processingError, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
+        
+        {/* Video Processing Progress */}
+        {isProcessing && processingProgress && (
+          <Card className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Video Processing</h2>
+                <div className="flex items-center gap-2">
+                  {processingProgress.status === 'processing' && (
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  )}
+                  {processingProgress.status === 'completed' && (
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  )}
+                  {processingProgress.status === 'failed' && (
+                    <XCircle className="w-5 h-5 text-red-600" />
+                  )}
+                  <span className="text-sm font-medium capitalize">
+                    {processingProgress.status}
+                  </span>
+                </div>
+              </div>
+              
+              <Progress value={processingProgress.progress} className="w-full" />
+              
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{processingProgress.message}</span>
+                <span className="font-medium">{Math.round(processingProgress.progress)}%</span>
+              </div>
+              
+              {processingProgress.metadata && processingProgress.status !== 'completed' && (
+                <div className="text-xs text-muted-foreground">
+                  <pre className="bg-muted p-2 rounded overflow-auto">
+                    {JSON.stringify(processingProgress.metadata, null, 2)}
+                  </pre>
+                </div>
+              )}
+              
+              {processingProgress.error && (
+                <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{processingProgress.error}</span>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         {currentVideo && !selectedFile && (
           <Card className="p-8">

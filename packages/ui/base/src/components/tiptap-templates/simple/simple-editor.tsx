@@ -1,0 +1,471 @@
+"use client"
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { EditorContent, EditorContext, useEditor, type Editor, type JSONContent } from "@tiptap/react"
+
+// --- Tiptap Core Extensions ---
+import { StarterKit } from "@tiptap/starter-kit"
+import { TaskItem, TaskList } from "@tiptap/extension-list"
+import { TextAlign } from "@tiptap/extension-text-align"
+import { Typography } from "@tiptap/extension-typography"
+import { Highlight } from "@tiptap/extension-highlight"
+import { Subscript } from "@tiptap/extension-subscript"
+import { Superscript } from "@tiptap/extension-superscript"
+import { Selection } from "@tiptap/extensions"
+import { Placeholder } from "@tiptap/extension-placeholder"
+import { TextStyle } from '@tiptap/extension-text-style'
+import { Color } from '@tiptap/extension-color'
+
+// --- UI Primitives ---
+import { Button } from "@/components/tiptap-ui-primitive/button"
+import { Spacer } from "@/components/tiptap-ui-primitive/spacer"
+import {
+  Toolbar,
+  ToolbarGroup,
+  ToolbarSeparator,
+} from "@/components/tiptap-ui-primitive/toolbar"
+
+// --- Tiptap Node ---
+import { ImageUploadNode } from "@/components/tiptap-node/image-upload-node/image-upload-node-extension"
+import { VideoUploadExtension } from "@/components/tiptap-node/video-upload-node/video-upload-node-extension"
+import { AudioUploadExtension } from "@/components/tiptap-node/audio-upload-node/audio-upload-node-extension"
+import { FileUploadExtension } from "@/components/tiptap-node/file-upload-node/file-upload-node-extension"
+import { HorizontalRule } from "@/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension"
+import { ImageNode } from "@/components/tiptap-node/image-node/image-node-extension"
+import { VideoNode } from "@/components/tiptap-node/video-node/video-node-extension"
+import { AudioNode } from "@/components/tiptap-node/audio-node/audio-node-extension"
+import { FileNode } from "@/components/tiptap-node/file-node/file-node-extension"
+import "../../tiptap-node/blockquote-node/blockquote-node.scss"
+import "../../tiptap-node/code-block-node/code-block-node.scss"
+import "../../tiptap-node/horizontal-rule-node/horizontal-rule-node.scss"
+import "../../tiptap-node/list-node/list-node.scss"
+import "../../tiptap-node/image-node/image-node.scss"
+import "../../tiptap-node/video-node/video-node.scss"
+import "../../tiptap-node/audio-node/audio-node.scss"
+import "../../tiptap-node/heading-node/heading-node.scss"
+import "../../tiptap-node/paragraph-node/paragraph-node.scss"
+
+// --- Tiptap UI ---
+import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
+import { MediaDropdownMenu } from "@/components/tiptap-ui/media-dropdown-menu"
+import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu"
+import { BlockquoteButton } from "@/components/tiptap-ui/blockquote-button"
+import { CodeBlockButton } from "@/components/tiptap-ui/code-block-button"
+import {
+  ColorHighlightPopover,
+  ColorHighlightPopoverContent,
+  ColorHighlightPopoverButton,
+} from "@/components/tiptap-ui/color-highlight-popover"
+import {
+  LinkPopover,
+  LinkContent,
+  LinkButton,
+} from "@/components/tiptap-ui/link-popover"
+import { MarkButton } from "@/components/tiptap-ui/mark-button"
+import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
+import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
+
+// --- Icons ---
+import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
+import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
+import { LinkIcon } from "@/components/tiptap-icons/link-icon"
+
+// --- Hooks ---
+import { useIsBreakpoint } from "@/hooks/use-is-breakpoint"
+import { useWindowSize } from "@/hooks/use-window-size"
+import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
+
+// --- Components ---
+import { ThemeToggle } from "@/components/tiptap-templates/simple/theme-toggle"
+
+// --- Lib ---
+import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
+import type { UploadFunction } from "@/components/tiptap-node/image-upload-node/image-upload-node-extension"
+
+// --- Styles ---
+import "@/components/tiptap-templates/simple/simple-editor.scss"
+import { NodeBackground } from "@/components/tiptap-extension/node-background-extension"
+import { DragContextMenu } from "@/components/tiptap-ui/drag-context-menu/drag-context-menu"
+import { UiState } from "@/components/tiptap-extension/ui-state-extension"
+import { SlashDropdownMenu } from "@/components/tiptap-ui/slash-dropdown-menu/slash-dropdown-menu"
+
+/**
+ * Sanitizes a filename by removing or replacing problematic characters
+ * Particularly handles Unicode characters like accents (é → e)
+ */
+const sanitizeFilename = (file: File): File => {
+  const originalName = file.name
+  const lastDotIndex = originalName.lastIndexOf(".")
+  const nameWithoutExt = lastDotIndex > 0 ? originalName.slice(0, lastDotIndex) : originalName
+  const extension = lastDotIndex > 0 ? originalName.slice(lastDotIndex) : ""
+
+  // Normalize Unicode characters (é → e, à → a, etc.)
+  const sanitizedName = nameWithoutExt
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
+    .replace(/[^a-zA-Z0-9._-]/g, "_") // Replace other special chars with underscore
+    .replace(/_+/g, "_") // Collapse multiple underscores
+    .replace(/^_|_$/g, "") // Trim underscores from start/end
+
+  const newFilename = sanitizedName + extension
+
+  // Create a new File object with the sanitized name
+  return new File([file], newFilename, { type: file.type })
+}
+
+const MainToolbarContent = ({
+  editor,
+  onHighlighterClick,
+  onLinkClick,
+  isMobile,
+  uploadFunctions,
+}: {
+  editor: Editor | null
+  onHighlighterClick: () => void
+  onLinkClick: () => void
+  isMobile: boolean
+  uploadFunctions?: {
+    image?: UploadFunction
+    video?: UploadFunction
+    audio?: UploadFunction
+    file?: UploadFunction
+  }
+}) => {
+  return (
+    <>
+      <Spacer />
+
+      <ToolbarGroup>
+        <UndoRedoButton action="undo" />
+        <UndoRedoButton action="redo" />
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup>
+        <HeadingDropdownMenu levels={[1, 2, 3, 4]} portal={isMobile} />
+        <ListDropdownMenu
+          types={["bulletList", "orderedList", "taskList"]}
+          portal={isMobile}
+        />
+        <BlockquoteButton />
+        <CodeBlockButton />
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup>
+        <MarkButton type="bold" />
+        <MarkButton type="italic" />
+        <MarkButton type="strike" />
+        <MarkButton type="code" />
+        <MarkButton type="underline" />
+        {!isMobile ? (
+          <ColorHighlightPopover />
+        ) : (
+          <ColorHighlightPopoverButton onClick={onHighlighterClick} />
+        )}
+        {!isMobile ? <LinkPopover /> : <LinkButton onClick={onLinkClick} />}
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup>
+        <MarkButton type="superscript" />
+        <MarkButton type="subscript" />
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup>
+        <TextAlignButton align="left" />
+        <TextAlignButton align="center" />
+        <TextAlignButton align="right" />
+        <TextAlignButton align="justify" />
+      </ToolbarGroup>
+
+      <ToolbarSeparator />
+
+      <ToolbarGroup>
+        <MediaDropdownMenu 
+          editor={editor}
+          text="Add"
+          onImageUpload={uploadFunctions?.image ? () => {
+            if (editor && !editor.isDestroyed) {
+              editor.chain().focus().setImageUploadNode().run()
+            }
+          } : undefined}
+          onVideoUpload={uploadFunctions?.video ? () => {
+            if (editor && !editor.isDestroyed) {
+              editor.chain().focus().addVideoUpload().run()
+            }
+          } : undefined}
+          onAudioUpload={uploadFunctions?.audio ? () => {
+            if (editor && !editor.isDestroyed) {
+              editor.chain().focus().addAudioUpload().run()
+            }
+          } : undefined}
+          onFileUpload={uploadFunctions?.file ? () => {
+            if (editor && !editor.isDestroyed) {
+              editor.chain().focus().addFileUpload().run()
+            }
+          } : undefined}
+        />
+      </ToolbarGroup>
+
+      <Spacer />
+
+      {isMobile && <ToolbarSeparator />}
+
+      {/* <ToolbarGroup>
+        <ThemeToggle />
+      </ToolbarGroup> */}
+    </>
+  )
+}
+
+const MobileToolbarContent = ({
+  type,
+  onBack,
+}: {
+  type: "highlighter" | "link"
+  onBack: () => void
+}) => (
+  <>
+    <ToolbarGroup>
+      <Button data-style="ghost" onClick={onBack}>
+        <ArrowLeftIcon className="tiptap-button-icon" />
+        {type === "highlighter" ? (
+          <HighlighterIcon className="tiptap-button-icon" />
+        ) : (
+          <LinkIcon className="tiptap-button-icon" />
+        )}
+      </Button>
+    </ToolbarGroup>
+
+    <ToolbarSeparator />
+
+    {type === "highlighter" ? (
+      <ColorHighlightPopoverContent />
+    ) : (
+      <LinkContent />
+    )}
+  </>
+)
+
+export interface SimpleEditorProps {
+  value?: JSONContent
+  onChange?: (value: JSONContent) => void
+  editable?: boolean
+  placeholder?: string
+  /**
+   * Upload functions for different media types
+   * These should be provided by the parent app (e.g., using useStorage hook)
+   */
+  uploadFunctions?: {
+    image?: UploadFunction
+    video?: UploadFunction
+    audio?: UploadFunction
+    file?: UploadFunction
+  }
+  /**
+   * Map of media source URL IDs to resolver callbacks
+   * Used to resolve media URLs based on srcUrlId attribute
+   * Example: { api: (src) => `https://api.example.com${src}` }
+   */
+  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+}
+
+export function SimpleEditor({
+  value,
+  onChange,
+  editable = true,
+  placeholder = "Start typing...",
+  uploadFunctions,
+  injectMediaUrl,
+}: SimpleEditorProps) {
+  const isMobile = useIsBreakpoint()
+  const { height } = useWindowSize()
+  const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
+    "main"
+  )
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [toolbarHeight, setToolbarHeight] = useState(0)
+
+  useLayoutEffect(() => {
+    if (toolbarRef.current) {
+      setToolbarHeight(toolbarRef.current.getBoundingClientRect().height)
+    }
+  }, [])
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    editable,
+    editorProps: {
+      attributes: {
+        autocomplete: "off",
+        autocorrect: "off",
+        autocapitalize: "off",
+        "aria-label": "Main content area, start typing to enter text.",
+        class: "simple-editor prose",
+      },
+    },
+    extensions: [
+      StarterKit.configure({
+        horizontalRule: false,
+        link: {
+          openOnClick: false,
+          enableClickSelection: true,
+        },
+      }),
+      HorizontalRule,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Highlight.configure({ multicolor: true }),
+      Typography,
+      Superscript,
+      Subscript,
+      Selection,
+      Placeholder.configure({
+        placeholder,
+      }),
+      // Display nodes for media (required for upload nodes to transform to)
+      ImageNode.configure({
+        injectMediaUrl,
+      }),
+      VideoNode.configure({
+        injectMediaUrl,
+      }),
+      AudioNode.configure({
+        injectMediaUrl,
+      }),
+      FileNode.configure({
+        injectMediaUrl,
+      }),
+      // Image upload extension
+      ...(uploadFunctions?.image
+        ? [
+            ImageUploadNode.configure({
+              accept: "image/*",
+              maxSize: MAX_FILE_SIZE,
+              limit: 3,
+              upload: uploadFunctions.image,
+              prepareForUpload: sanitizeFilename,
+              onError: (error) => {
+                console.error("Image upload failed:", error)
+              },
+            }),
+          ]
+        : []),
+      // Video upload extension
+      ...(uploadFunctions?.video
+        ? [
+            VideoUploadExtension.configure({
+              upload: uploadFunctions.video,
+              prepareForUpload: sanitizeFilename,
+              onError: (error) => {
+                console.error("Video upload failed:", error)
+              },
+            }),
+          ]
+        : []),
+      // Audio upload extension
+      ...(uploadFunctions?.audio
+        ? [
+            AudioUploadExtension.configure({
+              upload: uploadFunctions.audio,
+              prepareForUpload: sanitizeFilename,
+              onError: (error) => {
+                console.error("Audio upload failed:", error)
+              },
+            }),
+          ]
+        : []),
+      // File upload extension
+      ...(uploadFunctions?.file
+        ? [
+            FileUploadExtension.configure({
+              upload: uploadFunctions.file,
+              prepareForUpload: sanitizeFilename,
+              onError: (error) => {
+                console.error("File upload failed:", error)
+              },
+            }),
+          ]
+        : []),
+      
+      // Text styling extensions which handle the "Colors" menu
+      TextStyle,
+      Color,
+      NodeBackground,
+      
+      UiState
+    ],
+    content: value ?? [{ type: "paragraph", children: [{ text: "" }] }],
+    onUpdate: ({ editor }) => {
+      if (onChange) {
+        onChange(editor.getJSON())
+      }
+    },
+  })
+
+  // Update editor content when value prop changes
+  useEffect(() => {
+    if (editor && value && JSON.stringify(editor.getJSON()) !== JSON.stringify(value)) {
+      editor.commands.setContent(value, { emitUpdate: false })
+    }
+  }, [editor, value])
+
+  const rect = useCursorVisibility({
+    editor,
+    overlayHeight: toolbarHeight,
+  })
+
+  useEffect(() => {
+    if (!isMobile && mobileView !== "main") {
+      setMobileView("main")
+    }
+  }, [isMobile, mobileView])
+
+  return (
+    <div className="simple-editor-wrapper">
+      <EditorContext.Provider value={{ editor }}>
+        <Toolbar
+          ref={toolbarRef}
+          style={{
+            ...(isMobile && height && rect.y
+              ? {
+                  bottom: `calc(100% - ${(height - rect.y).toString()}px)`,
+                }
+              : {}),
+          }}
+        >
+          {mobileView === "main" ? (
+            <MainToolbarContent
+              editor={editor}
+              onHighlighterClick={() => { setMobileView("highlighter") }}
+              onLinkClick={() => { setMobileView("link") }}
+              isMobile={isMobile}
+              uploadFunctions={uploadFunctions}
+            />
+          ) : (
+            <MobileToolbarContent
+              type={mobileView === "highlighter" ? "highlighter" : "link"}
+              onBack={() => { setMobileView("main") }}
+            />
+          )}
+        </Toolbar>
+
+        <EditorContent
+          editor={editor}
+          role="presentation"
+          className="simple-editor-content"
+        />
+        <SlashDropdownMenu editor={editor} />
+        
+        <DragContextMenu />
+      </EditorContext.Provider>
+    </div>
+  )
+}

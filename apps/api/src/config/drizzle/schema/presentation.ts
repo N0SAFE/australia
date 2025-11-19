@@ -3,6 +3,8 @@ import {
   text,
   timestamp,
   integer,
+  boolean,
+  real,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -19,6 +21,10 @@ export const presentationVideo = pgTable("presentation_video", {
   width: integer("width"),
   height: integer("height"),
   thumbnailPath: text("thumbnail_path"),
+  // Video processing fields
+  isProcessed: boolean("is_processed").notNull().default(false),
+  processingProgress: real("processing_progress").default(0),
+  processingError: text("processing_error"),
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at")
     .notNull()

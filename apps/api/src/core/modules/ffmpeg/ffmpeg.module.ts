@@ -1,5 +1,6 @@
 import { Module, Global } from '@nestjs/common';
 import { FfmpegService } from './services/ffmpeg.service';
+import { HardwareAccelerationService } from './services/hardware-acceleration.service';
 
 /**
  * FFmpeg Core Module
@@ -8,7 +9,7 @@ import { FfmpegService } from './services/ffmpeg.service';
  */
 @Global()
 @Module({
-  providers: [FfmpegService],
+  providers: [HardwareAccelerationService, FfmpegService],
   exports: [FfmpegService],
 })
 export class FfmpegModule {}

@@ -1,0 +1,175 @@
+@use "tailwindcss";
+
+.simple-viewer-wrapper {
+  @apply w-full max-w-full;
+  
+  .simple-viewer-content {
+    @apply w-full max-w-4xl mx-auto px-4 py-8;
+
+    .tiptap {
+      @apply outline-none p-4;
+      
+      /* Prose-like styling optimized for pink background */
+      p {
+        @apply mb-4 leading-7 text-gray-800 dark:text-gray-100 font-medium;
+      }
+
+      /* Override TipTap node default colors for pink background */
+      &.pink-theme {
+        // Override CSS variables for pink theme
+        --tt-inline-code-bg-color: rgba(255, 255, 255, 0.8);
+        --tt-inline-code-text-color: #be185d; /* pink-700 */
+        --tt-inline-code-border-color: rgba(236, 72, 153, 0.2);
+        --tt-codeblock-bg: rgba(255, 255, 255, 0.9);
+        --tt-codeblock-text: #1f2937; /* gray-800 */
+        --tt-codeblock-border: rgba(236, 72, 153, 0.2);
+        --blockquote-bg-color: #FF0077; /* pink-dark custom color */
+        --link-text-color: #FF0077; /* pink-dark custom color */
+
+        .dark & {
+          --tt-inline-code-bg-color: rgba(0, 0, 0, 0.4);
+          --tt-inline-code-text-color: #fbcfe8; /* pink-200 */
+          --tt-inline-code-border-color: rgba(249, 168, 212, 0.3);
+          --tt-codeblock-bg: rgba(0, 0, 0, 0.5);
+          --tt-codeblock-text: #f3f4f6; /* gray-100 */
+          --tt-codeblock-border: rgba(249, 168, 212, 0.3);
+          --blockquote-bg-color: #fbcfe8; /* pink-200 */
+          --link-text-color: #fbcfe8; /* pink-200 */
+        }
+      }
+
+      h1 {
+        @apply text-4xl font-bold mt-8 mb-6 leading-tight;
+        color: #FF0077; /* pink-dark */
+        
+        @media (prefers-color-scheme: dark) {
+          color: #fbcfe8; /* pink-200 */
+        }
+      }
+
+      h2 {
+        @apply text-3xl font-semibold mt-6 mb-4 leading-snug text-pink-600;
+        
+        @media (prefers-color-scheme: dark) {
+          color: #fbcfe8; /* pink-200 */
+        }
+      }
+
+      h3 {
+        @apply text-2xl font-medium mt-4 mb-3 leading-normal text-pink-600;
+        
+        @media (prefers-color-scheme: dark) {
+          color: #fbcfe8; /* pink-200 */
+        }
+      }
+
+      h4 {
+        @apply text-xl font-medium mt-4 mb-2 text-pink-500;
+        
+        @media (prefers-color-scheme: dark) {
+          color: #f9a8d4; /* pink-300 */
+        }
+      }
+
+      ul, ol {
+        @apply my-4 pl-6;
+        
+        li {
+          @apply mb-2 text-gray-800 dark:text-gray-100;
+        }
+      }
+
+      blockquote {
+        @apply my-6;
+      }
+
+      code {
+        @apply font-mono bg-white/70 dark:bg-black/40 text-pink-700 dark:text-pink-200 px-1.5 py-0.5 rounded text-sm border border-pink-500/20 dark:border-pink-300/30;
+      }
+
+      pre {
+        @apply my-6 overflow-x-auto bg-white/90 dark:bg-black/50 p-4 rounded-lg border border-pink-500/20 dark:border-pink-300/30;
+        
+        code {
+          @apply bg-transparent border-0 p-0;
+        }
+      }
+
+      a {
+        @apply underline cursor-pointer font-semibold;
+        color: #FF0077; /* pink-dark */
+        
+        &:hover {
+          text-decoration-thickness: 2px;
+          color: #db2777; /* pink-600 */
+        }
+        
+        @media (prefers-color-scheme: dark) {
+          color: #fbcfe8; /* pink-200 */
+          
+          &:hover {
+            color: #fce7f3; /* pink-100 */
+          }
+        }
+      }
+
+      strong, b {
+        @apply text-pink-700 dark:text-pink-100 font-bold;
+      }
+
+      em, i {
+        @apply text-pink-600 dark:text-pink-200;
+      }
+
+      img, video, audio {
+        @apply max-w-full h-auto rounded-lg my-6 shadow-md;
+      }
+
+      /* Task list styling */
+      ul[data-type="taskList"] {
+        @apply list-none pl-0;
+
+        li {
+          @apply flex items-start text-gray-800 dark:text-gray-100;
+
+          > label {
+            @apply flex-none mr-2 select-none;
+            
+            input[type="checkbox"] {
+              accent-color: #FF0077; /* pink-dark */
+              
+              @media (prefers-color-scheme: dark) {
+                accent-color: #fbcfe8; /* pink-200 */
+              }
+            }
+          }
+
+          > div {
+            @apply flex-1;
+          }
+        }
+      }
+
+      /* Horizontal rule */
+      hr {
+        @apply my-8 border-0 border-t-2;
+        border-color: rgba(255, 0, 119, 0.3); /* pink-dark with 30% opacity */
+        
+        @media (prefers-color-scheme: dark) {
+          border-color: rgba(251, 207, 232, 0.4); /* pink-200 with 40% opacity */
+        }
+      }
+
+      /* Highlight marks */
+      mark {
+        @apply text-pink-700 px-1 py-0.5 rounded-sm;
+        background-color: rgba(255, 212, 228, 0.6); /* pink-light with 60% opacity */
+        
+        @media (prefers-color-scheme: dark) {
+          background-color: rgba(219, 39, 119, 0.4); /* pink-600 with 40% opacity */
+          color: #fce7f3; /* pink-100 */
+        }
+      }
+    }
+  }
+}

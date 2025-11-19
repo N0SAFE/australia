@@ -89,10 +89,13 @@ function CreateCapsuleDialog() {
     }
 
     // Create capsule with editor content as JSON string
+    // Note: openingMessage is optional and can be empty
     createCapsule(
       {
         ...formData,
         content: JSON.stringify(editorValue),
+        // Only include openingMessage if it's not empty
+        openingMessage: formData.openingMessage || undefined,
       },
       {
         onSuccess: () => {

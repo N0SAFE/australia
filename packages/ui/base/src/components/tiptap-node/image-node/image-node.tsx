@@ -55,32 +55,37 @@ export function ImageNodeView(props: NodeViewProps) {
     }
   }
 
+  const imageElement = (
+    <div
+      className="image-node group relative"
+      style={{
+        width: (width as string | undefined) ?? "100%",
+        maxWidth: "100%",
+      }}
+    >
+      <img
+        src={resolvedSrc}
+        alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
+        title={(title as string | undefined) ?? (alt as string | undefined) ?? ""}
+        style={{
+          width: "100%",
+          height: "auto",
+          display: "block",
+        }}
+        className="rounded"
+      />
+    </div>
+  )
+
   return (
     <NodeViewWrapper className="image-node-wrapper py-2">
       <div className={alignmentStyles[align as keyof typeof alignmentStyles]}>
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <div
-              className="image-node group relative"
-            style={{
-              width: (width as string | undefined) ?? "100%",
-              maxWidth: "100%",
-            }}
-          >
-            <img
-              src={resolvedSrc}
-              alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
-              title={(title as string | undefined) ?? (alt as string | undefined) ?? ""}
-              style={{
-                width: "100%",
-                height: "auto",
-                display: "block",
-              }}
-              className="rounded"
-            />
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-64">
+        {editor.isEditable ? (
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              {imageElement}
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-64">
           <ContextMenuSub>
             <ContextMenuSubTrigger>Alignment</ContextMenuSubTrigger>
             <ContextMenuSubContent>
@@ -121,7 +126,10 @@ export function ImageNodeView(props: NodeViewProps) {
             </ContextMenuSubContent>
           </ContextMenuSub>
         </ContextMenuContent>
-      </ContextMenu>
+          </ContextMenu>
+        ) : (
+          imageElement
+        )}
       </div>
     </NodeViewWrapper>
   )

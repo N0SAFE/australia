@@ -1,14 +1,12 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useRef, useState, useEffect } from 'react'
 import { UserAppLayoutHome } from '@/routes'
 import { useQuery } from '@tanstack/react-query'
 import { orpc } from '@/lib/orpc'
 import { getApiUrl } from '@/lib/api-url'
-import { usePresentationProcessingProgress } from '@/hooks/usePresentationProcessing'
 
 export default function PresentationPage() {
   const router = useRouter()
@@ -22,9 +20,6 @@ export default function PresentationPage() {
   const { data: video, isLoading } = useQuery(orpc.presentation.getCurrent.queryOptions({
     input: {}
   }))
-
-  // Fetch processing progress
-  const { data: progress } = usePresentationProcessingProgress()
 
   useEffect(() => {
     // Attempt to enter fullscreen and play the video when component mounts
@@ -132,24 +127,6 @@ export default function PresentationPage() {
       >
         Your browser does not support the video tag.
       </video>
-
-      {/* Processing progress bar - shown when video is not fully processed */}
-      {video && !video.isProcessed && progress && (
-        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 w-[90%] max-w-2xl bg-black/80 backdrop-blur-sm p-6 rounded-lg border border-white/20">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-white">
-              <span className="text-sm font-medium">
-                {progress.message}
-              </span>
-              <span className="text-sm font-mono">{Math.round(progress.progress)}%</span>
-            </div>
-            <Progress value={progress.progress} className="h-2" />
-            {progress.error && (
-              <p className="text-red-400 text-xs mt-2">{progress.error}</p>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Button overlay - shown after video ends */}
       {showButton && (

@@ -104,49 +104,54 @@ export function VideoNodeView(props: NodeViewProps) {
     }
   }
 
+  const videoElement = (
+    <div 
+      className="video-node group relative inline-block"
+      style={{
+        width: (width as string | undefined) ?? "100%",
+        maxWidth: "100%",
+      }}
+    >
+      {/* Processing Progress Bar */}
+      {showProgress && processingProgress && (
+        <div className="absolute top-0 left-0 right-0 z-10 bg-blue-600 h-1 transition-all duration-300"
+          style={{
+            width: `${processingProgress.progress}%`,
+          }}
+          title={processingProgress.message || `Processing: ${processingProgress.progress}%`}
+        />
+      )}
+      
+      {/* Video Element */}
+      <div className="relative w-full overflow-hidden rounded">
+        <video
+          src={resolvedSrc}
+          title={(title as string | undefined) ?? "Video"}
+          controls={controls as boolean}
+          height={(height as string | undefined) ?? undefined}
+          style={{
+            width: "100%",
+            height: (height as string | undefined) ?? "auto",
+            display: "block",
+          }}
+          className="rounded"
+        >
+          <track kind="captions" />
+          Your browser does not support the video tag.
+        </video>
+      </div>
+    </div>
+  )
+
   return (
     <NodeViewWrapper className="video-node-wrapper py-2 w-full">
       <div className={alignmentStyles[align as keyof typeof alignmentStyles]}>
-        <ContextMenu>
-          <ContextMenuTrigger>
-            <div 
-              className="video-node group relative inline-block"
-              style={{
-                width: (width as string | undefined) ?? "100%",
-                maxWidth: "100%",
-              }}
-            >
-              {/* Processing Progress Bar */}
-              {showProgress && processingProgress && (
-                <div className="absolute top-0 left-0 right-0 z-10 bg-blue-600 h-1 transition-all duration-300"
-                  style={{
-                    width: `${processingProgress.progress}%`,
-                  }}
-                  title={processingProgress.message || `Processing: ${processingProgress.progress}%`}
-                />
-              )}
-              
-              {/* Video Element */}
-              <div className="relative w-full overflow-hidden rounded">
-                <video
-                  src={resolvedSrc}
-                  title={(title as string | undefined) ?? "Video"}
-                  controls={controls as boolean}
-                  height={(height as string | undefined) ?? undefined}
-                  style={{
-                    width: "100%",
-                    height: (height as string | undefined) ?? "auto",
-                    display: "block",
-                  }}
-                  className="rounded"
-                >
-                  <track kind="captions" />
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-64">
+        {editor.isEditable ? (
+          <ContextMenu>
+            <ContextMenuTrigger>
+              {videoElement}
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-64">
           <ContextMenuSub>
             <ContextMenuSubTrigger>Alignment</ContextMenuSubTrigger>
             <ContextMenuSubContent>
@@ -187,7 +192,10 @@ export function VideoNodeView(props: NodeViewProps) {
             </ContextMenuSubContent>
           </ContextMenuSub>
         </ContextMenuContent>
-      </ContextMenu>
+          </ContextMenu>
+        ) : (
+          videoElement
+        )}
       </div>
     </NodeViewWrapper>
   )

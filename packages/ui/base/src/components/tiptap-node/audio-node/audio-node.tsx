@@ -55,37 +55,39 @@ export function AudioNodeView(props: NodeViewProps) {
     }
   }
 
+  const audioElement = (
+    <div 
+      className="audio-node group relative inline-block"
+      style={{
+        width: (width as string | undefined) ?? "100%",
+        maxWidth: "100%",
+      }}
+    >
+      <audio
+        src={resolvedSrc}
+        title={(title as string | undefined) ?? "Audio"}
+        controls={controls as boolean}
+        style={{
+          width: "100%",
+          display: "block",
+        }}
+        className="rounded"
+      >
+        <track kind="captions" />
+        Your browser does not support the audio tag.
+      </audio>
+    </div>
+  )
+
   return (
     <NodeViewWrapper className="audio-node-wrapper py-2 w-full">
       <div className={alignmentStyles[align as keyof typeof alignmentStyles]}>
-        <ContextMenu>
-          <ContextMenuTrigger>
-            <div 
-              className="audio-node group relative inline-block"
-              style={{
-                width: (width as string | undefined) ?? "100%",
-                maxWidth: "100%",
-              }}
-            >
-              {/* Audio Element */}
-              <div className="relative w-full overflow-hidden rounded">
-                <audio
-                  src={resolvedSrc}
-                  title={(title as string | undefined) ?? "Audio"}
-                  controls={controls as boolean}
-                  style={{
-                    width: "100%",
-                    display: "block",
-                  }}
-                  className="rounded"
-                >
-                  <track kind="captions" />
-                  Your browser does not support the audio tag.
-                </audio>
-              </div>
-            </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-64">
+        {editor.isEditable ? (
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              {audioElement}
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-64">
           <ContextMenuSub>
             <ContextMenuSubTrigger>Alignment</ContextMenuSubTrigger>
             <ContextMenuSubContent>
@@ -126,7 +128,10 @@ export function AudioNodeView(props: NodeViewProps) {
             </ContextMenuSubContent>
           </ContextMenuSub>
         </ContextMenuContent>
-      </ContextMenu>
+          </ContextMenu>
+        ) : (
+          audioElement
+        )}
       </div>
     </NodeViewWrapper>
   )

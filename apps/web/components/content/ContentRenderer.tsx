@@ -29,6 +29,7 @@ export const ContentRenderer: FC<{
   return (
     <SimpleViewer
       value={content}
+      className="pink-theme"
       injectMediaUrl={{
         api: (src) => `${process.env.NEXT_PUBLIC_API_URL || ''}${src}`
       }}

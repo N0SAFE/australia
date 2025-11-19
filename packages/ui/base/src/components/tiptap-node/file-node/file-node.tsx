@@ -64,48 +64,53 @@ export function FileNodeView(props: NodeViewProps) {
     }
   }
 
+  const fileElement = (
+    <div className="group relative"
+      style={{
+        width: (width as string | undefined) ?? "600px",
+        maxWidth: "100%",
+      }}
+    >
+      <div
+        className="file-node cursor-pointer rounded border bg-card p-4 hover:bg-accent/50 transition-colors"
+        onClick={handleDownload}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            handleDownload(e)
+          }
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="file-node-icon flex-shrink-0">
+            <FileIcon className="h-6 w-6" />
+          </div>
+          <div className="file-node-info flex-1 min-w-0">
+            <div className="file-node-name font-medium truncate">{(name as string | undefined) ?? "Unknown File"}</div>
+            <div className="file-node-meta text-sm text-muted-foreground">
+              {size ? formatBytes(size as number) : ""}
+              {size && type ? " • " : ""}
+              {(type as string | undefined) ?? ""}
+            </div>
+          </div>
+          <div className="file-node-action flex-shrink-0">
+            <DownloadIcon className="h-4 w-4" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <NodeViewWrapper className="file-node-wrapper py-2">
       <div className={alignmentStyles[align as keyof typeof alignmentStyles]}>
-        <ContextMenu>
-          <ContextMenuTrigger>
-            <div className="group relative"
-            style={{
-              width: (width as string | undefined) ?? "600px",
-              maxWidth: "100%",
-            }}
-          >
-            <div
-              className="file-node cursor-pointer rounded border bg-card p-4 hover:bg-accent/50 transition-colors"
-              onClick={handleDownload}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  handleDownload(e)
-                }
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div className="file-node-icon flex-shrink-0">
-                  <FileIcon className="h-6 w-6" />
-                </div>
-                <div className="file-node-info flex-1 min-w-0">
-                  <div className="file-node-name font-medium truncate">{(name as string | undefined) ?? "Unknown File"}</div>
-                  <div className="file-node-meta text-sm text-muted-foreground">
-                    {size ? formatBytes(size as number) : ""}
-                    {size && type ? " • " : ""}
-                    {(type as string | undefined) ?? ""}
-                  </div>
-                </div>
-                <div className="file-node-action flex-shrink-0">
-                  <DownloadIcon className="h-4 w-4" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="w-64">
+        {editor.isEditable ? (
+          <ContextMenu>
+            <ContextMenuTrigger>
+              {fileElement}
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-64">
           <ContextMenuSub>
             <ContextMenuSubTrigger>Alignment</ContextMenuSubTrigger>
             <ContextMenuSubContent>
@@ -146,7 +151,10 @@ export function FileNodeView(props: NodeViewProps) {
             </ContextMenuSubContent>
           </ContextMenuSub>
         </ContextMenuContent>
-      </ContextMenu>
+          </ContextMenu>
+        ) : (
+          fileElement
+        )}
       </div>
     </NodeViewWrapper>
   )

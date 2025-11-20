@@ -1,42 +1,57 @@
 /**
- * Type definition for media URL resolver callback
- * @param src - The original source path/URL
- * @returns Promise resolving to the full URL to use for the media
+ * Type definition for video URL strategy resolver
+ * @param meta - Metadata object from the video node (must contain srcResolveStrategy and fileId)
+ * @returns Promise resolving to the full URL to use for the video
  */
-export type MediaUrlResolver = (src: string) => Promise<string> | string
+export type VideoStrategyResolver = (meta: unknown) => Promise<string> | string
 
 /**
- * Resolves media URLs based on srcUrlId and injected resolver callbacks
+ * Type definition for image URL strategy resolver
+ * @param meta - Metadata object from the image node (must contain srcResolveStrategy and fileId)
+ * @returns Promise resolving to the full URL to use for the image
+ */
+export type ImageStrategyResolver = (meta: unknown) => Promise<string> | string
+
+/**
+ * Type definition for audio URL strategy resolver
+ * @param meta - Metadata object from the audio node (must contain srcResolveStrategy and fileId)
+ * @returns Promise resolving to the full URL to use for the audio
+ */
+export type AudioStrategyResolver = (meta: unknown) => Promise<string> | string
+
+/**
+ * Type definition for file URL strategy resolver
+ * @param meta - Metadata object from the file node (must contain srcResolveStrategy and fileId)
+ * @returns Promise resolving to the full URL to use for the file
+ */
+export type FileStrategyResolver = (meta: unknown) => Promise<string> | string
+
+/**
+ * Resolves media URL using the provided strategy resolver
  * 
  * Rules:
- * 1. If no srcUrlId: use src as-is (local to current app)
- * 2. If srcUrlId exists: call the resolver callback for that ID with the src
- * 3. If srcUrlId exists but no resolver: use src as-is
+ * 1. If no meta provided: return empty string
+ * 2. If no strategy provided: return empty string
+ * 3. If strategy exists: call it with meta only
+ * 4. If strategy fails: return empty string
  */
 export async function resolveMediaUrl(
-  src: string,
-  srcUrlId: string | null | undefined,
-  mediaUrlResolvers: Record<string, MediaUrlResolver> | undefined
+  meta: unknown,
+  strategyResolver: VideoStrategyResolver | ImageStrategyResolver | AudioStrategyResolver | FileStrategyResolver | undefined
 ): Promise<string> {
-  // No src, return empty
-  if (!src) return ""
+  // No meta, return empty
+  if (!meta) return ""
 
-  // Case 1: No srcUrlId - use src as-is
-  if (!srcUrlId) {
-    return src
+  // Case 1: No strategy - return empty
+  if (!strategyResolver) {
+    return ""
   }
 
-  // Case 2: srcUrlId exists - use resolver callback
-  const resolver = mediaUrlResolvers?.[srcUrlId]
-  if (resolver) {
-    try {
-      return await resolver(src)
-    } catch (error) {
-      console.error(`Failed to resolve media URL for srcUrlId "${srcUrlId}":`, error)
-      return src // Fallback to original src on error
-    }
+  // Case 2: Use strategy resolver with meta only
+  try {
+    return await strategyResolver(meta)
+  } catch (error) {
+    console.error(`Failed to resolve media URL:`, error)
+    return "" // Return empty on error
   }
-
-  // Case 3: srcUrlId exists but no resolver - use src as-is
-  return src
 }

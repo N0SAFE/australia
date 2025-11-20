@@ -85,9 +85,9 @@ export class StorageController {
 
                 return {
                     filename: multerMetadata.filename,
-                    path: `/storage/files/${multerMetadata.filename}`,
                     size: input.file.size,
                     mimeType: input.file.type,
+                    fileId: dbResult.file.id,
                 };
             } catch (error) {
                 console.error("[StorageController] Error in uploadImage:", error);
@@ -138,7 +138,7 @@ export class StorageController {
 
             // Start async video processing in background (non-blocking)
             this.storageEventService
-                .startProcessing("videoProcessing", { videoId: dbResult.videoMetadata.id }, ({ abortSignal, emit }) => {
+                .startProcessing("videoProcessing", { fileId: dbResult.file.id }, ({ abortSignal, emit }) => {
                     return this.videoProcessingService
                         .processVideo(
                             finalFilePath,
@@ -153,11 +153,17 @@ export class StorageController {
                         )
                         .then(async (metadata) => {
                             // SUCCESS: Update database to mark as processed
-                            await this.fileMetadataService.updateVideoProcessingStatus(dbResult.videoMetadata.id, {
-                                isProcessed: true,
-                                processingProgress: 100,
-                                processingError: undefined,
-                            });
+                            // If video was converted, newFilePath will be set and we need to update the file path in DB
+                            await this.fileMetadataService.updateVideoProcessingStatus(
+                                dbResult.videoMetadata.id,
+                                {
+                                    isProcessed: true,
+                                    processingProgress: 100,
+                                    processingError: undefined,
+                                },
+                                dbResult.file.id,
+                                metadata.newFilePath // Update file path if video was converted
+                            );
 
                             // Emit final completion event with metadata
                             emit({
@@ -177,7 +183,7 @@ export class StorageController {
 
                             // Check if this was an abort
                             if (abortSignal?.aborted || err.message.includes("aborted")) {
-                                this.logger.warn(`Video processing aborted for video ${dbResult.videoMetadata.id}: ${err.message}`);
+                                this.logger.warn(`Video processing aborted for video ${dbResult.videoMetadata.id} with fileId: ${dbResult.file.id}: ${err.message}`);
                                 return; // Don't mark as error in DB for aborts
                             }
 
@@ -187,7 +193,7 @@ export class StorageController {
                                 processingError: err.message,
                             });
 
-                            this.logger.error(`Video processing failed for video ${dbResult.videoMetadata.id}: ${err.message}`);
+                            this.logger.error(`Video processing failed for video ${dbResult.videoMetadata.id} with fileId: ${dbResult.file.id}: ${err.message}`);
 
                             // Throw error to propagate to subscriber
                             throw err;
@@ -210,7 +216,6 @@ export class StorageController {
 
             return {
                 filename: finalFilename,
-                path: `/storage/files/${finalFilename}`,
                 size: finalSize,
                 mimeType: finalMimeType,
                 fileId: dbResult.file.id,
@@ -265,41 +270,97 @@ export class StorageController {
 
             return {
                 filename: multerMetadata.filename,
-                path: `/storage/files/${multerMetadata.filename}`,
                 size: input.file.size,
                 mimeType: input.file.type,
+                fileId: dbResult.file.id,
             };
         });
     }
 
     /**
-     * Serve file endpoint - implements ORPC contract
+     * Get image file by ID
      */
-    @Implement(storageContract.getFile)
-    getFile() {
-        return implement(storageContract.getFile).handler(async ({ input }) => {
-            const { filename } = input;
+    @Implement(storageContract.getImage)
+    getImage() {
+        return implement(storageContract.getImage).handler(async ({ input }) => {
+            const { fileId } = input;
 
-            console.log("[StorageController] getFile called with filename:", filename);
+            // Get image with metadata from database
+            const result = await this.fileMetadataService.getImageByFileId(fileId);
+            if (!result || !result.file) {
+                throw new ORPCError("NOT_FOUND", {
+                    message: "Image not found",
+                });
+            }
 
-            // Check if file exists
-            const exists = await this.storageService.fileExists(filename);
-            console.log("[StorageController] File exists check result:", exists);
+            const image = result.file;
 
-            if (!exists) {
-                console.log("[StorageController] Throwing ORPCError for:", filename);
+            // Get absolute path and read file
+            const imagePath = this.fileStorageService.getAbsolutePath(image.filePath);
+            const buffer = await readFile(imagePath);
+
+            // Return as File object
+            return new File([buffer], image.filename, {
+                type: image.mimeType,
+            });
+        });
+    }
+
+    /**
+     * Get audio file by ID
+     */
+    @Implement(storageContract.getAudio)
+    getAudio() {
+        return implement(storageContract.getAudio).handler(async ({ input }) => {
+            const { fileId } = input;
+
+            // Get audio with metadata from database
+            const result = await this.fileMetadataService.getAudioByFileId(fileId);
+            if (!result || !result.file) {
+                throw new ORPCError("NOT_FOUND", {
+                    message: "Audio not found",
+                });
+            }
+
+            const audio = result.file;
+
+            // Get absolute path and read file
+            const audioPath = this.fileStorageService.getAbsolutePath(audio.filePath);
+            const buffer = await readFile(audioPath);
+
+            // Return as File object
+            return new File([buffer], audio.filename, {
+                type: audio.mimeType,
+            });
+        });
+    }
+
+    /**
+     * Get raw file by ID
+     */
+    @Implement(storageContract.getRawFile)
+    getRawFile() {
+        return implement(storageContract.getRawFile).handler(async ({ input }) => {
+            const { fileId } = input;
+
+            // Get raw file with metadata from database
+            const result = await this.fileMetadataService.getRawFileByFileId(fileId);
+            if (!result || !result.file) {
                 throw new ORPCError("NOT_FOUND", {
                     message: "File not found",
                 });
             }
 
-            // Read file and metadata
-            const filePath = this.storageService.getFilePath(filename);
-            const [buffer, metadata] = await Promise.all([readFile(filePath), this.storageService.getFileMetadata(filename)]);
+            const rawFile = result.file;
 
-            console.log("[StorageController] File read successfully:", filename);
+            // Get absolute path and read file
+            const rawFilePath = this.fileStorageService.getAbsolutePath(rawFile.filePath);
+            const buffer = await readFile(rawFilePath);
 
-            return new File([buffer], filename, { type: metadata.mimeType });
+            // Return as File object
+            return new File([buffer], rawFile.filename, {
+                type: rawFile.mimeType,
+            });
         });
     }
 
@@ -309,10 +370,10 @@ export class StorageController {
     @Implement(storageContract.getVideo)
     getVideo() {
         return implement(storageContract.getVideo).handler(async ({ input }) => {
-            const { videoId } = input;
+            const { fileId } = input;
 
             // Get video with metadata from database
-            const result = await this.fileMetadataService.getVideoByFileId(videoId);
+            const result = await this.fileMetadataService.getVideoByFileId(fileId);
             if (!result || !result.file) {
                 throw new ORPCError("NOT_FOUND", {
                     message: "Video not found",
@@ -320,6 +381,13 @@ export class StorageController {
             }
 
             const video = result.file;
+            
+            console.log('[DEBUG getVideo] Database query result:', {
+                fileId,
+                filePath: video.filePath,
+                storedFilename: video.storedFilename,
+                filename: video.filename,
+            });
 
             // Get absolute path and read file
             const videoPath = this.fileStorageService.getAbsolutePath(video.filePath);
@@ -329,6 +397,57 @@ export class StorageController {
             return new File([buffer], video.filename, {
                 type: video.mimeType,
             });
+        });
+    }
+
+    @Implement(storageContract.getImageData)
+    getImageData() {
+        return implement(storageContract.getImageData).handler(async ({ input }) => {
+            const { fileId } = input;
+            
+            const result = await this.fileMetadataService.getImageByFileId(fileId)
+            
+            return {}
+        });
+    }
+    
+    @Implement(storageContract.getAudioData)
+    getAudioData() {
+        return implement(storageContract.getAudioData).handler(async ({ input }) => {
+            const { fileId } = input;
+            
+            const result = await this.fileMetadataService.getImageByFileId(fileId)
+            
+            return {}
+        });
+    }
+    
+    @Implement(storageContract.getRawFileData)
+    getRawFileData() {
+        return implement(storageContract.getRawFileData).handler(async ({ input }) => {
+            const { fileId } = input;
+            
+            const result = await this.fileMetadataService.getImageByFileId(fileId)
+            
+            return {}
+        });
+    }
+    
+    @Implement(storageContract.getVideoData)
+    getVideoData() {
+        return implement(storageContract.getVideoData).handler(async ({ input }) => {
+            const { fileId } = input;
+            
+            const result = await this.fileMetadataService.getVideoByFileId(fileId)
+            if (!result) {
+                throw new ORPCError("NOT_FOUND", {
+                    message: "Video not found",
+                });
+            }
+            
+            return {
+                isProcessed: result.videoMetadata?.isProcessed ?? true
+            }
         });
     }
 
@@ -343,25 +462,32 @@ export class StorageController {
         const storageEventService = this.storageEventService;
         const fileMetadataService = this.fileMetadataService;
         return implement(storageContract.subscribeVideoProcessing).handler(async function* ({ input }) {
-            const { videoId } = input;
+            const { fileId } = input;
+
+            console.log(fileId);
 
             // Get current video processing state
-            const result = await fileMetadataService.getVideoByFileId(videoId);
+            const result = await fileMetadataService.getVideoByFileId(fileId);
             if (!result || !result.file || !result.videoMetadata) {
+                console.log("not found");
                 throw new ORPCError("NOT_FOUND", {
                     message: "Video not found",
                 });
             }
 
+            console.log("result", result);
+
             const videoMetadata = result.videoMetadata;
 
             // If already failed, throw error immediately
             if (videoMetadata.processingError) {
+                console.log("error");
                 throw new Error(videoMetadata.processingError);
             }
 
             // If already processed, just return (no events to stream)
             if (videoMetadata.isProcessed) {
+                console.log("completed");
                 return;
             }
 
@@ -373,7 +499,7 @@ export class StorageController {
             };
 
             // Subscribe to video processing events
-            const subscription = storageEventService.subscribe("videoProcessing", { videoId });
+            const subscription = storageEventService.subscribe("videoProcessing", { fileId });
 
             // Yield events as they arrive - completion detected by iterator end
             for await (const event of subscription) {

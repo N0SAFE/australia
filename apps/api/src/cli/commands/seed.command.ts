@@ -11,7 +11,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 // Seed version identifier - increment this when you want to re-seed
-const SEED_VERSION = '1.8.0';
+const SEED_VERSION = '1.9.0';
 
 // Helper function to format date as YYYY-MM-DD
 function formatDate(date: Date): string {
@@ -26,6 +26,7 @@ function addDays(date: Date, days: number): Date {
 }
 
 // Helper function to upload a seed asset file using the FileMetadataService
+// Returns the fileId for use in meta with srcResolveStrategy
 async function uploadSeedAsset(
   fileMetadataService: FileMetadataService,
   assetFilename: string,
@@ -116,8 +117,8 @@ async function uploadSeedAsset(
     
     console.log(`✅ Uploaded ${type} as: ${storedFilename} (File ID: ${dbResult.file.id})`);
 
-    // Return the path that will be served by the API
-    return `/storage/files/${storedFilename}`;
+    // Return the fileId for use in meta
+    return dbResult.file.id;
   } catch (error) {
     console.error(`❌ Failed to upload ${type} asset ${assetFilename}:`, error);
     throw error;
@@ -296,49 +297,40 @@ export class SeedCommand extends CommandRunner {
               content: [{type: 'text', text: 'You can also attach files to your capsules. Here are some example files you can download:'}]
             },
             {
-              type: 'paragraph',
-              content: [
-                {type: 'text', text: '🖼️ '},
-                {
-                  type: 'text',
-                  marks: [{
-                    type: 'link',
-                    attrs: {href: demoImage, target: '_blank'}
-                  }],
-                  text: 'Download Mountain Sunset Image'
-                },
-                {type: 'text', text: ' - A beautiful sunset over mountain peaks'}
-              ]
+              type: 'image',
+              attrs: {
+                alt: 'Mountain Sunset - A beautiful sunset over mountain peaks',
+                width: 1920,
+                height: 1080,
+                meta: {
+                  srcResolveStrategy: 'image',
+                  fileId: demoImage
+                }
+              }
             },
             {
-              type: 'paragraph',
-              content: [
-                {type: 'text', text: '🎬 '},
-                {
-                  type: 'text',
-                  marks: [{
-                    type: 'link',
-                    attrs: {href: demoVideo, target: '_blank'}
-                  }],
-                  text: 'Download Big Buck Bunny Video'
-                },
-                {type: 'text', text: ' - Sample video content'}
-              ]
+              type: 'video',
+              attrs: {
+                title: 'Big Buck Bunny - Sample video content',
+                width: 1920,
+                height: 1080,
+                controls: true,
+                meta: {
+                  srcResolveStrategy: 'video',
+                  fileId: demoVideo
+                }
+              }
             },
             {
-              type: 'paragraph',
-              content: [
-                {type: 'text', text: '🎵 '},
-                {
-                  type: 'text',
-                  marks: [{
-                    type: 'link',
-                    attrs: {href: demoAudio, target: '_blank'}
-                  }],
-                  text: 'Download Audio Track'
-                },
-                {type: 'text', text: ' - Sample music file'}
-              ]
+              type: 'audio',
+              attrs: {
+                title: 'Sample Audio Track',
+                controls: true,
+                meta: {
+                  srcResolveStrategy: 'audio',
+                  fileId: demoAudio
+                }
+              }
             },
             {
               type: 'paragraph',
@@ -469,11 +461,13 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'image',
               attrs: {
-                src: pastImagePath,
-                srcUrlId: 'api',
                 alt: 'Forest Trail - A serene path through the forest',
                 width: 1920,
-                height: 1280
+                height: 1280,
+                meta: {
+                  srcResolveStrategy: 'image',
+                  fileId: pastImagePath
+                }
               }
             },
             {
@@ -509,9 +503,13 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'image',
               attrs: {
-                src: image1Path,                srcUrlId: 'api',                alt: 'Mountain Sunset - A beautiful sunset over mountain peaks',
+                alt: 'Mountain Sunset - A beautiful sunset over mountain peaks',
                 width: 1920,
-                height: 1080
+                height: 1080,
+                meta: {
+                  srcResolveStrategy: 'image',
+                  fileId: image1Path
+                }
               }
             }
           ]
@@ -537,12 +535,14 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'video',
               attrs: {
-                src: video1Path,
-                srcUrlId: 'api',
                 title: 'Mixed Content Video',
                 width: 1920,
                 height: 1080,
-                controls: true
+                controls: true,
+                meta: {
+                  srcResolveStrategy: 'video',
+                  fileId: video1Path
+                }
               }
             }
           ]
@@ -569,10 +569,12 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'audio',
               attrs: {
-                src: audio1Path,
-                srcUrlId: 'api',
                 title: 'Sample Audio - Soundhelix Song',
-                controls: true
+                controls: true,
+                meta: {
+                  srcResolveStrategy: 'audio',
+                  fileId: audio1Path
+                }
               }
             }
           ]
@@ -647,11 +649,13 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'image',
               attrs: {
-                src: image2Path,
-                srcUrlId: 'api',
                 alt: 'Forest Trail - A serene path through the forest',
                 width: 1920,
-                height: 1280
+                height: 1280,
+                meta: {
+                  srcResolveStrategy: 'image',
+                  fileId: image2Path
+                }
               }
             }
           ]
@@ -678,8 +682,11 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'video',
               attrs: {
-                src: video2Path,
-                srcUrlId: 'api'
+                controls: true,
+                meta: {
+                  srcResolveStrategy: 'video',
+                  fileId: video2Path
+                }
               }
             }
           ]
@@ -706,8 +713,11 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'audio',
               attrs: {
-                src: audio2Path,
-                srcUrlId: 'api'
+                controls: true,
+                meta: {
+                  srcResolveStrategy: 'audio',
+                  fileId: audio2Path
+                }
               }
             }
           ]
@@ -783,11 +793,13 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'image',
               attrs: {
-                src: image3Path,
-                srcUrlId: 'api',
                 alt: 'Ocean Waves - Powerful waves crashing on the shore',
                 width: 1920,
-                height: 1280
+                height: 1280,
+                meta: {
+                  srcResolveStrategy: 'image',
+                  fileId: image3Path
+                }
               }
             }
           ]
@@ -856,8 +868,11 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'video',
               attrs: {
-                src: video3Path,
-                srcUrlId: 'api'
+                controls: true,
+                meta: {
+                  srcResolveStrategy: 'video',
+                  fileId: video3Path
+                }
               }
             }
           ]

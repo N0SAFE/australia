@@ -1,14 +1,15 @@
 import { mergeAttributes, Node } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { AudioNodeView } from "./audio-node"
+import type { AudioStrategyResolver } from "../../../lib/media-url-resolver"
 
 export interface AudioNodeOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HTMLAttributes: Record<string, any>
   /**
-   * Media URL resolver callbacks by ID
+   * Audio URL strategy resolver that receives meta only
    */
-  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+  audioStrategy?: AudioStrategyResolver
 }
 
 declare module "@tiptap/core" {
@@ -31,16 +32,13 @@ export const AudioNode = Node.create<AudioNodeOptions>({
   addOptions() {
     return {
       HTMLAttributes: {},
-      injectMediaUrl: {},
+      audioStrategy: undefined,
     }
   },
 
   addAttributes() {
     return {
-      src: {
-        default: null,
-      },
-      srcUrlId: {
+      meta: {
         default: null,
       },
       title: {

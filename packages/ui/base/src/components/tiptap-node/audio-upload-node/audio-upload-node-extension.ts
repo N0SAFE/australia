@@ -30,7 +30,7 @@ export interface AudioUploadOptions {
     file: File,
     onProgress: (event: { progress: number }) => void,
     signal: AbortSignal
-  ) => Promise<string>
+  ) => Promise<{ url: string; meta?: unknown }>
   /**
    * Function to prepare file before upload (e.g., sanitize filename)
    */

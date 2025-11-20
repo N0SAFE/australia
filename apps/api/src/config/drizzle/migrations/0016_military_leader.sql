@@ -1,0 +1,1 @@
+ALTER TABLE "text_file" RENAME TO "raw_file";

@@ -13,26 +13,31 @@ import {
   ContextMenuTrigger,
 } from "@/components/shadcn/context-menu"
 import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize } from "lucide-react"
-import { resolveMediaUrl } from "@/lib/media-url-resolver"
+import { resolveMediaUrl, type ImageStrategyResolver } from "../../../lib/media-url-resolver"
 
 export function ImageNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
-  const { src, srcUrlId, alt, title, width, align = "center" } = node.attrs
+  const { meta, alt, title, width, align = "center" } = node.attrs
   
   // State for resolved URL
-  const [resolvedSrc, setResolvedSrc] = useState<string>(src as string)
+  const [resolvedSrc, setResolvedSrc] = useState<string>("")
   
-  // Get injected media URL resolvers from extension options
-  const injectMediaUrl = editor.extensionManager.extensions.find(ext => ext.name === 'image')?.options.injectMediaUrl
+  // Get imageStrategy from extension options
+  const extension = editor.extensionManager.extensions.find(ext => ext.name === 'image')
+  const imageStrategy = extension?.options.imageStrategy as ImageStrategyResolver | undefined
   
-  // Resolve the final URL asynchronously
+  // Resolve the final URL asynchronously using strategy with meta only
   useEffect(() => {
     const resolve = async () => {
-      const resolved = await resolveMediaUrl(src as string, srcUrlId as string | null, injectMediaUrl)
+      if (!imageStrategy || !meta) {
+        setResolvedSrc("")
+        return
+      }
+      const resolved = await resolveMediaUrl(meta, imageStrategy)
       setResolvedSrc(resolved)
     }
     void resolve()
-  }, [src, srcUrlId, injectMediaUrl])
+  }, [meta, imageStrategy])
 
   const alignmentStyles = {
     left: "flex justify-start",
@@ -54,7 +59,7 @@ export function ImageNodeView(props: NodeViewProps) {
       }
     }
   }
-
+  
   const imageElement = (
     <div
       className="image-node group relative"
@@ -63,17 +68,29 @@ export function ImageNodeView(props: NodeViewProps) {
         maxWidth: "100%",
       }}
     >
-      <img
-        src={resolvedSrc}
-        alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
-        title={(title as string | undefined) ?? (alt as string | undefined) ?? ""}
-        style={{
-          width: "100%",
-          height: "auto",
-          display: "block",
-        }}
-        className="rounded"
-      />
+      {resolvedSrc ? (
+        <img
+          src={resolvedSrc}
+          alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
+          title={(title as string | undefined) ?? (alt as string | undefined) ?? ""}
+          style={{
+            width: "100%",
+            height: "auto",
+            display: "block",
+          }}
+          className="rounded"
+        />
+      ) : (
+        <div
+          className="bg-muted rounded flex items-center justify-center"
+          style={{
+            width: "100%",
+            minHeight: "200px",
+          }}
+        >
+          <span className="text-muted-foreground text-sm">Loading image...</span>
+        </div>
+      )}
     </div>
   )
 

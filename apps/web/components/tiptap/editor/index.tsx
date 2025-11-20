@@ -266,11 +266,18 @@ export interface SimpleEditorProps {
     file?: UploadFunction
   }
   /**
-   * Map of media source URL IDs to resolver callbacks
-   * Used to resolve media URLs based on srcUrlId attribute
-   * Example: { api: (src) => `https://api.example.com${src}` }
+   * Strategy resolvers for media URL resolution
+   * Used to resolve media URLs based on meta.srcResolveStrategy
    */
-  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+  videoStrategy?: (meta: unknown) => Promise<string> | string
+  imageStrategy?: (meta: unknown) => Promise<string> | string
+  audioStrategy?: (meta: unknown) => Promise<string> | string
+  fileStrategy?: (meta: unknown) => Promise<string> | string
+  /**
+   * Video processing progress component for Tiptap video nodes
+   * Component that handles fetching and rendering video processing progress
+   */
+  VideoProgressComponent?: import("react").ComponentType<import("@repo/ui/tiptap-node/video-node-extension").VideoProgressComponentProps>
 }
 
 export function SimpleEditor({
@@ -279,7 +286,11 @@ export function SimpleEditor({
   editable = true,
   placeholder = "Start typing...",
   uploadFunctions,
-  injectMediaUrl,
+  videoStrategy,
+  imageStrategy,
+  audioStrategy,
+  fileStrategy,
+  VideoProgressComponent,
 }: SimpleEditorProps) {
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()
@@ -329,16 +340,17 @@ export function SimpleEditor({
       }),
       // Display nodes for media (required for upload nodes to transform to)
       ImageNode.configure({
-        injectMediaUrl,
+        imageStrategy,
       }),
       VideoNode.configure({
-        injectMediaUrl,
+        videoStrategy,
+        VideoProgressComponent,
       }),
       AudioNode.configure({
-        injectMediaUrl,
+        audioStrategy,
       }),
       FileNode.configure({
-        injectMediaUrl,
+        fileStrategy,
       }),
       // Image upload extension
       ...(uploadFunctions?.image

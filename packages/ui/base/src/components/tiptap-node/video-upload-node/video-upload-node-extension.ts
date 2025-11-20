@@ -1,6 +1,6 @@
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { Node, mergeAttributes } from "@tiptap/core"
-import { VideoUploadNode } from "./video-upload-node"
+import { VideoUploadNode, type UploadResult } from "./video-upload-node"
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -9,6 +9,15 @@ declare module "@tiptap/core" {
     }
   }
 }
+
+/**
+ * Video upload function type that returns upload result with URL and optional metadata
+ */
+export type VideoUploadFunction = (
+  file: File,
+  onProgress: (event: { progress: number }) => void,
+  signal: AbortSignal
+) => Promise<UploadResult>
 
 export interface VideoUploadOptions {
   /**
@@ -31,13 +40,9 @@ export interface VideoUploadOptions {
    * @param {File} file - The file to be uploaded
    * @param {Function} onProgress - Callback function to report upload progress
    * @param {AbortSignal} signal - Signal that can be used to abort the upload
-   * @returns {Promise<string>} Promise resolving to the URL of the uploaded file
+   * @returns {Promise<UploadResult>} Promise resolving to upload result with URL and optional meta
    */
-  upload: (
-    file: File,
-    onProgress: (event: { progress: number }) => void,
-    signal: AbortSignal
-  ) => Promise<string>
+  upload: VideoUploadFunction
   /**
    * Function to prepare file before upload (e.g., sanitize filename)
    * @param {File} file - The original file
@@ -96,27 +101,6 @@ export const VideoUploadExtension = Node.create<VideoUploadOptions>({
       },
       accept: {
         default: this.options.accept,
-      },
-      videoId: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-video-id"),
-        renderHTML: (attributes) => {
-          if (!attributes.videoId) {
-            return {}
-          }
-          return {
-            "data-video-id": String(attributes.videoId),
-          }
-        },
-      },
-      isProcessed: {
-        default: false,
-        parseHTML: (element) => element.getAttribute("data-is-processed") === "true",
-        renderHTML: (attributes) => {
-          return {
-            "data-is-processed": String(attributes.isProcessed),
-          }
-        },
       },
     }
   },

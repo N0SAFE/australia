@@ -96,7 +96,6 @@ import { SimpleEditor } from "@/components/tiptap/editor/index";
 import { JSONContent } from "@repo/ui/tiptap-exports/react";
 import { useStorage } from "@/hooks/useStorage";
 
-
 /**
  * Sanitize filename to ASCII-safe characters for HTTP headers
  * Replaces accented characters and special chars with ASCII equivalents
@@ -123,7 +122,7 @@ function sanitizeFilename(filename: string): string {
 function CreateCapsuleDialog() {
   const [open, setOpen] = useState(false);
   const [editorValue, setEditorValue] = useState<JSONContent>([
-    { type: "paragraph", content: [{ type: "text", text: "" }] }
+    { type: "paragraph", content: [{ type: "text", text: "" }] },
   ]);
   const [date, setDate] = useState<Date>();
   const [formData, setFormData] = useState({
@@ -131,6 +130,29 @@ function CreateCapsuleDialog() {
     isLocked: true,
   });
   const storage = useStorage();
+
+  // Media URL resolution strategies
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+  
+  const imageStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/image/${meta.fileId}`;
+  };
+  
+  const videoStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/video/${meta.fileId}`;
+  };
+  
+  const audioStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/audio/${meta.fileId}`;
+  };
+  
+  const fileStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/file/${meta.fileId}`;
+  };
 
   const { mutate: createCapsule, isPending } = useCreateCapsule();
 
@@ -233,66 +255,78 @@ function CreateCapsuleDialog() {
                 </div>
                 <div className="border rounded-lg shadow-sm bg-background">
                   <SimpleEditor
-                  value={editorValue}
-                  onChange={(newValue) => {
-                    console.log(
-                      "📝 [SimpleEditor] Content changed:",
-                      JSON.stringify(newValue, null, 2),
-                    );
-                    setEditorValue(newValue);
-                  }}
-                  editable={true}
-                  placeholder="Écrivez le contenu de votre capsule temporelle..."
-                  injectMediaUrl={{
-                    api: (src) => {
+                    value={editorValue}
+                    onChange={(newValue) => {
                       console.log(
-                        `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`,
+                        "📝 [SimpleEditor] Content changed:",
+                        JSON.stringify(newValue, null, 2),
                       );
-                      return `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`;
-                    },
-                  }}
-                  uploadFunctions={{
-                    image: async (file, onProgress, signal) => {
-                      // Sanitize filename to ASCII-safe characters for HTTP headers
-                      const sanitizedFile = new File(
-                        [file],
-                        sanitizeFilename(file.name),
-                        { type: file.type },
-                      );
-                      const result = await storage.uploadImageAsync(
-                        sanitizedFile,
-                        onProgress,
-                      );
-                      return result.url!;
-                    },
-                    video: async (file, onProgress, signal) => {
-                      // Sanitize filename to ASCII-safe characters for HTTP headers
-                      const sanitizedFile = new File(
-                        [file],
-                        sanitizeFilename(file.name),
-                        { type: file.type },
-                      );
-                      const result = await storage.uploadVideoAsync(
-                        sanitizedFile,
-                        onProgress,
-                      );
-                      return result.url!;
-                    },
-                    audio: async (file, onProgress, signal) => {
-                      // Sanitize filename to ASCII-safe characters for HTTP headers
-                      const sanitizedFile = new File(
-                        [file],
-                        sanitizeFilename(file.name),
-                        { type: file.type },
-                      );
-                      const result = await storage.uploadAudioAsync(
-                        sanitizedFile,
-                        onProgress,
-                      );
-                      return result.url!;
-                    },
-                  }}
-                />
+                      setEditorValue(newValue);
+                    }}
+                    editable={true}
+                    placeholder="Écrivez le contenu de votre capsule temporelle..."
+                    // Media URL resolution strategies
+                    imageStrategy={imageStrategy}
+                    videoStrategy={videoStrategy}
+                    audioStrategy={audioStrategy}
+                    fileStrategy={fileStrategy}
+                    uploadFunctions={{
+                      image: async (file, onProgress, signal) => {
+                        // Sanitize filename to ASCII-safe characters for HTTP headers
+                        const sanitizedFile = new File(
+                          [file],
+                          sanitizeFilename(file.name),
+                          { type: file.type },
+                        );
+                        const result = await storage.uploadImageAsync(
+                          sanitizedFile,
+                          onProgress,
+                        );
+                        return {
+                          meta: {
+                            srcResolveStrategy: 'image',
+                            fileId: result.fileId!,
+                          },
+                        };
+                      },
+                      video: async (file, onProgress, signal) => {
+                        // Sanitize filename to ASCII-safe characters for HTTP headers
+                        const sanitizedFile = new File(
+                          [file],
+                          sanitizeFilename(file.name),
+                          { type: file.type },
+                        );
+                        const result = await storage.uploadVideoAsync(
+                          sanitizedFile,
+                          onProgress,
+                        );
+                        return {
+                          meta: {
+                            srcResolveStrategy: 'video',
+                            fileId: result.fileId!,
+                          },
+                        };
+                      },
+                      audio: async (file, onProgress, signal) => {
+                        // Sanitize filename to ASCII-safe characters for HTTP headers
+                        const sanitizedFile = new File(
+                          [file],
+                          sanitizeFilename(file.name),
+                          { type: file.type },
+                        );
+                        const result = await storage.uploadAudioAsync(
+                          sanitizedFile,
+                          onProgress,
+                        );
+                        return {
+                          meta: {
+                            srcResolveStrategy: 'audio',
+                            fileId: result.fileId!,
+                          },
+                        };
+                      },
+                    }}
+                  />
                 </div>
               </div>
 
@@ -324,7 +358,10 @@ function CreateCapsuleDialog() {
                       {date ? format(date, "PPP") : <span>Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto overflow-hidden p-0" align="start">
+                  <PopoverContent
+                    className="w-auto overflow-hidden p-0"
+                    align="start"
+                  >
                     <Calendar
                       mode="single"
                       selected={date}

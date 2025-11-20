@@ -71,11 +71,32 @@ export class PresentationService {
                     )
                     .then(async (metadata) => {
                         // SUCCESS: Update database to mark as processed
-                        await this.presentationRepository.updateVideoProcessingStatus("singleton", {
+                        const updates: Parameters<typeof this.presentationRepository.updateVideoProcessingStatus>[1] = {
                             isProcessed: true,
                             processingProgress: 100,
                             processingError: null,
-                        });
+                        };
+
+                        // If video was converted and file path changed, update it
+                        if (metadata.newFilePath) {
+                            // Extract relative path from absolute path
+                            // FFmpeg returns: /app/apps/api/uploads/videos/video-123.mp4
+                            // Database needs: videos/video-123.mp4 (without uploads/ prefix)
+                            const uploadsIndex = metadata.newFilePath.indexOf("uploads/");
+                            const relativePath = uploadsIndex >= 0 
+                                ? metadata.newFilePath.substring(uploadsIndex + "uploads/".length)
+                                : metadata.newFilePath;
+
+                            await this.presentationRepository.upsert({
+                                filePath: relativePath,
+                                filename: relativePath.split("/").pop() ?? "",
+                                mimeType: "video/mp4",
+                                size: fileData.size, // Keep original size
+                                ...updates,
+                            });
+                        } else {
+                            await this.presentationRepository.updateVideoProcessingStatus("singleton", updates);
+                        }
 
                         console.log("metadata", metadata);
 
@@ -173,8 +194,12 @@ export class PresentationService {
                         // Update file path if it changed during conversion
                         if (metadata.newFilePath) {
                             // Extract relative path from absolute path
+                            // FFmpeg returns: /app/apps/api/uploads/videos/video-123.mp4
+                            // Database needs: videos/video-123.mp4 (without uploads/ prefix)
                             const uploadsIndex = metadata.newFilePath.indexOf("uploads/");
-                            const relativePath = uploadsIndex >= 0 ? metadata.newFilePath.substring(uploadsIndex) : metadata.newFilePath;
+                            const relativePath = uploadsIndex >= 0 
+                                ? metadata.newFilePath.substring(uploadsIndex + "uploads/".length)
+                                : metadata.newFilePath;
 
                             await this.presentationRepository.upsert({
                                 filePath: relativePath,

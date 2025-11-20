@@ -47,7 +47,13 @@ export class FileStorageService {
    * Get absolute file system path
    */
   getAbsolutePath(filePath: string): string {
-    return join(UPLOADS_DIR, filePath);
+    const absolutePath = join(UPLOADS_DIR, filePath);
+    console.log('[DEBUG getAbsolutePath]', {
+      input: filePath,
+      UPLOADS_DIR,
+      output: absolutePath,
+    });
+    return absolutePath;
   }
 
   /**

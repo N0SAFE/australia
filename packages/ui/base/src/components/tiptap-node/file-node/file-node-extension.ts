@@ -1,13 +1,14 @@
 import { mergeAttributes, Node } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { FileNodeView } from "./file-node"
+import type { FileStrategyResolver } from "../../../lib/media-url-resolver"
 
 export interface FileNodeOptions {
   HTMLAttributes: Record<string, any>
   /**
-   * Media URL resolver callbacks by ID
+   * File URL strategy resolver that receives meta only
    */
-  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+  fileStrategy?: FileStrategyResolver
 }
 
 declare module "@tiptap/core" {
@@ -30,16 +31,13 @@ export const FileNode = Node.create<FileNodeOptions>({
   addOptions() {
     return {
       HTMLAttributes: {},
-      injectMediaUrl: {},
+      fileStrategy: undefined,
     }
   },
 
   addAttributes() {
     return {
-      src: {
-        default: null,
-      },
-      srcUrlId: {
+      meta: {
         default: null,
       },
       name: {

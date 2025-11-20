@@ -13,7 +13,7 @@ describe('FileMetadataService', () => {
       createVideoFile: vi.fn(),
       createImageFile: vi.fn(),
       createAudioFile: vi.fn(),
-      createTextFile: vi.fn(),
+      createRawFile: vi.fn(),
       getFileById: vi.fn(),
       getFileByPath: vi.fn(),
       updateVideoProcessingStatus: vi.fn(),
@@ -111,16 +111,16 @@ describe('FileMetadataService', () => {
     });
   });
 
-  describe('createTextFile', () => {
+  describe('createRawFile', () => {
     it('should extract metadata and create a text file entry via repository', async () => {
       const mockResult = {
         file: { id: 'file-uuid-456' },
         textMetadata: { id: 'text-uuid-123' },
       };
 
-      mockRepository.createTextFile.mockResolvedValue(mockResult);
+      mockRepository.createRawFile.mockResolvedValue(mockResult);
 
-      const result = await service.createTextFile({
+      const result = await service.createRawFile({
         filePath: 'files/test.txt',
         absoluteFilePath: '/uploads/files/test.txt',
         filename: 'test.txt',
@@ -132,7 +132,7 @@ describe('FileMetadataService', () => {
       expect(result).toBeDefined();
       expect(result.file).toEqual(mockResult.file);
       expect(result.textMetadata).toEqual(mockResult.textMetadata);
-      expect(mockRepository.createTextFile).toHaveBeenCalledTimes(1);
+      expect(mockRepository.createRawFile).toHaveBeenCalledTimes(1);
     });
   });
 

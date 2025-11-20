@@ -3,6 +3,7 @@
 import { FC, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
+import { VideoProgressTracker } from "@/components/video-progress/VideoProgressTracker";
 import {
   Popover,
   PopoverContent,
@@ -101,6 +102,29 @@ export const AdminCapsuleDetailsPageClient: FC<{
   const { mutate: updateCapsule, isPending: isUpdating } = useUpdateCapsule();
   const router = useRouter();
   const storage = useStorage();
+
+  // Media URL resolution strategies
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+  
+  const imageStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/image/${meta.fileId}`;
+  };
+  
+  const videoStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/video/${meta.fileId}`;
+  };
+  
+  const audioStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/audio/${meta.fileId}`;
+  };
+  
+  const fileStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/file/${meta.fileId}`;
+  };
 
   // Update local state when capsule data loads
   useEffect(() => {
@@ -271,14 +295,11 @@ export const AdminCapsuleDetailsPageClient: FC<{
                 }}
                 editable={update}
                 placeholder="Écrivez le contenu de votre capsule temporelle..."
-                injectMediaUrl={{
-                  api: (src) => {
-                    console.log(
-                      `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`,
-                    );
-                    return `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`;
-                  },
-                }}
+                // Media URL resolution strategies
+                imageStrategy={imageStrategy}
+                videoStrategy={videoStrategy}
+                audioStrategy={audioStrategy}
+                fileStrategy={fileStrategy}
                 uploadFunctions={{
                   image: async (file, onProgress, signal) => {
                     // Sanitize filename to ASCII-safe characters for HTTP headers
@@ -291,7 +312,12 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizedFile,
                       onProgress,
                     );
-                    return result.url!;
+                    return {
+                      meta: {
+                        srcResolveStrategy: 'image',
+                        fileId: result.fileId!,
+                      },
+                    };
                   },
                   video: async (file, onProgress, signal) => {
                     // Sanitize filename to ASCII-safe characters for HTTP headers
@@ -304,7 +330,12 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizedFile,
                       onProgress,
                     );
-                    return result.url!;
+                    return {
+                      meta: {
+                        srcResolveStrategy: 'video',
+                        fileId: result.fileId!,
+                      },
+                    };
                   },
                   audio: async (file, onProgress, signal) => {
                     // Sanitize filename to ASCII-safe characters for HTTP headers
@@ -317,17 +348,24 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizedFile,
                       onProgress,
                     );
-                    return result.url!;
+                    return {
+                      meta: {
+                        srcResolveStrategy: 'audio',
+                        fileId: result.fileId!,
+                      },
+                    };
                   },
                 }}
+                VideoProgressComponent={VideoProgressTracker}
               />
             ) : (
               <SimpleViewer
                 value={editorValue}
-                injectMediaUrl={{
-                  api: (src) =>
-                    `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`,
-                }}
+                // Media URL resolution strategies
+                imageStrategy={imageStrategy}
+                videoStrategy={videoStrategy}
+                audioStrategy={audioStrategy}
+                fileStrategy={fileStrategy}
               />
             )}
           </div>

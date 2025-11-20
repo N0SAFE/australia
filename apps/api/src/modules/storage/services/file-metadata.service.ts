@@ -209,9 +209,9 @@ export class FileMetadataService {
   }
 
   /**
-   * Create text file record with metadata extraction
+   * Create raw file record (for generic/document files)
    */
-  async createTextFile(data: {
+  async createRawFile(data: {
     filePath: string;
     absoluteFilePath: string;
     filename: string;
@@ -220,18 +220,16 @@ export class FileMetadataService {
     size: number;
     uploadedBy?: string;
   }) {
-    // Extract metadata from the file
-    const textMetadata = await this.extractTextMetadata(data.absoluteFilePath);
-
-    // Save to database via repository
-    return this.fileMetadataRepository.createTextFile({
+    // For raw files, we don't extract metadata
+    // Just save to database via repository
+    return this.fileMetadataRepository.createRawFile({
       filePath: data.filePath,
+      absoluteFilePath: data.absoluteFilePath,
       filename: data.filename,
       storedFilename: data.storedFilename,
       mimeType: data.mimeType,
       size: data.size,
       uploadedBy: data.uploadedBy,
-      textMetadata,
     });
   }
 
@@ -259,6 +257,11 @@ export class FileMetadataService {
 
   /**
    * Update video processing status
+   * Called after video processing completes or fails
+   * @param videoId - Video metadata ID
+   * @param status - Processing status update
+   * @param fileId - Optional file ID to update file path
+   * @param newFilePath - Optional new file path (when video was converted)
    */
   async updateVideoProcessingStatus(
     videoId: string,
@@ -266,8 +269,34 @@ export class FileMetadataService {
       isProcessed: boolean;
       processingProgress?: number;
       processingError?: string;
-    }
+    },
+    fileId?: string,
+    newFilePath?: string
   ) {
-    return this.fileMetadataRepository.updateVideoProcessingStatus(videoId, status);
+    return this.fileMetadataRepository.updateVideoProcessingStatus(videoId, status, fileId, newFilePath);
+  }
+
+  /**
+   * Get image with file metadata by file ID
+   * Returns undefined if not found or if file is not an image
+   */
+  async getImageByFileId(fileId: string) {
+    return this.fileMetadataRepository.getImageByFileId(fileId);
+  }
+
+  /**
+   * Get audio with file metadata by file ID
+   * Returns undefined if not found or if file is not an audio
+   */
+  async getAudioByFileId(fileId: string) {
+    return this.fileMetadataRepository.getAudioByFileId(fileId);
+  }
+
+  /**
+   * Get raw file with file metadata by file ID
+   * Returns undefined if not found or if file is not a raw file
+   */
+  async getRawFileByFileId(fileId: string) {
+    return this.fileMetadataRepository.getRawFileByFileId(fileId);
   }
 }

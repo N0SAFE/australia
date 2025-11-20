@@ -7,7 +7,7 @@ export type UploadFunction = (
   file: File,
   onProgress?: (event: { progress: number }) => void,
   abortSignal?: AbortSignal
-) => Promise<string>
+) => Promise<{ url: string; meta?: unknown }>
 
 export type PrepareForUploadFunction = (
   file: File

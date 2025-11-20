@@ -44,9 +44,9 @@ export const uploadImageInput = z.object({
 
 export const uploadImageOutput = z.object({
   filename: z.string(),
-  path: z.string(),
   size: z.number(),
   mimeType: z.string(),
+  fileId: z.string(),
 });
 
 export const uploadImageContract = oc

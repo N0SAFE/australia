@@ -23,24 +23,24 @@ export function useVideoProcessingProgress() {
 
   /**
    * Subscribe to processing progress updates for a specific video
-   * @param videoId - The video identifier (srcUrlId or src)
+   * @param fileId - The video identifier (srcUrlId or src)
    * @param callback - Function to call with progress updates
    * @returns Unsubscribe function
    */
-  const onProgressUpdate = useCallback((videoId: string, callback: ProgressCallback): UnsubscribeFunction => {
+  const onProgressUpdate = useCallback((fileId: string, callback: ProgressCallback): UnsubscribeFunction => {
     // Get or create the set of callbacks for this video
-    if (!callbacksRef.current.has(videoId)) {
-      callbacksRef.current.set(videoId, new Set())
+    if (!callbacksRef.current.has(fileId)) {
+      callbacksRef.current.set(fileId, new Set())
     }
     
-    const callbacks = callbacksRef.current.get(videoId)!
+    const callbacks = callbacksRef.current.get(fileId)!
     callbacks.add(callback)
     
     // Return unsubscribe function
     return () => {
       callbacks.delete(callback)
       if (callbacks.size === 0) {
-        callbacksRef.current.delete(videoId)
+        callbacksRef.current.delete(fileId)
       }
     }
   }, [])
@@ -48,24 +48,24 @@ export function useVideoProcessingProgress() {
   /**
    * Enable progress bar display for a specific video
    */
-  const enableProgress = useCallback((videoId: string) => {
-    enabledRef.current.set(videoId, true)
+  const enableProgress = useCallback((fileId: string) => {
+    enabledRef.current.set(fileId, true)
   }, [])
 
   /**
    * Disable progress bar display for a specific video
    */
-  const disableProgress = useCallback((videoId: string) => {
-    enabledRef.current.set(videoId, false)
+  const disableProgress = useCallback((fileId: string) => {
+    enabledRef.current.set(fileId, false)
   }, [])
 
   /**
    * Update progress for a specific video (call this when you receive progress updates)
-   * @param videoId - The video identifier
+   * @param fileId - The video identifier
    * @param progress - The progress data
    */
-  const updateProgress = useCallback((videoId: string, progress: ProcessingProgress) => {
-    const callbacks = callbacksRef.current.get(videoId)
+  const updateProgress = useCallback((fileId: string, progress: ProcessingProgress) => {
+    const callbacks = callbacksRef.current.get(fileId)
     if (callbacks) {
       callbacks.forEach(callback => callback(progress))
     }
@@ -74,8 +74,8 @@ export function useVideoProcessingProgress() {
   /**
    * Check if progress is enabled for a specific video
    */
-  const isProgressEnabled = useCallback((videoId: string): boolean => {
-    return enabledRef.current.get(videoId) ?? false
+  const isProgressEnabled = useCallback((fileId: string): boolean => {
+    return enabledRef.current.get(fileId) ?? false
   }, [])
 
   return {

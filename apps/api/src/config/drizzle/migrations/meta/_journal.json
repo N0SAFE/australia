@@ -113,6 +113,13 @@
       "when": 1763458308437,
       "tag": "0015_workable_dragon_lord",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1763652379578,
+      "tag": "0016_military_leader",
+      "breakpoints": true
     }
   ]
 }

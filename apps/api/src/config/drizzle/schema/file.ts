@@ -17,7 +17,7 @@ export const file = pgTable("file", {
   id: uuid("id").primaryKey().defaultRandom(),
   
   // Discriminator fields
-  type: text("type", { enum: ['image', 'video', 'audio', 'text'] }).notNull(),
+  type: text("type", { enum: ['image', 'video', 'audio', 'raw'] }).notNull(),
   contentId: uuid("content_id").notNull(), // References the specific type table (imageFile.id, videoFile.id, etc.)
   
   // File system information
@@ -394,14 +394,14 @@ export const audioFile = pgTable("audio_file", {
 });
 
 /**
- * Text file metadata table
- * Contains detailed information specific to text files
+ * Raw file metadata table
+ * Contains detailed information specific to raw/generic files (documents, archives, etc.)
  */
-export const textFile = pgTable("text_file", {
+export const rawFile = pgTable("raw_file", {
   id: uuid("id").primaryKey().defaultRandom(),
   
   // File format
-  format: text("format"), // txt, md, json, xml, html, csv, etc.
+  format: text("format"), // txt, md, json, xml, html, csv, pdf, doc, zip, etc.
   
   // Character encoding
   encoding: text("encoding").notNull().default('utf-8'), // UTF-8, ASCII, ISO-8859-1, etc.

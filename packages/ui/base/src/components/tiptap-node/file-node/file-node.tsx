@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react"
 import { FileIcon, DownloadIcon, AlignLeft, AlignCenter, AlignRight, Maximize, Minimize } from "lucide-react"
 import { formatBytes } from "@/lib/tiptap-utils"
-import { resolveMediaUrl } from "@/lib/media-url-resolver"
+import { resolveMediaUrl, type FileStrategyResolver } from "../../../lib/media-url-resolver"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -18,22 +18,27 @@ import {
 
 export function FileNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
-  const { src, srcUrlId, name, size, type, width, align = "center" } = node.attrs
+  const { meta, name, size, type, width, align = "center" } = node.attrs
   
   // State for resolved URL
-  const [resolvedSrc, setResolvedSrc] = useState<string>(src as string)
+  const [resolvedSrc, setResolvedSrc] = useState<string>("")
   
-  // Get injected media URL resolvers from extension options
-  const injectMediaUrl = editor.extensionManager.extensions.find(ext => ext.name === 'file')?.options.injectMediaUrl
+  // Get fileStrategy from extension options
+  const extension = editor.extensionManager.extensions.find(ext => ext.name === 'file')
+  const fileStrategy = extension?.options.fileStrategy as FileStrategyResolver | undefined
   
-  // Resolve the final URL asynchronously
+  // Resolve the final URL asynchronously using strategy with meta only
   useEffect(() => {
     const resolve = async () => {
-      const resolved = await resolveMediaUrl(src as string, srcUrlId as string | null, injectMediaUrl)
+      if (!fileStrategy || !meta) {
+        setResolvedSrc("")
+        return
+      }
+      const resolved = await resolveMediaUrl(meta, fileStrategy)
       setResolvedSrc(resolved)
     }
     void resolve()
-  }, [src, srcUrlId, injectMediaUrl])
+  }, [meta, fileStrategy])
 
   const handleDownload = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault()

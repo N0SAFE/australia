@@ -44,9 +44,9 @@ export const uploadAudioInput = z.object({
 
 export const uploadAudioOutput = z.object({
   filename: z.string(),
-  path: z.string(),
   size: z.number(),
   mimeType: z.string(),
+  fileId: z.string(),
 });
 
 export const uploadAudioContract = oc

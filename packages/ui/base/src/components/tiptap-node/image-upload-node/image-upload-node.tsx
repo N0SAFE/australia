@@ -33,6 +33,11 @@ export interface FileItem {
    */
   url?: string
   /**
+   * Generic metadata object for implementation-specific data
+   * @optional
+   */
+  meta?: unknown
+  /**
    * Controller that can be used to abort the upload process
    * @optional
    */
@@ -58,13 +63,13 @@ export interface UploadOptions {
    * @param {File} file - The file to be uploaded
    * @param {Function} onProgress - Callback function to report upload progress
    * @param {AbortSignal} signal - Signal that can be used to abort the upload
-   * @returns {Promise<string>} Promise resolving to the URL of the uploaded file
+   * @returns {Promise<{url: string, meta?: unknown}>} Promise resolving to upload result with URL and optional metadata
    */
   upload: (
     file: File,
     onProgress: (event: { progress: number }) => void,
     signal: AbortSignal
-  ) => Promise<string>
+  ) => Promise<{ url: string; meta?: unknown }>
   /**
    * Callback triggered when a file is uploaded successfully
    * @param {string} url - URL of the successfully uploaded file
@@ -104,7 +109,7 @@ function useFileUpload(options: UploadOptions) {
         throw new Error("Upload function is not defined")
       }
 
-      const url = await options.upload(
+      const result = await options.upload(
         file,
         (event: { progress: number }) => {
           setFileItems((prev) =>
@@ -116,18 +121,18 @@ function useFileUpload(options: UploadOptions) {
         abortController.signal
       )
 
-      if (!url) throw new Error("Upload failed: No URL returned")
+      if (!result?.meta?.fileId) throw new Error("Upload failed: No fileId returned in meta")
 
       if (!abortController.signal.aborted) {
         setFileItems((prev) =>
           prev.map((item) =>
             item.id === fileId
-              ? { ...item, status: "success", url, progress: 100 }
+              ? { ...item, status: "success", meta: result.meta, progress: 100 }
               : item
           )
         )
-        options.onSuccess?.(url)
-        return url
+        options.onSuccess?.(result.meta.fileId)
+        return result.meta
       }
 
       return null
@@ -148,7 +153,7 @@ function useFileUpload(options: UploadOptions) {
     }
   }
 
-  const uploadFiles = async (files: File[]): Promise<string[]> => {
+  const uploadFiles = async (files: File[]): Promise<{ url: string; meta?: unknown }[]> => {
     if (!files || files.length === 0) {
       options.onError?.(new Error("No files to upload"))
       return []
@@ -167,8 +172,19 @@ function useFileUpload(options: UploadOptions) {
     const uploadPromises = files.map((file) => uploadFile(file))
     const results = await Promise.all(uploadPromises)
 
-    // Filter out null results (failed uploads)
-    return results.filter((url): url is string => url !== null)
+    // Filter out null results (failed uploads) and map to result objects
+    const successfulUploads = results
+      .map((url, index) => {
+        if (!url) return null
+        const fileItem = fileItems.find(item => item.url === url)
+        return {
+          url,
+          meta: fileItem?.meta ?? undefined
+        }
+      })
+      .filter((result): result is { url: string; meta?: unknown } => result !== null)
+    
+    return successfulUploads
   }
 
   const removeFileItem = (fileId: string) => {
@@ -448,20 +464,23 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
       ? files.map(file => extension.options.prepareForUpload!(file))
       : files
     
-    const urls = await uploadFiles(preparedFiles)
+    const results = await uploadFiles(preparedFiles)
 
-    if (urls.length > 0) {
+    if (results.length > 0) {
       const pos = props.getPos()
 
       if (isValidPosition(pos)) {
-        const imageNodes = urls.map((url, index) => {
+        const imageNodes = results.map((result, index) => {
           const filename =
             preparedFiles[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
           return {
             type: extension.options.type,
             attrs: {
               ...extension.options,
-              src: url,
+              meta: {
+                srcResolveStrategy: 'image',
+                ...(result.meta as object || {}),
+              },
               alt: filename,
               title: filename,
             },

@@ -44,7 +44,6 @@ export const uploadVideoInput = z.object({
 
 export const uploadVideoOutput = z.object({
   filename: z.string(),
-  path: z.string(),
   size: z.number(),
   mimeType: z.string(),
   fileId: z.uuid(),

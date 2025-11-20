@@ -26,13 +26,38 @@ export const ContentRenderer: FC<{
     }
   }, [capsule.content]);
 
+  // Media URL resolution strategies
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+  
+  const imageStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/image/${meta.fileId}`;
+  };
+  
+  const videoStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/video/${meta.fileId}`;
+  };
+  
+  const audioStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/audio/${meta.fileId}`;
+  };
+  
+  const fileStrategy = async (meta: any) => {
+    if (!meta?.fileId) return "";
+    return `${API_URL}/storage/file/${meta.fileId}`;
+  };
+
   return (
     <SimpleViewer
       value={content}
       className="pink-theme"
-      injectMediaUrl={{
-        api: (src) => `${process.env.NEXT_PUBLIC_API_URL || ''}${src}`
-      }}
+      // Media URL resolution strategies
+      imageStrategy={imageStrategy}
+      videoStrategy={videoStrategy}
+      audioStrategy={audioStrategy}
+      fileStrategy={fileStrategy}
     />
   );
 };

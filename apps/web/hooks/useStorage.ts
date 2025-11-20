@@ -34,7 +34,7 @@ type FileUploadResult = {
   mimeType: string
   url?: string
   fileId?: string
-  videoId?: string
+  fileId?: string
   isProcessed?: boolean
   message?: string
 }
@@ -116,12 +116,6 @@ function useXHRUpload(endpoint: string, successMessage: string) {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const result = JSON.parse(xhr.responseText) as FileUploadResult
-            
-            // Add URL if not present - construct full API URL
-            // Server will handle subdirectory lookup based on filename prefix
-            if (!result.url) {
-              result.url = `${apiUrl}/storage/files/${result.filename}`
-            }
             
             setState({
               isUploading: false,
@@ -248,12 +242,12 @@ export function useUploadAudio() {
 /**
  * Hook to subscribe to video processing progress events
  * 
- * @param videoId - The video ID to track
+ * @param fileId - The video ID to track
  * @param options - Configuration options
  * @returns Current progress state and control functions
  */
 export function useVideoProcessing(
-  videoId: string | undefined,
+  fileId: string | undefined,
   options: {
     enabled?: boolean
     onComplete?: (data: VideoProcessingProgress) => void
@@ -262,9 +256,10 @@ export function useVideoProcessing(
 ) {
   return useQuery(
     orpc.storage.subscribeVideoProcessing.experimental_liveOptions({
-      input: { videoId: videoId ?? '' },
-      enabled: options.enabled && !!videoId,
+      input: { fileId: fileId ?? '' },
+      enabled: options.enabled && !!fileId,
       onData: (data) => {
+        console.log(data)
         if (data.status === 'completed') {
           options.onComplete?.(data)
         } else if (data.status === 'failed') {
@@ -286,14 +281,14 @@ export function useUploadVideoWithProgress(options: {
   onProcessingComplete?: (data: VideoProcessingProgress) => void
   onProcessingError?: (data: VideoProcessingProgress) => void
 } = {}) {
-  const [videoId, setVideoId] = useState<string | null>(null)
+  const [fileId, setVideoId] = useState<string | null>(null)
 
   const uploadMutation = useMutation(orpc.storage.uploadVideo.mutationOptions({
     onSuccess: (result) => {
       toast.success(`Video uploaded successfully: ${result.filename}`)
       
-      // Store videoId to trigger progress tracking
-      setVideoId(result.videoId)
+      // Store fileId to trigger progress tracking
+      setVideoId(result.fileId)
       
       options.onUploadSuccess?.(result)
     },
@@ -304,9 +299,9 @@ export function useUploadVideoWithProgress(options: {
 
   // Track progress after upload
   const processingState = useVideoProcessing(
-    videoId ?? undefined,
+    fileId ?? undefined,
     {
-      enabled: !!videoId,
+      enabled: !!fileId,
       onComplete: options.onProcessingComplete,
       onError: options.onProcessingError,
     }

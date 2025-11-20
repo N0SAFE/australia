@@ -1,3 +1,4 @@
+'use client';
 import Link from 'next/link';
 import { Button } from '@repo/ui/components/shadcn/button';
 import { FileText, ArrowLeft } from 'lucide-react';
@@ -24,11 +25,9 @@ export default function AdminPresentationNotFound() {
               Edit Presentation
             </Link>
           </Button>
-          <Button asChild variant="outline" onClick={() => window.history.back()}>
-            <Link href="#">
-              <ArrowLeft className="mr-2 size-4" />
-              Go Back
-            </Link>
+          <Button variant="outline" onClick={() => window.history.back()}>
+            <ArrowLeft className="mr-2 size-4" />
+            Go Back
           </Button>
         </div>
       </div>

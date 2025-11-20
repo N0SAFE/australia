@@ -17,52 +17,16 @@ export function ServiceWorkerProvider({
     if (
       typeof window !== "undefined" &&
       "serviceWorker" in navigator &&
-      process.env.NODE_ENV === "production"
+      window.workbox !== undefined
     ) {
-      // Register our custom service worker
-      navigator.serviceWorker
-        .register("/sw-custom.js", { scope: "/" })
-        .then((registration) => {
-          console.log("Service Worker registered:", registration);
+      const wb = window.workbox;
 
-          // Check for updates periodically
-          setInterval(() => {
-            registration.update();
-          }, 60 * 60 * 1000); // Check every hour
+      // A common UX pattern for progressive web apps is to show a banner when a service worker has updated and waiting to install.
+      wb.addEventListener("controlling", () => {
+        window.location.reload();
+      });
 
-          // Listen for updates
-          registration.addEventListener("updatefound", () => {
-            const newWorker = registration.installing;
-            if (newWorker) {
-              newWorker.addEventListener("statechange", () => {
-                if (
-                  newWorker.state === "installed" &&
-                  navigator.serviceWorker.controller
-                ) {
-                  // New service worker available
-                  window.dispatchEvent(new Event("sw-update-available"));
-                }
-              });
-            }
-          });
-
-          // Handle controller change (new SW activated)
-          navigator.serviceWorker.addEventListener("controllerchange", () => {
-            window.location.reload();
-          });
-        })
-        .catch((error) => {
-          console.error("Service Worker registration failed:", error);
-        });
-
-      // Also check if workbox is available (for next-pwa compatibility)
-      if (window.workbox !== undefined) {
-        const wb = window.workbox;
-        wb.addEventListener("controlling", () => {
-          window.location.reload();
-        });
-        wb.register();
-      }
+      wb.register();
     }
   }, []);
 

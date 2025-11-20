@@ -9,41 +9,33 @@ export function UpdateNotification() {
     useState<ServiceWorkerRegistration | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      // Listen for custom SW update event
-      const handleUpdateAvailable = () => {
-        navigator.serviceWorker.ready.then((reg) => {
-          setRegistration(reg);
-          setShowUpdate(true);
-        });
+    if (
+      typeof window !== "undefined" &&
+      "serviceWorker" in navigator &&
+      window.workbox !== undefined
+    ) {
+      const wb = window.workbox;
+
+      // Add event listener to detect when the registered service worker has installed but waiting to activate
+      const promptNewVersionAvailable = (event: any) => {
+        setShowUpdate(true);
+        setRegistration(event.sw);
       };
 
-      window.addEventListener("sw-update-available", handleUpdateAvailable);
+      wb.addEventListener("waiting", promptNewVersionAvailable);
+      wb.addEventListener("externalwaiting", promptNewVersionAvailable);
 
-      // Also check workbox if available
-      if (window.workbox !== undefined) {
-        const wb = window.workbox;
+      // Register periodic update checks
+      wb.register();
 
-        const promptNewVersionAvailable = (event: any) => {
-          setShowUpdate(true);
-          setRegistration(event.sw);
-        };
-
-        wb.addEventListener("waiting", promptNewVersionAvailable);
-        wb.addEventListener("externalwaiting", promptNewVersionAvailable);
-
-        return () => {
-          window.removeEventListener(
-            "sw-update-available",
-            handleUpdateAvailable
-          );
-          wb.removeEventListener("waiting", promptNewVersionAvailable);
-          wb.removeEventListener("externalwaiting", promptNewVersionAvailable);
-        };
-      }
+      // Check for updates every hour
+      setInterval(() => {
+        wb.update();
+      }, 60 * 60 * 1000); // 1 hour
 
       return () => {
-        window.removeEventListener("sw-update-available", handleUpdateAvailable);
+        wb.removeEventListener("waiting", promptNewVersionAvailable);
+        wb.removeEventListener("externalwaiting", promptNewVersionAvailable);
       };
     }
   }, []);
@@ -60,9 +52,6 @@ export function UpdateNotification() {
           window.location.reload();
         }
       });
-    } else {
-      // Fallback: just reload
-      window.location.reload();
     }
 
     setShowUpdate(false);

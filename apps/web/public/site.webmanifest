@@ -38,5 +38,24 @@
   ],
   "categories": ["social", "photo", "utilities"],
   "screenshots": [],
-  "shortcuts": []
+  "shortcuts": [
+    {
+      "name": "Home",
+      "short_name": "Home",
+      "description": "Go to the home page",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/favicon_google.svg",
+          "sizes": "48x48"
+        }
+      ]
+    }
+  ],
+  "scope": "/",
+  "prefer_related_applications": false,
+  "lang": "fr",
+  "dir": "ltr",
+  "iarc_rating_id": "",
+  "related_applications": []
 }

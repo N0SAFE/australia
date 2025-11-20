@@ -1,8 +1,17 @@
 import type { NextConfig } from "next";
 import { envSchema } from "./env";
+import withSerwistInit from "@serwist/next";
 
 // Handle both full URLs and hostname-only values (for Render deployment)
 const apiUrl = new URL(envSchema.shape.API_URL.parse(process.env.API_URL));
+
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  cacheOnNavigation: true,
+  reloadOnOnline: true,
+  disable: process.env.NODE_ENV === "development",
+});
 
 const nextConfig: NextConfig = {
   async rewrites() {
@@ -72,4 +81,4 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default nextConfig;
+export default withSerwist(nextConfig);

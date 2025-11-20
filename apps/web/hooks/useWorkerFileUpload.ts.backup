@@ -33,9 +33,11 @@ type FileUploadResult = {
 }
 
 /**
- * File type for upload
+ * Upload state for Worker-based uploads
  */
-type FileType = 'image' | 'video' | 'audio'
+type UploadState = {
+  progress: UploadProgress | null
+}
 
 /**
  * Generate unique upload ID
@@ -45,28 +47,9 @@ function generateUploadId(): string {
 }
 
 /**
- * Get ORPC endpoint path based on file type
+ * File type for upload
  */
-function getEndpointForFileType(fileType: FileType): string {
-  const endpoints = {
-    image: '/storage/upload/image',
-    video: '/storage/upload/video',
-    audio: '/storage/upload/audio',
-  }
-  return endpoints[fileType]
-}
-
-/**
- * Get success message based on file type
- */
-function getSuccessMessage(fileType: FileType): string {
-  const messages = {
-    image: 'Image uploaded successfully',
-    video: 'Video uploaded successfully',
-    audio: 'Audio uploaded successfully',
-  }
-  return messages[fileType]
-}
+type FileType = 'image' | 'video' | 'audio'
 
 /**
  * Web Worker-based file upload hook using TanStack Query mutation
@@ -79,16 +62,14 @@ function getSuccessMessage(fileType: FileType): string {
  */
 export function useWorkerFileUpload(
   fileType: FileType,
-  options?: Omit<UseMutationOptions<FileUploadResult, Error, File>, 'mutationFn'>
+  options?: UseMutationOptions<FileUploadResult, Error, File>
 ) {
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
+  const [state, setState] = useState<UploadState>({
+    progress: null,
+  })
+
   const workerRef = useRef<Worker | null>(null)
   const currentUploadIdRef = useRef<string | null>(null)
-  const progressCallbackRef = useRef<((event: { progress: number }) => void) | null>(null)
-
-  // Get endpoint and success message based on file type
-  const endpoint = getEndpointForFileType(fileType)
-  const successMessage = getSuccessMessage(fileType)
 
   // Initialize worker on mount
   useEffect(() => {
@@ -190,13 +171,64 @@ export function useWorkerFileUpload(
 
       switch (response.type) {
         case 'progress':
-          setUploadProgress({
-            loaded: response.loaded,
-            total: response.total,
-            percentage: response.percentage,
+          setState((prev) => ({
+            ...prev,
+            progress: {
+              loaded: response.loaded,
+              total: response.total,
+              percentage: response.percentage,
+            },
+          }))
+          break
+
+        case 'success': {
+          const result = response.data as FileUploadResult
+
+          // Get API URL and add full URL if not present
+          const apiUrl =
+            typeof window === 'undefined'
+              ? validateEnvPath(process.env.API_URL ?? '', 'API_URL')
+              : validateEnvPath(
+                  process.env.NEXT_PUBLIC_API_URL ?? '',
+                  'NEXT_PUBLIC_API_URL'
+                )
+
+          if (!result.url) {
+            result.url = `${apiUrl}/storage/files/${result.filename}`
+          }
+
+          setState({
+            isUploading: false,
+            progress: { loaded: 100, total: 100, percentage: 100 },
+            error: null,
+            data: result,
           })
-          // Call progress callback if provided
-          progressCallbackRef.current?.({ progress: response.percentage })
+
+          toast.success(`${successMessage}: ${result.filename}`)
+          currentUploadIdRef.current = null
+          break
+        }
+
+        case 'error':
+          setState({
+            isUploading: false,
+            progress: null,
+            error: new Error(response.error),
+            data: null,
+          })
+          toast.error(`Upload failed: ${response.error}`)
+          currentUploadIdRef.current = null
+          break
+
+        case 'cancelled':
+          setState({
+            isUploading: false,
+            progress: null,
+            error: new Error('Upload cancelled'),
+            data: null,
+          })
+          toast.error('Upload cancelled')
+          currentUploadIdRef.current = null
           break
       }
     }
@@ -208,13 +240,13 @@ export function useWorkerFileUpload(
         URL.revokeObjectURL(workerUrl)
       }
     }
-  }, [])
+  }, [successMessage])
 
   /**
-   * Upload function using Worker
+   * Start file upload
    */
-  const uploadWithWorker = useCallback(
-    async (file: File): Promise<FileUploadResult> => {
+  const mutateAsync = useCallback(
+    async (file: File, onProgress?: (event: { progress: number }) => void) => {
       return new Promise<FileUploadResult>((resolve, reject) => {
         if (!workerRef.current) {
           reject(new Error('Worker not initialized'))
@@ -225,8 +257,13 @@ export function useWorkerFileUpload(
         const uploadId = generateUploadId()
         currentUploadIdRef.current = uploadId
 
-        // Reset progress
-        setUploadProgress(null)
+        // Reset state
+        setState({
+          isUploading: true,
+          progress: null,
+          error: null,
+          data: null,
+        })
 
         // Get API URL
         const apiUrl =
@@ -248,32 +285,22 @@ export function useWorkerFileUpload(
           }
 
           switch (response.type) {
-            case 'success': {
-              workerRef.current?.removeEventListener('message', handleMessage)
-              const result = response.data as FileUploadResult
-              
-              // Add full URL if not present
-              if (!result.url) {
-                result.url = `${apiUrl}/storage/files/${result.filename}`
-              }
-              
-              setUploadProgress({ loaded: 100, total: 100, percentage: 100 })
-              currentUploadIdRef.current = null
-              resolve(result)
+            case 'progress':
+              onProgress?.({ progress: response.percentage })
               break
-            }
+
+            case 'success':
+              workerRef.current?.removeEventListener('message', handleMessage)
+              resolve(response.data as FileUploadResult)
+              break
 
             case 'error':
               workerRef.current?.removeEventListener('message', handleMessage)
-              setUploadProgress(null)
-              currentUploadIdRef.current = null
               reject(new Error(response.error))
               break
 
             case 'cancelled':
               workerRef.current?.removeEventListener('message', handleMessage)
-              setUploadProgress(null)
-              currentUploadIdRef.current = null
               reject(new Error('Upload cancelled'))
               break
           }
@@ -291,35 +318,12 @@ export function useWorkerFileUpload(
         }
 
         workerRef.current.postMessage(message)
+
         console.log(`[useWorkerFileUpload] Starting upload: ${file.name}`)
       })
     },
     [endpoint]
   )
-
-  /**
-   * Create mutation using TanStack Query
-   */
-  const mutation = useMutation<FileUploadResult, Error, File>({
-    mutationFn: uploadWithWorker,
-    onSuccess: (data) => {
-      toast.success(`${successMessage}: ${data.filename}`)
-      options?.onSuccess?.(data, data as any, undefined)
-    },
-    onError: (error) => {
-      toast.error(`Upload failed: ${error.message}`)
-      options?.onError?.(error, error as any, undefined)
-    },
-    ...options,
-  })
-
-  /**
-   * Enhanced reset that also clears progress
-   */
-  const resetWithProgress = useCallback(() => {
-    mutation.reset()
-    setUploadProgress(null)
-  }, [mutation])
 
   /**
    * Cancel current upload
@@ -335,67 +339,69 @@ export function useWorkerFileUpload(
   }, [])
 
   /**
-   * Mutate with progress callback
+   * Reset upload state
    */
-  const mutateWithProgress = useCallback(
-    (file: File, onProgress?: (event: { progress: number }) => void) => {
-      progressCallbackRef.current = onProgress || null
-      mutation.mutate(file)
-    },
-    [mutation]
-  )
-
-  /**
-   * MutateAsync with progress callback
-   */
-  const mutateAsyncWithProgress = useCallback(
-    async (file: File, onProgress?: (event: { progress: number }) => void) => {
-      progressCallbackRef.current = onProgress || null
-      return mutation.mutateAsync(file)
-    },
-    [mutation]
-  )
+  const reset = useCallback(() => {
+    setState({
+      isUploading: false,
+      progress: null,
+      error: null,
+      data: null,
+    })
+    currentUploadIdRef.current = null
+  }, [])
 
   return {
-    // TanStack Query mutation interface
-    ...mutation,
-    
-    // Enhanced mutation methods with progress callback
-    mutate: mutateWithProgress,
-    mutateAsync: mutateAsyncWithProgress,
-    reset: resetWithProgress,
-    
-    // Additional methods
+    mutateAsync,
+    mutate: (file: File, onProgress?: (event: { progress: number }) => void) => {
+      mutateAsync(file, onProgress).catch(() => {})
+    },
     cancel,
-    
-    // Progress state
-    uploadProgress: uploadProgress?.percentage ?? 0,
-    progressDetail: uploadProgress,
+    reset,
+    isPending: state.isUploading,
+    uploadProgress: state.progress?.percentage ?? 0,
+    error: state.error,
+    data: state.data,
   }
 }
 
 /**
- * Hook to upload files (any type) using Web Worker
- * This is the main hook that should be used for file uploads
- * 
- * @param fileType - Type of file: 'image', 'video', or 'audio'
- * @param options - TanStack Query mutation options
+ * Mutation hook to upload an image file using Web Worker
  */
-export function useWorkerUploadFile(
-  fileType: FileType = 'image',
-  options?: Omit<UseMutationOptions<FileUploadResult, Error, File>, 'mutationFn'>
-) {
-  return useWorkerFileUpload(fileType, options)
+export function useWorkerUploadImage() {
+  return useWorkerFileUpload(
+    '/storage/upload/image',
+    'Image uploaded successfully'
+  )
+}
+
+/**
+ * Mutation hook to upload a video file using Web Worker
+ */
+export function useWorkerUploadVideo() {
+  return useWorkerFileUpload(
+    '/storage/upload/video',
+    'Video uploaded successfully'
+  )
+}
+
+/**
+ * Mutation hook to upload an audio file using Web Worker
+ */
+export function useWorkerUploadAudio() {
+  return useWorkerFileUpload(
+    '/storage/upload/audio',
+    'Audio uploaded successfully'
+  )
 }
 
 /**
  * Composite hook for all Worker-based storage operations
- * Uses TanStack Query mutations under the hood
  */
 export function useWorkerStorage() {
-  const uploadImage = useWorkerUploadFile('image')
-  const uploadVideo = useWorkerUploadFile('video')
-  const uploadAudio = useWorkerUploadFile('audio')
+  const uploadImage = useWorkerUploadImage()
+  const uploadVideo = useWorkerUploadVideo()
+  const uploadAudio = useWorkerUploadAudio()
 
   return {
     // Upload methods
@@ -441,7 +447,7 @@ export function useWorkerStorage() {
     // Error states
     errors: {
       image: uploadImage.error,
-      video: uploadImage.error,
+      video: uploadVideo.error,
       audio: uploadAudio.error,
     },
 

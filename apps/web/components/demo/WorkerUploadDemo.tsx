@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useWorkerUploadImage } from '@/hooks/useWorkerFileUpload'
+import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
 import { Button } from '@repo/ui/button'
 import { Progress } from '@repo/ui/progress'
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card'
@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card'
  * - Result display
  */
 export function WorkerUploadDemo() {
-  const upload = useWorkerUploadImage()
+  const upload = useWorkerUploadFile('image')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {

@@ -19,10 +19,12 @@ These hooks run XMLHttpRequest in the main thread.
 
 Located in `useWorkerFileUpload.ts`:
 
-- `useWorkerUploadImage()` - Upload image files in background worker
-- `useWorkerUploadVideo()` - Upload video files in background worker
-- `useWorkerUploadAudio()` - Upload audio files in background worker
+- `useWorkerUploadFile(fileType)` - Main upload hook for any file type ('image' | 'video' | 'audio')
 - `useWorkerStorage()` - Composite hook for all upload types with workers
+
+**Uses TanStack Query** - All hooks use `useMutation` under the hood for consistency with TanStack Query patterns.
+
+**Uses ORPC Contracts** - Automatically detects the correct endpoint based on file type from ORPC contracts.
 
 **Benefits of Worker-based uploads:**
 - ✅ Non-blocking UI - uploads run in background thread
@@ -33,13 +35,13 @@ Located in `useWorkerFileUpload.ts`:
 
 ## Usage Examples
 
-### Basic Image Upload with Worker
+### Basic File Upload with Worker
 
 ```tsx
-import { useWorkerUploadImage } from '@/hooks/useWorkerFileUpload'
+import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
 
 function ImageUploadComponent() {
-  const upload = useWorkerUploadImage()
+  const upload = useWorkerUploadFile('image') // or 'video', 'audio'
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -67,11 +69,11 @@ function ImageUploadComponent() {
 ### Upload with Custom Progress Callback
 
 ```tsx
-import { useWorkerUploadVideo } from '@/hooks/useWorkerFileUpload'
+import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
 import { useState } from 'react'
 
 function VideoUploadWithProgress() {
-  const upload = useWorkerUploadVideo()
+  const upload = useWorkerUploadFile('video')
   const [customProgress, setCustomProgress] = useState(0)
 
   const handleUpload = async (file: File) => {
@@ -98,10 +100,10 @@ function VideoUploadWithProgress() {
 ### Upload with Cancellation
 
 ```tsx
-import { useWorkerUploadImage } from '@/hooks/useWorkerFileUpload'
+import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
 
 function CancellableUpload() {
-  const upload = useWorkerUploadImage()
+  const upload = useWorkerUploadFile('image')
 
   const handleFileSelect = (file: File) => {
     upload.mutate(file)
@@ -166,11 +168,11 @@ function MultiTypeUploader() {
 ### Drag and Drop Upload
 
 ```tsx
-import { useWorkerUploadImage } from '@/hooks/useWorkerFileUpload'
+import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
 import { useState } from 'react'
 
 function DragDropUpload() {
-  const upload = useWorkerUploadImage()
+  const upload = useWorkerUploadFile('image')
   const [isDragging, setIsDragging] = useState(false)
 
   const handleDrop = (e: React.DragEvent) => {
@@ -292,10 +294,10 @@ To migrate from standard to Worker-based uploads:
 import { useUploadImage } from '@/hooks/useStorage'
 
 // After  
-import { useWorkerUploadImage } from '@/hooks/useWorkerFileUpload'
+import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
 
-// The API is identical, so no other changes needed!
-const upload = useWorkerUploadImage()
+// Specify file type in the hook
+const upload = useWorkerUploadFile('image')
 ```
 
 For the composite hook:
@@ -310,3 +312,9 @@ import { useWorkerStorage } from '@/hooks/useWorkerFileUpload'
 // API is identical with added cancel methods
 const storage = useWorkerStorage()
 ```
+
+### Key Changes
+
+1. **Single hook for all file types**: Use `useWorkerUploadFile(type)` instead of separate hooks
+2. **TanStack Query integration**: Now uses `useMutation` under the hood
+3. **ORPC contracts**: Endpoints are automatically determined from ORPC contracts

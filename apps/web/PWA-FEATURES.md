@@ -8,7 +8,7 @@ Gossip Club has been enhanced with Progressive Web App (PWA) capabilities to pro
 
 ### 1. Service Worker with Caching Strategies
 
-The app uses `@ducanh2912/next-pwa` with Workbox that implements intelligent caching strategies:
+The app uses `@serwist/next` (the official Next.js recommended PWA solution) with Serwist that implements intelligent caching strategies:
 
 - **Network-First** for API calls and pages (fresh data when online, cached fallback when offline)
 - **Cache-First** for static assets and videos (faster loading, bandwidth savings)
@@ -74,6 +74,7 @@ The web manifest (`/public/site.webmanifest`) includes:
 apps/web/
 ├── app/
 │   ├── layout.tsx                    # PWA components integration
+│   ├── sw.ts                         # Service worker source (Serwist)
 │   └── offline/
 │       └── page.tsx                  # Offline fallback page
 ├── components/
@@ -87,9 +88,9 @@ apps/web/
 ├── lib/
 │   └── pwa/
 │       └── background-sync.ts        # Background sync utilities
-├── next.config.ts                    # next-pwa configuration
+├── next.config.ts                    # Serwist configuration
 └── public/
-    ├── sw.js                         # Generated service worker (by next-pwa)
+    ├── sw.js                         # Generated service worker (by Serwist)
     └── site.webmanifest              # PWA manifest
 ```
 

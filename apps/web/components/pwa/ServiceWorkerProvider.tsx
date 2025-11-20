@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { Serwist } from "@serwist/next/worker";
 
 declare global {
   interface Window {
-    workbox: any;
+    serwist: Serwist | undefined;
   }
 }
 
@@ -17,16 +18,47 @@ export function ServiceWorkerProvider({
     if (
       typeof window !== "undefined" &&
       "serviceWorker" in navigator &&
-      window.workbox !== undefined
+      process.env.NODE_ENV === "production"
     ) {
-      const wb = window.workbox;
+      const registerSW = async () => {
+        try {
+          const registration = await navigator.serviceWorker.register("/sw.js", {
+            scope: "/",
+          });
 
-      // A common UX pattern for progressive web apps is to show a banner when a service worker has updated and waiting to install.
-      wb.addEventListener("controlling", () => {
-        window.location.reload();
-      });
+          // Check for updates periodically
+          setInterval(() => {
+            registration.update();
+          }, 60 * 60 * 1000); // Check every hour
 
-      wb.register();
+          // Listen for updates
+          registration.addEventListener("updatefound", () => {
+            const newWorker = registration.installing;
+            if (newWorker) {
+              newWorker.addEventListener("statechange", () => {
+                if (
+                  newWorker.state === "installed" &&
+                  navigator.serviceWorker.controller
+                ) {
+                  // New service worker available
+                  window.dispatchEvent(new Event("sw-update-available"));
+                }
+              });
+            }
+          });
+
+          // Handle controller change (new SW activated)
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            window.location.reload();
+          });
+
+          console.log("Service Worker registered successfully");
+        } catch (error) {
+          console.error("Service Worker registration failed:", error);
+        }
+      };
+
+      registerSW();
     }
   }, []);
 

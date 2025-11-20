@@ -9,33 +9,19 @@ export function UpdateNotification() {
     useState<ServiceWorkerRegistration | null>(null);
 
   useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      "serviceWorker" in navigator &&
-      window.workbox !== undefined
-    ) {
-      const wb = window.workbox;
-
-      // Add event listener to detect when the registered service worker has installed but waiting to activate
-      const promptNewVersionAvailable = (event: any) => {
-        setShowUpdate(true);
-        setRegistration(event.sw);
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      // Listen for custom SW update event
+      const handleUpdateAvailable = () => {
+        navigator.serviceWorker.ready.then((reg) => {
+          setRegistration(reg);
+          setShowUpdate(true);
+        });
       };
 
-      wb.addEventListener("waiting", promptNewVersionAvailable);
-      wb.addEventListener("externalwaiting", promptNewVersionAvailable);
-
-      // Register periodic update checks
-      wb.register();
-
-      // Check for updates every hour
-      setInterval(() => {
-        wb.update();
-      }, 60 * 60 * 1000); // 1 hour
+      window.addEventListener("sw-update-available", handleUpdateAvailable);
 
       return () => {
-        wb.removeEventListener("waiting", promptNewVersionAvailable);
-        wb.removeEventListener("externalwaiting", promptNewVersionAvailable);
+        window.removeEventListener("sw-update-available", handleUpdateAvailable);
       };
     }
   }, []);
@@ -52,6 +38,9 @@ export function UpdateNotification() {
           window.location.reload();
         }
       });
+    } else {
+      // Fallback: just reload
+      window.location.reload();
     }
 
     setShowUpdate(false);

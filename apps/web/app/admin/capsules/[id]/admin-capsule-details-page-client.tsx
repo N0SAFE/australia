@@ -51,7 +51,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Unlock } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import dynamic from "next/dynamic";
-import { useStorage } from "@/hooks/useStorage";
+import { orpc } from "@/lib/orpc";
+import { withFileUploads } from "@/lib/orpc/withFileUploads";
 
 const SimpleEditor = dynamic(
   () =>
@@ -100,7 +101,9 @@ export const AdminCapsuleDetailsPageClient: FC<{
 
   const { mutate: updateCapsule, isPending: isUpdating } = useUpdateCapsule();
   const router = useRouter();
-  const storage = useStorage();
+  
+  // Use the enhanced ORPC client with automatic file upload handling
+  const orpcWithUploads = withFileUploads(orpc);
 
   // Update local state when capsule data loads
   useEffect(() => {
@@ -287,9 +290,12 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizeFilename(file.name),
                       { type: file.type },
                     );
-                    const result = await storage.uploadImageAsync(
+                    const result = await orpcWithUploads.storage.uploadImage(
                       sanitizedFile,
-                      onProgress,
+                      {
+                        onProgress,
+                        signal,
+                      }
                     );
                     return result.url!;
                   },
@@ -300,9 +306,12 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizeFilename(file.name),
                       { type: file.type },
                     );
-                    const result = await storage.uploadVideoAsync(
+                    const result = await orpcWithUploads.storage.uploadVideo(
                       sanitizedFile,
-                      onProgress,
+                      {
+                        onProgress,
+                        signal,
+                      }
                     );
                     return result.url!;
                   },
@@ -313,9 +322,12 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizeFilename(file.name),
                       { type: file.type },
                     );
-                    const result = await storage.uploadAudioAsync(
+                    const result = await orpcWithUploads.storage.uploadAudio(
                       sanitizedFile,
-                      onProgress,
+                      {
+                        onProgress,
+                        signal,
+                      }
                     );
                     return result.url!;
                   },

@@ -3,6 +3,14 @@
 import { FC, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 /**
  * Sanitize filename to ASCII-safe characters for HTTP headers
@@ -616,14 +624,6 @@ export const AdminCapsuleDetailsPageClient: FC<{
         )}
         <Field className="max-w-lg">
           <FieldLabel htmlFor="openingDate">Date d&apos;ouverture</FieldLabel>
-<<<<<<< Updated upstream
-          <Calendar
-            mode="single"
-            selected={date}
-            onSelect={setDate}
-            className="rounded-lg border"
-          />
-=======
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -648,7 +648,6 @@ export const AdminCapsuleDetailsPageClient: FC<{
               />
             </PopoverContent>
           </Popover>
->>>>>>> Stashed changes
         </Field>
         {update && (
           <Field>

@@ -283,7 +283,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizedFile,
                       onProgress,
                     );
-                    return result.url;
+                    return result.url!;
                   },
                   video: async (file, onProgress, signal) => {
                     // Sanitize filename to ASCII-safe characters for HTTP headers
@@ -296,7 +296,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizedFile,
                       onProgress,
                     );
-                    return result.url;
+                    return result.url!;
                   },
                   audio: async (file, onProgress, signal) => {
                     // Sanitize filename to ASCII-safe characters for HTTP headers
@@ -309,7 +309,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizedFile,
                       onProgress,
                     );
-                    return result.url;
+                    return result.url!;
                   },
                 }}
               />
@@ -616,12 +616,39 @@ export const AdminCapsuleDetailsPageClient: FC<{
         )}
         <Field className="max-w-lg">
           <FieldLabel htmlFor="openingDate">Date d&apos;ouverture</FieldLabel>
+<<<<<<< Updated upstream
           <Calendar
             mode="single"
             selected={date}
             onSelect={setDate}
             className="rounded-lg border"
           />
+=======
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+                disabled={!update}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                disabled={!update}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+>>>>>>> Stashed changes
         </Field>
         {update && (
           <Field>

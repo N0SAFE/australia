@@ -287,7 +287,7 @@ cd "$PROJECT_DIR"
 
 if [ -f "package.json" ]; then
     print_info "Installing dependencies with Bun..."
-    su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && $ACTUAL_HOME/.bun/bin/bun install"
+    su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && $ACTUAL_HOME/.bun/bin/bun ci"
     print_success "Dependencies installed"
 else
     print_warning "No package.json found, skipping dependency installation"

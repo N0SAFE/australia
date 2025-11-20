@@ -3,7 +3,7 @@ import { z } from 'zod/v4';
 
 export const presentationGetVideoInput = z.object({});
 
-export const presentationGetVideoOutput = z.instanceof(File);
+export const presentationGetVideoOutput = z.file();
 
 export const presentationGetVideoContract = oc
   .route({

@@ -20,9 +20,39 @@ vi.mock('sonner', () => ({
   },
 }))
 
-// Mock ORPC client
+// Mock ORPC client with contract structure
 vi.mock('@/lib/orpc', () => ({
-  orpc: {},
+  orpc: {
+    storage: {
+      uploadImage: {
+        '~orpc': {
+          route: {
+            path: '/storage/upload/image',
+            method: 'POST',
+            summary: 'Upload an image file',
+          },
+        },
+      },
+      uploadVideo: {
+        '~orpc': {
+          route: {
+            path: '/storage/upload/video',
+            method: 'POST',
+            summary: 'Upload a video file',
+          },
+        },
+      },
+      uploadAudio: {
+        '~orpc': {
+          route: {
+            path: '/storage/upload/audio',
+            method: 'POST',
+            summary: 'Upload an audio file',
+          },
+        },
+      },
+    },
+  },
 }))
 
 describe('useWorkerFileUpload', () => {
@@ -215,9 +245,40 @@ describe('useWorkerFileUpload', () => {
   })
 
   describe('useWorkerFileUpload', () => {
+    // Create mock contract objects
+    const mockImageContract = {
+      '~orpc': {
+        route: {
+          path: '/storage/upload/image',
+          method: 'POST',
+          summary: 'Upload an image file',
+        },
+      },
+    }
+
+    const mockVideoContract = {
+      '~orpc': {
+        route: {
+          path: '/storage/upload/video',
+          method: 'POST',
+          summary: 'Upload a video file',
+        },
+      },
+    }
+
+    const mockAudioContract = {
+      '~orpc': {
+        route: {
+          path: '/storage/upload/audio',
+          method: 'POST',
+          summary: 'Upload an audio file',
+        },
+      },
+    }
+
     it('should initialize with correct default state', () => {
       const { result } = renderHook(() =>
-        useWorkerUploadFile('image'), { wrapper: createWrapper() }
+        useWorkerUploadFile(mockImageContract), { wrapper: createWrapper() }
       )
 
       expect(result.current.isPending).toBe(false)
@@ -228,7 +289,7 @@ describe('useWorkerFileUpload', () => {
 
     it('should update progress during upload', async () => {
       const { result } = renderHook(() =>
-        useWorkerUploadFile('image'), { wrapper: createWrapper() }
+        useWorkerUploadFile(mockImageContract), { wrapper: createWrapper() }
       )
 
       const file = createMockFile('test.png')
@@ -249,7 +310,7 @@ describe('useWorkerFileUpload', () => {
 
     it('should complete upload successfully', async () => {
       const { result } = renderHook(() =>
-        useWorkerUploadFile('image'), { wrapper: createWrapper() }
+        useWorkerUploadFile(mockImageContract), { wrapper: createWrapper() }
       )
 
       const file = createMockFile('test.png')
@@ -270,7 +331,7 @@ describe('useWorkerFileUpload', () => {
 
     it('should call progress callback', async () => {
       const { result } = renderHook(() =>
-        useWorkerUploadFile('image'), { wrapper: createWrapper() }
+        useWorkerUploadFile(mockImageContract), { wrapper: createWrapper() }
       )
 
       const file = createMockFile('test.png')
@@ -287,7 +348,7 @@ describe('useWorkerFileUpload', () => {
 
     it('should reset state', async () => {
       const { result } = renderHook(() =>
-        useWorkerUploadFile('image'), { wrapper: createWrapper() }
+        useWorkerUploadFile(mockImageContract), { wrapper: createWrapper() }
       )
 
       const file = createMockFile('test.png')
@@ -311,11 +372,21 @@ describe('useWorkerFileUpload', () => {
   })
 
   describe('useWorkerUploadFile', () => {
-    it('should support different file types', () => {
+    const mockImageContract = {
+      '~orpc': { route: { path: '/storage/upload/image', method: 'POST', summary: 'Upload an image file' } },
+    }
+    const mockVideoContract = {
+      '~orpc': { route: { path: '/storage/upload/video', method: 'POST', summary: 'Upload a video file' } },
+    }
+    const mockAudioContract = {
+      '~orpc': { route: { path: '/storage/upload/audio', method: 'POST', summary: 'Upload an audio file' } },
+    }
+
+    it('should support different contract routes', () => {
       const wrapper = createWrapper()
-      const { result: imageResult } = renderHook(() => useWorkerUploadFile('image'), { wrapper })
-      const { result: videoResult } = renderHook(() => useWorkerUploadFile('video'), { wrapper })
-      const { result: audioResult } = renderHook(() => useWorkerUploadFile('audio'), { wrapper })
+      const { result: imageResult } = renderHook(() => useWorkerUploadFile(mockImageContract), { wrapper })
+      const { result: videoResult } = renderHook(() => useWorkerUploadFile(mockVideoContract), { wrapper })
+      const { result: audioResult } = renderHook(() => useWorkerUploadFile(mockAudioContract), { wrapper })
 
       expect(imageResult.current).toBeDefined()
       expect(imageResult.current.mutate).toBeDefined()
@@ -327,8 +398,20 @@ describe('useWorkerFileUpload', () => {
   })
 
   describe('useWorkerStorage', () => {
+    const mockContracts = {
+      uploadImage: {
+        '~orpc': { route: { path: '/storage/upload/image', method: 'POST', summary: 'Upload an image file' } },
+      },
+      uploadVideo: {
+        '~orpc': { route: { path: '/storage/upload/video', method: 'POST', summary: 'Upload a video file' } },
+      },
+      uploadAudio: {
+        '~orpc': { route: { path: '/storage/upload/audio', method: 'POST', summary: 'Upload an audio file' } },
+      },
+    }
+
     it('should provide all upload methods', () => {
-      const { result } = renderHook(() => useWorkerStorage(), { wrapper: createWrapper() })
+      const { result } = renderHook(() => useWorkerStorage(mockContracts), { wrapper: createWrapper() })
 
       expect(result.current.uploadImage).toBeDefined()
       expect(result.current.uploadVideo).toBeDefined()
@@ -339,7 +422,7 @@ describe('useWorkerFileUpload', () => {
     })
 
     it('should track upload states independently', () => {
-      const { result } = renderHook(() => useWorkerStorage(), { wrapper: createWrapper() })
+      const { result } = renderHook(() => useWorkerStorage(mockContracts), { wrapper: createWrapper() })
 
       expect(result.current.isUploading.image).toBe(false)
       expect(result.current.isUploading.video).toBe(false)
@@ -348,7 +431,7 @@ describe('useWorkerFileUpload', () => {
     })
 
     it('should provide cancel methods', () => {
-      const { result } = renderHook(() => useWorkerStorage(), { wrapper: createWrapper() })
+      const { result } = renderHook(() => useWorkerStorage(mockContracts), { wrapper: createWrapper() })
 
       expect(result.current.cancel.image).toBeDefined()
       expect(result.current.cancel.video).toBeDefined()
@@ -356,7 +439,7 @@ describe('useWorkerFileUpload', () => {
     })
 
     it('should provide reset methods', () => {
-      const { result } = renderHook(() => useWorkerStorage(), { wrapper: createWrapper() })
+      const { result } = renderHook(() => useWorkerStorage(mockContracts), { wrapper: createWrapper() })
 
       expect(result.current.reset.image).toBeDefined()
       expect(result.current.reset.video).toBeDefined()

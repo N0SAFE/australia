@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, type UseMutationOptions } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { validateEnvPath } from '#/env'
-import { orpc } from '@/lib/orpc'
 import type {
   UploadWorkerMessage,
   UploadWorkerResponse,
@@ -33,11 +32,6 @@ type FileUploadResult = {
 }
 
 /**
- * File type for upload
- */
-type FileType = 'image' | 'video' | 'audio'
-
-/**
  * Generate unique upload ID
  */
 function generateUploadId(): string {
@@ -45,40 +39,68 @@ function generateUploadId(): string {
 }
 
 /**
- * Get ORPC endpoint path based on file type
+ * Type for ORPC contract route with metadata
  */
-function getEndpointForFileType(fileType: FileType): string {
-  const endpoints = {
-    image: '/storage/upload/image',
-    video: '/storage/upload/video',
-    audio: '/storage/upload/audio',
+type ORPCContractRoute = {
+  ['~orpc']?: {
+    route?: {
+      path?: string
+      method?: string
+    }
   }
-  return endpoints[fileType]
 }
 
 /**
- * Get success message based on file type
+ * Extract endpoint path from ORPC contract
  */
-function getSuccessMessage(fileType: FileType): string {
-  const messages = {
-    image: 'Image uploaded successfully',
-    video: 'Video uploaded successfully',
-    audio: 'Audio uploaded successfully',
+function getEndpointFromContract(contract: any): string {
+  // Try to access the ORPC metadata
+  const orpcMetadata = contract?.['~orpc']
+  if (orpcMetadata?.route?.path) {
+    return orpcMetadata.route.path
   }
-  return messages[fileType]
+  
+  // Fallback: try to infer from the contract structure
+  // This is a safety fallback in case the metadata structure is different
+  throw new Error('Cannot extract endpoint path from contract. Please ensure you pass a valid ORPC contract route.')
+}
+
+/**
+ * Get success message from contract or use default
+ */
+function getSuccessMessage(contract: any): string {
+  const orpcMetadata = contract?.['~orpc']
+  const summary = orpcMetadata?.route?.summary
+  
+  if (summary) {
+    return summary.replace('Upload', 'Uploaded').replace('upload', 'uploaded')
+  }
+  
+  return 'File uploaded successfully'
 }
 
 /**
  * Web Worker-based file upload hook using TanStack Query mutation
  * Handles file uploads in a background thread to prevent blocking the UI
- * Uses ORPC contracts to automatically determine the correct endpoint
+ * Uses ORPC contract to automatically determine the correct endpoint
  * 
- * @param fileType - Type of file to upload ('image' | 'video' | 'audio')
+ * @param contractRoute - ORPC contract route (e.g., orpc.storage.uploadImage)
  * @param options - TanStack Query mutation options
  * @returns Upload mutation with progress tracking
+ * 
+ * @example
+ * ```typescript
+ * import { orpc } from '@/lib/orpc'
+ * 
+ * const upload = useWorkerUploadFile(orpc.storage.uploadImage, {
+ *   onSuccess: (data) => console.log('Uploaded:', data)
+ * })
+ * 
+ * upload.mutate(file)
+ * ```
  */
-export function useWorkerFileUpload(
-  fileType: FileType,
+export function useWorkerUploadFile(
+  contractRoute: any,
   options?: Omit<UseMutationOptions<FileUploadResult, Error, File>, 'mutationFn'>
 ) {
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null)
@@ -86,9 +108,9 @@ export function useWorkerFileUpload(
   const currentUploadIdRef = useRef<string | null>(null)
   const progressCallbackRef = useRef<((event: { progress: number }) => void) | null>(null)
 
-  // Get endpoint and success message based on file type
-  const endpoint = getEndpointForFileType(fileType)
-  const successMessage = getSuccessMessage(fileType)
+  // Extract endpoint and success message from contract
+  const endpoint = getEndpointFromContract(contractRoute)
+  const successMessage = getSuccessMessage(contractRoute)
 
   // Initialize worker on mount
   useEffect(() => {
@@ -375,27 +397,35 @@ export function useWorkerFileUpload(
 }
 
 /**
- * Hook to upload files (any type) using Web Worker
- * This is the main hook that should be used for file uploads
- * 
- * @param fileType - Type of file: 'image', 'video', or 'audio'
- * @param options - TanStack Query mutation options
- */
-export function useWorkerUploadFile(
-  fileType: FileType = 'image',
-  options?: Omit<UseMutationOptions<FileUploadResult, Error, File>, 'mutationFn'>
-) {
-  return useWorkerFileUpload(fileType, options)
-}
-
-/**
  * Composite hook for all Worker-based storage operations
  * Uses TanStack Query mutations under the hood
+ * 
+ * @param contracts - Optional contracts object (defaults to orpc.storage)
+ * 
+ * @example
+ * ```typescript
+ * import { orpc } from '@/lib/orpc'
+ * 
+ * const storage = useWorkerStorage()
+ * storage.uploadImage(file)
+ * storage.uploadVideo(file)
+ * ```
  */
-export function useWorkerStorage() {
-  const uploadImage = useWorkerUploadFile('image')
-  const uploadVideo = useWorkerUploadFile('video')
-  const uploadAudio = useWorkerUploadFile('audio')
+export function useWorkerStorage(contracts?: {
+  uploadImage: any
+  uploadVideo: any
+  uploadAudio: any
+}) {
+  // Import orpc lazily to avoid circular dependency issues
+  let orpcContracts = contracts
+  if (!orpcContracts) {
+    const { orpc } = require('@/lib/orpc')
+    orpcContracts = orpc.storage
+  }
+  
+  const uploadImage = useWorkerUploadFile(orpcContracts.uploadImage)
+  const uploadVideo = useWorkerUploadFile(orpcContracts.uploadVideo)
+  const uploadAudio = useWorkerUploadFile(orpcContracts.uploadAudio)
 
   return {
     // Upload methods

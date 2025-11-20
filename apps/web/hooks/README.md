@@ -19,12 +19,12 @@ These hooks run XMLHttpRequest in the main thread.
 
 Located in `useWorkerFileUpload.ts`:
 
-- `useWorkerUploadFile(fileType)` - Main upload hook for any file type ('image' | 'video' | 'audio')
+- `useWorkerUploadFile(contractRoute, options?)` - Main upload hook that accepts ORPC contract routes
 - `useWorkerStorage()` - Composite hook for all upload types with workers
 
 **Uses TanStack Query** - All hooks use `useMutation` under the hood for consistency with TanStack Query patterns.
 
-**Uses ORPC Contracts** - Automatically detects the correct endpoint based on file type from ORPC contracts.
+**Uses ORPC Contracts** - Automatically extracts the endpoint path from the contract's metadata using `contract['~orpc'].route.path`.
 
 **Benefits of Worker-based uploads:**
 - ✅ Non-blocking UI - uploads run in background thread
@@ -39,9 +39,10 @@ Located in `useWorkerFileUpload.ts`:
 
 ```tsx
 import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
+import { orpc } from '@/lib/orpc'
 
 function ImageUploadComponent() {
-  const upload = useWorkerUploadFile('image') // or 'video', 'audio'
+  const upload = useWorkerUploadFile(orpc.storage.uploadImage)
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -70,10 +71,11 @@ function ImageUploadComponent() {
 
 ```tsx
 import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
+import { orpc } from '@/lib/orpc'
 import { useState } from 'react'
 
 function VideoUploadWithProgress() {
-  const upload = useWorkerUploadFile('video')
+  const upload = useWorkerUploadFile(orpc.storage.uploadVideo)
   const [customProgress, setCustomProgress] = useState(0)
 
   const handleUpload = async (file: File) => {
@@ -101,9 +103,10 @@ function VideoUploadWithProgress() {
 
 ```tsx
 import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
+import { orpc } from '@/lib/orpc'
 
 function CancellableUpload() {
-  const upload = useWorkerUploadFile('image')
+  const upload = useWorkerUploadFile(orpc.storage.uploadImage)
 
   const handleFileSelect = (file: File) => {
     upload.mutate(file)
@@ -169,10 +172,11 @@ function MultiTypeUploader() {
 
 ```tsx
 import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
+import { orpc } from '@/lib/orpc'
 import { useState } from 'react'
 
 function DragDropUpload() {
-  const upload = useWorkerUploadFile('image')
+  const upload = useWorkerUploadFile(orpc.storage.uploadImage)
   const [isDragging, setIsDragging] = useState(false)
 
   const handleDrop = (e: React.DragEvent) => {
@@ -295,9 +299,10 @@ import { useUploadImage } from '@/hooks/useStorage'
 
 // After  
 import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
+import { orpc } from '@/lib/orpc'
 
-// Specify file type in the hook
-const upload = useWorkerUploadFile('image')
+// Pass the ORPC contract route directly
+const upload = useWorkerUploadFile(orpc.storage.uploadImage)
 ```
 
 For the composite hook:
@@ -315,6 +320,7 @@ const storage = useWorkerStorage()
 
 ### Key Changes
 
-1. **Single hook for all file types**: Use `useWorkerUploadFile(type)` instead of separate hooks
-2. **TanStack Query integration**: Now uses `useMutation` under the hood
-3. **ORPC contracts**: Endpoints are automatically determined from ORPC contracts
+1. **Contract-based routing**: Pass ORPC contract routes directly to `useWorkerUploadFile`
+2. **Automatic path extraction**: Hook extracts endpoint path from `contract['~orpc'].route.path`
+3. **TanStack Query integration**: Now uses `useMutation` under the hood
+4. **Type-safe**: Full TypeScript type checking with ORPC contracts

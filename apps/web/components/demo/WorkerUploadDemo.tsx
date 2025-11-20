@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
+import { orpc } from '@/lib/orpc'
 import { Button } from '@repo/ui/button'
 import { Progress } from '@repo/ui/progress'
 import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card'
@@ -15,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card'
  * - Result display
  */
 export function WorkerUploadDemo() {
-  const upload = useWorkerUploadFile('image')
+  const upload = useWorkerUploadFile(orpc.storage.uploadImage)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {

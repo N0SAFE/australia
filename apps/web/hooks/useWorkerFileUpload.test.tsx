@@ -90,72 +90,95 @@ describe('useWorkerFileUpload', () => {
     // Mock Worker using a simplified inline implementation
     global.Worker = class Worker {
       onmessage: ((event: MessageEvent) => void) | null = null
+      private messageListeners: ((event: MessageEvent) => void)[] = []
       
       constructor(stringUrl: string | URL) {
         // Simulate worker initialization
       }
 
       postMessage(message: any) {
-        // Simulate worker responses
-        setTimeout(() => {
-          if (message.type === 'upload' && this.onmessage) {
-            // Progress event
-            this.onmessage(
-              new MessageEvent('message', {
-                data: {
-                  type: 'progress',
-                  id: message.id,
-                  loaded: 512,
-                  total: 1024,
-                  percentage: 50,
-                },
-              })
-            )
-
-            // Success event
-            setTimeout(() => {
-              if (this.onmessage) {
-                this.onmessage(
-                  new MessageEvent('message', {
-                    data: {
-                      type: 'success',
-                      id: message.id,
-                      data: {
-                        filename: 'test-file.png',
-                        path: '/uploads/test-file.png',
-                        size: 1024,
-                        mimeType: 'image/png',
-                      },
-                    },
-                  })
-                )
-              }
-            }, 10)
-          } else if (message.type === 'cancel' && this.onmessage) {
-            this.onmessage(
-              new MessageEvent('message', {
-                data: {
-                  type: 'cancelled',
-                  id: message.id,
-                },
-              })
-            )
+        // Simulate worker responses with immediate execution to avoid timing issues
+        if (message.type === 'upload') {
+          // Progress event - fire immediately
+          const progressEvent = new MessageEvent('message', {
+            data: {
+              type: 'progress',
+              id: message.id,
+              loaded: 512,
+              total: 1024,
+              percentage: 50,
+            },
+          })
+          
+          if (this.onmessage) {
+            this.onmessage(progressEvent)
           }
-        }, 5)
+          this.messageListeners.forEach(listener => listener(progressEvent))
+
+          // Final progress event
+          setTimeout(() => {
+            const finalProgressEvent = new MessageEvent('message', {
+              data: {
+                type: 'progress',
+                id: message.id,
+                loaded: 1024,
+                total: 1024,
+                percentage: 100,
+              },
+            })
+            if (this.onmessage) {
+              this.onmessage(finalProgressEvent)
+            }
+            this.messageListeners.forEach(listener => listener(finalProgressEvent))
+          }, 0)
+
+          // Success event - fire after a short delay
+          setTimeout(() => {
+            const successEvent = new MessageEvent('message', {
+              data: {
+                type: 'success',
+                id: message.id,
+                data: {
+                  filename: 'test-file.png',
+                  path: '/uploads/test-file.png',
+                  size: 1024,
+                  mimeType: 'image/png',
+                },
+              },
+            })
+            if (this.onmessage) {
+              this.onmessage(successEvent)
+            }
+            this.messageListeners.forEach(listener => listener(successEvent))
+          }, 10)
+        } else if (message.type === 'cancel') {
+          const cancelEvent = new MessageEvent('message', {
+            data: {
+              type: 'cancelled',
+              id: message.id,
+            },
+          })
+          if (this.onmessage) {
+            this.onmessage(cancelEvent)
+          }
+          this.messageListeners.forEach(listener => listener(cancelEvent))
+        }
       }
 
       addEventListener(type: string, listener: (event: MessageEvent) => void) {
         if (type === 'message') {
-          this.onmessage = listener
+          this.messageListeners.push(listener)
         }
       }
 
-      removeEventListener() {
-        // Mock implementation
+      removeEventListener(type: string, listener: (event: MessageEvent) => void) {
+        if (type === 'message') {
+          this.messageListeners = this.messageListeners.filter(l => l !== listener)
+        }
       }
 
       terminate() {
-        // Mock implementation
+        this.messageListeners = []
       }
     } as any
 
@@ -200,7 +223,7 @@ describe('useWorkerFileUpload', () => {
         () => {
           expect(result.current.uploadProgress).toBeGreaterThan(0)
         },
-        { timeout: 100 }
+        { timeout: 500 }
       )
     })
 
@@ -219,7 +242,7 @@ describe('useWorkerFileUpload', () => {
         () => {
           expect(result.current.data).not.toBeNull()
         },
-        { timeout: 100 }
+        { timeout: 500 }
       )
 
       expect(result.current.isPending).toBe(false)

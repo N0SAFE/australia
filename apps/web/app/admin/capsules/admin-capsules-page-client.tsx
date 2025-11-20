@@ -94,7 +94,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { SimpleEditor } from "@/components/tiptap/editor/index";
 import { JSONContent } from "@repo/ui/tiptap-exports/react";
-import { useStorage } from "@/hooks/useStorage";
+import { orpc } from "@/lib/orpc";
+import { withFileUploads } from "@/lib/orpc/withFileUploads";
 
 
 /**
@@ -130,7 +131,9 @@ function CreateCapsuleDialog() {
     openingMessage: "",
     isLocked: true,
   });
-  const storage = useStorage();
+  
+  // Use the enhanced ORPC client with automatic file upload handling
+  const orpcWithUploads = withFileUploads(orpc);
 
   const { mutate: createCapsule, isPending } = useCreateCapsule();
 
@@ -259,9 +262,12 @@ function CreateCapsuleDialog() {
                         sanitizeFilename(file.name),
                         { type: file.type },
                       );
-                      const result = await storage.uploadImageAsync(
+                      const result = await orpcWithUploads.storage.uploadImage(
                         sanitizedFile,
-                        onProgress,
+                        {
+                          onProgress,
+                          signal,
+                        }
                       );
                       return result.url!;
                     },
@@ -272,9 +278,12 @@ function CreateCapsuleDialog() {
                         sanitizeFilename(file.name),
                         { type: file.type },
                       );
-                      const result = await storage.uploadVideoAsync(
+                      const result = await orpcWithUploads.storage.uploadVideo(
                         sanitizedFile,
-                        onProgress,
+                        {
+                          onProgress,
+                          signal,
+                        }
                       );
                       return result.url!;
                     },
@@ -285,9 +294,12 @@ function CreateCapsuleDialog() {
                         sanitizeFilename(file.name),
                         { type: file.type },
                       );
-                      const result = await storage.uploadAudioAsync(
+                      const result = await orpcWithUploads.storage.uploadAudio(
                         sanitizedFile,
-                        onProgress,
+                        {
+                          onProgress,
+                          signal,
+                        }
                       );
                       return result.url!;
                     },

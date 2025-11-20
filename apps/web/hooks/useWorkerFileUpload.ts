@@ -1,0 +1,456 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { validateEnvPath } from '#/env'
+import type {
+  UploadWorkerMessage,
+  UploadWorkerResponse,
+} from '../workers/upload.worker'
+
+/**
+ * Progress state for upload tracking
+ */
+type UploadProgress = {
+  loaded: number
+  total: number
+  percentage: number
+}
+
+/**
+ * Generic file upload result
+ */
+type FileUploadResult = {
+  filename: string
+  path: string
+  size: number
+  mimeType: string
+  url?: string
+  fileId?: string
+  videoId?: string
+  isProcessed?: boolean
+  message?: string
+}
+
+/**
+ * Upload state for Worker-based uploads
+ */
+type UploadState = {
+  isUploading: boolean
+  progress: UploadProgress | null
+  error: Error | null
+  data: FileUploadResult | null
+}
+
+/**
+ * Generate unique upload ID
+ */
+function generateUploadId(): string {
+  return `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+/**
+ * Web Worker-based file upload hook
+ * Handles file uploads in a background thread to prevent blocking the UI
+ * 
+ * @param endpoint - API endpoint for upload (e.g., '/storage/upload/image')
+ * @param successMessage - Message to show on successful upload
+ * @returns Upload mutation interface similar to TanStack Query
+ */
+export function useWorkerFileUpload(endpoint: string, successMessage: string) {
+  const [state, setState] = useState<UploadState>({
+    isUploading: false,
+    progress: null,
+    error: null,
+    data: null,
+  })
+
+  const workerRef = useRef<Worker | null>(null)
+  const currentUploadIdRef = useRef<string | null>(null)
+
+  // Initialize worker on mount
+  useEffect(() => {
+    // Create worker from inline blob to avoid bundling issues
+    const workerCode = `
+      const activeRequests = new Map();
+
+      function handleUpload(id, file, url, withCredentials) {
+        const xhr = new XMLHttpRequest();
+        activeRequests.set(id, xhr);
+
+        xhr.open('POST', url);
+        xhr.withCredentials = withCredentials;
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            postMessage({
+              type: 'progress',
+              id,
+              loaded: e.loaded,
+              total: e.total,
+              percentage: (e.loaded / e.total) * 100,
+            });
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          activeRequests.delete(id);
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              postMessage({ type: 'success', id, data });
+            } catch (err) {
+              postMessage({ type: 'error', id, error: 'Failed to parse server response' });
+            }
+          } else {
+            let errorMessage = 'Upload failed';
+            try {
+              const errorResponse = JSON.parse(xhr.responseText);
+              errorMessage = errorResponse.message || errorMessage;
+            } catch {
+              errorMessage = xhr.statusText || errorMessage;
+            }
+            postMessage({ type: 'error', id, error: errorMessage });
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          activeRequests.delete(id);
+          postMessage({ type: 'error', id, error: 'Network request failed' });
+        });
+
+        xhr.addEventListener('abort', () => {
+          activeRequests.delete(id);
+          postMessage({ type: 'cancelled', id });
+        });
+
+        const formData = new FormData();
+        formData.append('file', file);
+        xhr.send(formData);
+      }
+
+      function handleCancel(id) {
+        const xhr = activeRequests.get(id);
+        if (xhr) {
+          xhr.abort();
+          activeRequests.delete(id);
+        }
+      }
+
+      self.addEventListener('message', (event) => {
+        const message = event.data;
+        switch (message.type) {
+          case 'upload':
+            handleUpload(message.id, message.file, message.url, message.withCredentials);
+            break;
+          case 'cancel':
+            handleCancel(message.id);
+            break;
+        }
+      });
+    `
+
+    const blob = new Blob([workerCode], { type: 'application/javascript' })
+    const workerUrl = URL.createObjectURL(blob)
+    workerRef.current = new Worker(workerUrl)
+
+    // Handle messages from worker
+    workerRef.current.onmessage = (
+      event: MessageEvent<UploadWorkerResponse>
+    ) => {
+      const response = event.data
+
+      // Only process messages for current upload
+      if (response.id !== currentUploadIdRef.current) {
+        return
+      }
+
+      switch (response.type) {
+        case 'progress':
+          setState((prev) => ({
+            ...prev,
+            progress: {
+              loaded: response.loaded,
+              total: response.total,
+              percentage: response.percentage,
+            },
+          }))
+          break
+
+        case 'success': {
+          const result = response.data as FileUploadResult
+
+          // Get API URL and add full URL if not present
+          const apiUrl =
+            typeof window === 'undefined'
+              ? validateEnvPath(process.env.API_URL ?? '', 'API_URL')
+              : validateEnvPath(
+                  process.env.NEXT_PUBLIC_API_URL ?? '',
+                  'NEXT_PUBLIC_API_URL'
+                )
+
+          if (!result.url) {
+            result.url = `${apiUrl}/storage/files/${result.filename}`
+          }
+
+          setState({
+            isUploading: false,
+            progress: { loaded: 100, total: 100, percentage: 100 },
+            error: null,
+            data: result,
+          })
+
+          toast.success(`${successMessage}: ${result.filename}`)
+          currentUploadIdRef.current = null
+          break
+        }
+
+        case 'error':
+          setState({
+            isUploading: false,
+            progress: null,
+            error: new Error(response.error),
+            data: null,
+          })
+          toast.error(`Upload failed: ${response.error}`)
+          currentUploadIdRef.current = null
+          break
+
+        case 'cancelled':
+          setState({
+            isUploading: false,
+            progress: null,
+            error: new Error('Upload cancelled'),
+            data: null,
+          })
+          toast.error('Upload cancelled')
+          currentUploadIdRef.current = null
+          break
+      }
+    }
+
+    // Cleanup worker on unmount
+    return () => {
+      if (workerRef.current) {
+        workerRef.current.terminate()
+        URL.revokeObjectURL(workerUrl)
+      }
+    }
+  }, [successMessage])
+
+  /**
+   * Start file upload
+   */
+  const mutateAsync = useCallback(
+    async (file: File, onProgress?: (event: { progress: number }) => void) => {
+      return new Promise<FileUploadResult>((resolve, reject) => {
+        if (!workerRef.current) {
+          reject(new Error('Worker not initialized'))
+          return
+        }
+
+        // Generate upload ID
+        const uploadId = generateUploadId()
+        currentUploadIdRef.current = uploadId
+
+        // Reset state
+        setState({
+          isUploading: true,
+          progress: null,
+          error: null,
+          data: null,
+        })
+
+        // Get API URL
+        const apiUrl =
+          typeof window === 'undefined'
+            ? validateEnvPath(process.env.API_URL ?? '', 'API_URL')
+            : validateEnvPath(
+                process.env.NEXT_PUBLIC_API_URL ?? '',
+                'NEXT_PUBLIC_API_URL'
+              )
+
+        const url = `${apiUrl}${endpoint}`
+
+        // Set up one-time message handler for this upload
+        const handleMessage = (event: MessageEvent<UploadWorkerResponse>) => {
+          const response = event.data
+
+          if (response.id !== uploadId) {
+            return
+          }
+
+          switch (response.type) {
+            case 'progress':
+              onProgress?.({ progress: response.percentage })
+              break
+
+            case 'success':
+              workerRef.current?.removeEventListener('message', handleMessage)
+              resolve(response.data as FileUploadResult)
+              break
+
+            case 'error':
+              workerRef.current?.removeEventListener('message', handleMessage)
+              reject(new Error(response.error))
+              break
+
+            case 'cancelled':
+              workerRef.current?.removeEventListener('message', handleMessage)
+              reject(new Error('Upload cancelled'))
+              break
+          }
+        }
+
+        workerRef.current.addEventListener('message', handleMessage)
+
+        // Send upload message to worker
+        const message: UploadWorkerMessage = {
+          type: 'upload',
+          id: uploadId,
+          file,
+          url,
+          withCredentials: true,
+        }
+
+        workerRef.current.postMessage(message)
+
+        console.log(`[useWorkerFileUpload] Starting upload: ${file.name}`)
+      })
+    },
+    [endpoint]
+  )
+
+  /**
+   * Cancel current upload
+   */
+  const cancel = useCallback(() => {
+    if (workerRef.current && currentUploadIdRef.current) {
+      const message: UploadWorkerMessage = {
+        type: 'cancel',
+        id: currentUploadIdRef.current,
+      }
+      workerRef.current.postMessage(message)
+    }
+  }, [])
+
+  /**
+   * Reset upload state
+   */
+  const reset = useCallback(() => {
+    setState({
+      isUploading: false,
+      progress: null,
+      error: null,
+      data: null,
+    })
+    currentUploadIdRef.current = null
+  }, [])
+
+  return {
+    mutateAsync,
+    mutate: (file: File, onProgress?: (event: { progress: number }) => void) => {
+      mutateAsync(file, onProgress).catch(() => {})
+    },
+    cancel,
+    reset,
+    isPending: state.isUploading,
+    uploadProgress: state.progress?.percentage ?? 0,
+    error: state.error,
+    data: state.data,
+  }
+}
+
+/**
+ * Mutation hook to upload an image file using Web Worker
+ */
+export function useWorkerUploadImage() {
+  return useWorkerFileUpload(
+    '/storage/upload/image',
+    'Image uploaded successfully'
+  )
+}
+
+/**
+ * Mutation hook to upload a video file using Web Worker
+ */
+export function useWorkerUploadVideo() {
+  return useWorkerFileUpload(
+    '/storage/upload/video',
+    'Video uploaded successfully'
+  )
+}
+
+/**
+ * Mutation hook to upload an audio file using Web Worker
+ */
+export function useWorkerUploadAudio() {
+  return useWorkerFileUpload(
+    '/storage/upload/audio',
+    'Audio uploaded successfully'
+  )
+}
+
+/**
+ * Composite hook for all Worker-based storage operations
+ */
+export function useWorkerStorage() {
+  const uploadImage = useWorkerUploadImage()
+  const uploadVideo = useWorkerUploadVideo()
+  const uploadAudio = useWorkerUploadAudio()
+
+  return {
+    // Upload methods
+    uploadImage: uploadImage.mutate,
+    uploadImageAsync: uploadImage.mutateAsync,
+    uploadVideo: uploadVideo.mutate,
+    uploadVideoAsync: uploadVideo.mutateAsync,
+    uploadAudio: uploadAudio.mutate,
+    uploadAudioAsync: uploadAudio.mutateAsync,
+
+    // Cancel methods
+    cancel: {
+      image: uploadImage.cancel,
+      video: uploadVideo.cancel,
+      audio: uploadAudio.cancel,
+    },
+
+    // Loading states
+    isUploading: {
+      image: uploadImage.isPending,
+      video: uploadVideo.isPending,
+      audio: uploadAudio.isPending,
+      any:
+        uploadImage.isPending ||
+        uploadVideo.isPending ||
+        uploadAudio.isPending,
+    },
+
+    // Upload progress (0-100 percentage)
+    uploadProgress: {
+      image: uploadImage.uploadProgress,
+      video: uploadVideo.uploadProgress,
+      audio: uploadAudio.uploadProgress,
+    },
+
+    // Reset functions
+    reset: {
+      image: uploadImage.reset,
+      video: uploadVideo.reset,
+      audio: uploadAudio.reset,
+    },
+
+    // Error states
+    errors: {
+      image: uploadImage.error,
+      video: uploadVideo.error,
+      audio: uploadAudio.error,
+    },
+
+    // Upload data (results)
+    data: {
+      image: uploadImage.data,
+      video: uploadVideo.data,
+      audio: uploadAudio.data,
+    },
+  }
+}

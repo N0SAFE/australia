@@ -173,7 +173,7 @@
         "react-day-picker": "^9.11.1",
         "react-hook-form": "catalog:react",
         "react-hotkeys-hook": "^5.2.1",
-        "react-lite-youtube-embed": "^2.5.6",
+        "react-lite-youtube-embed": "^3.3.1",
         "react-player": "3.3.1",
         "react-use": "^17.6.0",
         "recharts": "3.3.0",

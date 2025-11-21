@@ -1,7 +1,9 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PresentationRepository, type PresentationVideoRecord } from "../repositories/presentation.repository";
-import { FileStorageService } from "@/core/modules/file-storage/file-storage.service";
+import { FileUploadService } from "@/core/modules/file-upload/file-upload.service";
 import { StorageService } from "@/modules/storage/services/storage.service";
+import { join } from "path";
+import { UPLOADS_DIR } from "@/config/multer.config";
 import { VideoProcessingService } from "@/core/modules/video-processing";
 import { PresentationEventService } from "../events/presentation.event";
 
@@ -11,7 +13,7 @@ export class PresentationService {
 
     constructor(
         private readonly presentationRepository: PresentationRepository,
-        private readonly fileStorageService: FileStorageService,
+        private readonly fileUploadService: FileUploadService,
         private readonly storageService: StorageService,
         private readonly videoProcessingService: VideoProcessingService,
         private readonly presentationEventService: PresentationEventService
@@ -21,8 +23,22 @@ export class PresentationService {
      * Upload or replace presentation video
      */
     async uploadVideo(file: Express.Multer.File): Promise<PresentationVideoRecord & { url: string }> {
-        // Process file upload
-        const fileData = this.fileStorageService.processUploadedFile(file);
+        // Determine subdirectory based on mimetype
+        let subdir = 'videos';
+        if (file.mimetype.startsWith('video/')) {
+            subdir = 'videos';
+        } else if (file.mimetype.startsWith('audio/')) {
+            subdir = 'audio';
+        }
+
+        // Build file data
+        const fileData = {
+            url: `/uploads/${subdir}/${file.filename}`,
+            filePath: `${subdir}/${file.filename}`,
+            filename: file.filename,
+            mimetype: file.mimetype,
+            size: file.size,
+        };
 
         // Get current video to delete old file
         const currentVideo = await this.presentationRepository.findCurrent();
@@ -50,7 +66,7 @@ export class PresentationService {
 
         // Trigger async video processing (non-blocking) - return immediately
         // Get absolute file path
-        const absolutePath = this.fileStorageService.getAbsolutePath(fileData.filePath);
+        const absolutePath = this.fileUploadService.getFilePath(fileData.filename, fileData.mimetype);
 
         // Start processing in background with abort strategy (don't await)
         this.presentationEventService
@@ -141,8 +157,8 @@ export class PresentationService {
             throw new Error("Video is already processed");
         }
 
-        // Get absolute file path
-        const absolutePath = this.fileStorageService.getAbsolutePath(video.filePath);
+        // Get absolute file path from stored relative path
+        const absolutePath = join(UPLOADS_DIR, video.filePath);
 
         // Start processing in background with abort strategy (don't await)
         this.presentationEventService
@@ -298,7 +314,7 @@ export class PresentationService {
 
         return {
             ...video,
-            url: this.fileStorageService.getUrl(video.filePath),
+            url: `/uploads/${video.filePath}`,
         };
     }
 
@@ -329,6 +345,6 @@ export class PresentationService {
             throw new NotFoundException("No presentation video found");
         }
 
-        return this.fileStorageService.getAbsolutePath(video.filePath);
+        return join(UPLOADS_DIR, video.filePath);
     }
 }

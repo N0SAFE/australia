@@ -1,5 +1,6 @@
 import { validateEnvPath } from '#/env'
 import { toast } from 'sonner'
+import type { $ZodType as ZodType } from 'zod/v4/core'
 
 /**
  * Progress event for file uploads
@@ -14,9 +15,9 @@ export type FileUploadProgressEvent = {
 /**
  * Options for file upload routes
  */
-export type FileUploadOptions = {
+export type FileUploadOptions<TResult = unknown> = {
   onProgress?: (event: FileUploadProgressEvent) => void
-  onSuccess?: (data: any) => void
+  onSuccess?: (data: TResult) => void
   onError?: (error: Error) => void
   signal?: AbortSignal
 }
@@ -25,12 +26,12 @@ export type FileUploadOptions = {
  * Upload worker message types
  */
 type UploadWorkerMessage =
-  | { type: 'upload'; id: string; file: File; url: string; withCredentials: boolean }
+  | { type: 'upload'; id: string; input: unknown; url: string; withCredentials: boolean }
   | { type: 'cancel'; id: string }
 
 type UploadWorkerResponse =
   | { type: 'progress'; id: string; loaded: number; total: number; percentage: number }
-  | { type: 'success'; id: string; data: any }
+  | { type: 'success'; id: string; data: unknown }
   | { type: 'error'; id: string; error: string }
   | { type: 'cancelled'; id: string }
 
@@ -48,7 +49,33 @@ function createUploadWorker(): Worker {
   const workerCode = `
     const activeRequests = new Map();
 
-    function handleUpload(id, file, url, withCredentials) {
+    /**
+     * Recursively build FormData from input, handling Files at any level
+     */
+    function buildFormData(formData, input, parentKey = '') {
+      if (input instanceof File) {
+        // Direct File at this level
+        const key = parentKey || 'file';
+        formData.append(key, input);
+      } else if (Array.isArray(input)) {
+        // Array - append each item with indexed key
+        input.forEach((item, index) => {
+          const key = parentKey ? \`\${parentKey}.\${index}\` : String(index);
+          buildFormData(formData, item, key);
+        });
+      } else if (input && typeof input === 'object') {
+        // Object - recursively process properties
+        Object.entries(input).forEach(([key, value]) => {
+          const fullKey = parentKey ? \`\${parentKey}.\${key}\` : key;
+          buildFormData(formData, value, fullKey);
+        });
+      } else if (input !== undefined && input !== null) {
+        // Primitive value
+        formData.append(parentKey, String(input));
+      }
+    }
+
+    function handleUpload(id, input, url, withCredentials) {
       const xhr = new XMLHttpRequest();
       activeRequests.set(id, xhr);
 
@@ -100,7 +127,7 @@ function createUploadWorker(): Worker {
       });
 
       const formData = new FormData();
-      formData.append('file', file);
+      buildFormData(formData, input);
       xhr.send(formData);
     }
 
@@ -116,7 +143,7 @@ function createUploadWorker(): Worker {
       const message = event.data;
       switch (message.type) {
         case 'upload':
-          handleUpload(message.id, message.file, message.url, message.withCredentials);
+          handleUpload(message.id, message.input, message.url, message.withCredentials);
           break;
         case 'cancel':
           handleCancel(message.id);
@@ -143,13 +170,13 @@ function getOrCreateWorker(): Worker {
 }
 
 /**
- * Upload a file using Web Worker and XMLHttpRequest
+ * Upload data with files using Web Worker and XMLHttpRequest
  */
-async function uploadFileWithWorker(
-  file: File,
+async function uploadWithWorker<TResult = unknown>(
+  input: unknown,
   endpoint: string,
-  options?: FileUploadOptions
-): Promise<any> {
+  options?: FileUploadOptions<TResult>
+): Promise<TResult> {
   return new Promise((resolve, reject) => {
     const worker = getOrCreateWorker()
     const uploadId = generateUploadId()
@@ -199,10 +226,10 @@ async function uploadFileWithWorker(
             options.signal.removeEventListener('abort', abortHandler)
           }
 
-          const result = response.data
+          const result = response.data as TResult
           // Add full URL if not present
-          if (result && !result.url && result.filename) {
-            result.url = `${apiUrl}/storage/files/${result.filename}`
+          if (result && typeof result === 'object' && 'filename' in result && !('url' in result)) {
+            (result as Record<string, unknown>).url = `${apiUrl}/storage/files/${(result as Record<string, unknown>).filename}`
           }
 
           options?.onSuccess?.(result)
@@ -240,32 +267,104 @@ async function uploadFileWithWorker(
     const message: UploadWorkerMessage = {
       type: 'upload',
       id: uploadId,
-      file,
+      input,
       url,
       withCredentials: true,
     }
 
     worker.postMessage(message)
-    console.log(`[withFileUploads] Starting upload: ${file.name}`)
+    
+    // Log appropriate message based on input type
+    const fileName = input instanceof File ? input.name : 'data with files'
+    console.log(`[withFileUploads] Starting upload: ${fileName}`)
   })
 }
 
 /**
- * Check if a contract route has file input
+ * Recursively check if a value contains any File objects
  */
-function hasFileInput(contract: any): boolean {
-  try {
-    const orpcMetadata = contract?.['~orpc']
-    const inputSchema = orpcMetadata?.inputSchema
+function containsFile(value: unknown): boolean {
+  if (value instanceof File) {
+    return true
+  }
 
-    // Check if the input schema contains a 'file' field
-    if (inputSchema && typeof inputSchema === 'object') {
-      // Zod schemas have a _def property
-      const def = (inputSchema as any)._def
-      if (def?.typeName === 'ZodObject') {
-        const shape = def.shape?.()
-        return shape && 'file' in shape
+  if (Array.isArray(value)) {
+    return value.some((item) => containsFile(item))
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.values(value).some((val) => containsFile(val))
+  }
+
+  return false
+}
+
+/**
+ * Check if a Zod schema allows File input at any level
+ */
+function schemaAcceptsFiles(schema: ZodType): boolean {
+  try {
+    if (!schema || typeof schema !== 'object') {
+      return false
+    }
+
+    const def = schema._zod?.def
+
+    if (!def) {
+      return false
+    }
+
+    // Direct ZodFile check
+    if (def.type === 'file') {
+      return true
+    }
+
+    // Transform - check inner type
+    if (def.type === 'transform') {
+      const transformDef = def as { in?: ZodType }
+      const innerSchema = transformDef.in
+      return innerSchema ? schemaAcceptsFiles(innerSchema) : false
+    }
+
+    // Optional/Nullable - check inner type
+    if (def.type === 'optional' || def.type === 'nullable') {
+      const wrapperDef = def as { innerType?: ZodType }
+      return wrapperDef.innerType ? schemaAcceptsFiles(wrapperDef.innerType) : false
+    }
+
+    // Object - check all fields
+    if (def.type === 'object') {
+      const objectDef = def as { shape?: Record<string, ZodType> }
+      const shape = objectDef.shape
+      if (shape && typeof shape === 'object') {
+        return Object.values(shape).some((fieldSchema: ZodType) => 
+          fieldSchema && schemaAcceptsFiles(fieldSchema)
+        )
       }
+    }
+
+    // Array - check element type
+    if (def.type === 'array') {
+      const arrayDef = def as { element?: ZodType }
+      return arrayDef.element ? schemaAcceptsFiles(arrayDef.element) : false
+    }
+
+    // Union - check all options
+    if (def.type === 'union') {
+      const unionDef = def as { options?: ZodType[] }
+      const options = unionDef.options || []
+      return Array.isArray(options) && options.some((option: ZodType) => 
+        option && schemaAcceptsFiles(option)
+      )
+    }
+
+    // Intersection - check both sides
+    if (def.type === 'intersection') {
+      const intersectionDef = def as { left?: ZodType; right?: ZodType }
+      return Boolean(
+        (intersectionDef.left && schemaAcceptsFiles(intersectionDef.left)) || 
+        (intersectionDef.right && schemaAcceptsFiles(intersectionDef.right))
+      )
     }
 
     return false
@@ -275,9 +374,40 @@ function hasFileInput(contract: any): boolean {
 }
 
 /**
+ * ORPC Contract metadata type
+ */
+type ORPCContract = {
+  '~orpc'?: {
+    inputSchema?: ZodType
+    route?: {
+      path?: string
+      summary?: string
+    }
+  }
+}
+
+/**
+ * Check if a contract route has file input at any level
+ */
+function hasFileInput(contract: ORPCContract): boolean {
+  try {
+    const orpcMetadata = contract?.['~orpc']
+    const inputSchema = orpcMetadata?.inputSchema
+
+    if (!inputSchema) {
+      return false
+    }
+
+    return schemaAcceptsFiles(inputSchema)
+  } catch {
+    return false
+  }
+}
+
+/**
  * Get endpoint path from contract
  */
-function getEndpointFromContract(contract: any): string {
+function getEndpointFromContract(contract: ORPCContract): string {
   const orpcMetadata = contract?.['~orpc']
   if (orpcMetadata?.route?.path) {
     return orpcMetadata.route.path
@@ -288,7 +418,7 @@ function getEndpointFromContract(contract: any): string {
 /**
  * Get success message from contract
  */
-function getSuccessMessage(contract: any): string {
+function getSuccessMessage(contract: ORPCContract): string {
   const orpcMetadata = contract?.['~orpc']
   const summary = orpcMetadata?.route?.summary
 
@@ -300,17 +430,42 @@ function getSuccessMessage(contract: any): string {
 }
 
 /**
+ * ORPC Procedure type (has call methods and utilities)
+ */
+type ORPCProcedure = {
+  (input: unknown, options?: unknown): Promise<unknown>
+  [key: string]: unknown
+}
+
+/**
  * Wrap a route function to handle file uploads with Web Worker
  */
-function wrapRouteWithFileUpload(routeFunction: any, contract: any): any {
+function wrapRouteWithFileUpload<TProcedure extends ORPCProcedure>(
+  procedure: TProcedure,
+  contract: ORPCContract
+): TProcedure {
   const endpoint = getEndpointFromContract(contract)
   const successMessage = getSuccessMessage(contract)
 
-  // Return a function that accepts (file, options) and handles the upload
-  return async (file: File, options?: FileUploadOptions) => {
+  // Create a wrapper function that handles file uploads
+  const wrappedFunction = async (input: unknown, options?: unknown): Promise<unknown> => {
+    // Check if this is a FileUploadOptions (has onProgress callback)
+    const isFileUploadOptions = options && typeof options === 'object' && 'onProgress' in options
+    const fileUploadOptions = isFileUploadOptions ? options as FileUploadOptions : undefined
+
     try {
-      const result = await uploadFileWithWorker(file, endpoint, options)
-      toast.success(`${successMessage}: ${result.filename || 'file'}`)
+      // Check if input actually contains files at runtime
+      if (!containsFile(input)) {
+        // No files found, use regular ORPC call
+        console.log('[withFileUploads] No files detected, using standard ORPC call')
+        return await procedure(input, options)
+      }
+
+      const result = await uploadWithWorker(input, endpoint, fileUploadOptions)
+      const fileName = result && typeof result === 'object' && 'filename' in result 
+        ? (result as Record<string, unknown>).filename as string
+        : 'file'
+      toast.success(`${successMessage}: ${fileName}`)
       return result
     } catch (error) {
       if (error instanceof Error && error.message !== 'Upload cancelled') {
@@ -319,32 +474,39 @@ function wrapRouteWithFileUpload(routeFunction: any, contract: any): any {
       throw error
     }
   }
+
+  // Copy all properties and methods from the original procedure
+  // This preserves ORPC utilities like useQuery, useMutation, etc.
+  return Object.assign(wrappedFunction, procedure) as TProcedure
 }
 
 /**
  * Recursively wrap an ORPC client to enhance routes with file uploads
  */
-function wrapClientWithFileUploads(client: any, parentPath: string[] = []): any {
+function wrapClientWithFileUploads<T>(
+  client: T,
+  parentPath: string[] = []
+): T {
   if (!client || typeof client !== 'object') {
     return client
   }
 
   // Create a proxy to intercept property access
-  return new Proxy(client, {
+  return new Proxy(client as object, {
     get(target, prop) {
       if (typeof prop === 'symbol' || prop === 'then') {
-        return target[prop]
+        return Reflect.get(target, prop)
       }
 
-      const value = target[prop]
+      const value = Reflect.get(target, prop)
       const currentPath = [...parentPath, prop as string]
 
       // Check if this is a route with file input
-      if (value && typeof value === 'object' && value['~orpc']) {
-        if (hasFileInput(value)) {
+      if (value && typeof value === 'object' && '~orpc' in value) {
+        if (hasFileInput(value as ORPCContract)) {
           // This is a file upload route - wrap it
           console.log(`[withFileUploads] Wrapping route: ${currentPath.join('.')}`)
-          return wrapRouteWithFileUpload(value, value)
+          return wrapRouteWithFileUpload(value as ORPCProcedure, value as ORPCContract)
         }
       }
 
@@ -355,7 +517,7 @@ function wrapClientWithFileUploads(client: any, parentPath: string[] = []): any 
 
       return value
     },
-  })
+  }) as T
 }
 
 /**
@@ -383,7 +545,7 @@ function wrapClientWithFileUploads(client: any, parentPath: string[] = []): any 
  * ```
  */
 export function withFileUploads<T>(orpcClient: T): T {
-  return wrapClientWithFileUploads(orpcClient) as T
+  return wrapClientWithFileUploads(orpcClient)
 }
 
 /**

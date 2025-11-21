@@ -50,11 +50,13 @@ export class CapsuleController {
         try {
           capsuleFindByMonthOutput.parse(result);
           console.error('[Controller] ✅ Validation SUCCESS');
-        } catch (err: unknown) {
+        } catch (validationError: unknown) {
           console.error('[Controller] ❌ Validation FAILED');
-          console.error('[Controller] Error:', err.message);
-          if (err.issues) {
-            console.error('[Controller] Issues:', JSON.stringify(err.issues, null, 2));
+          if (validationError instanceof Error) {
+            console.error('[Controller] Error:', validationError.message);
+            if ('issues' in validationError && validationError.issues) {
+              console.error('[Controller] Issues:', JSON.stringify(validationError.issues, null, 2));
+            }
           }
         }
         

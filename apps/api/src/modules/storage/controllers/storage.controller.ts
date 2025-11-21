@@ -6,9 +6,11 @@ import { FileMetadataService } from "../services/file-metadata.service";
 import { VideoProcessingService } from "@/core/modules/video-processing";
 import { StorageEventService } from "../events/storage.event";
 import { FfmpegService } from "@/core/modules/ffmpeg/services/ffmpeg.service";
-import { FileStorageService } from "@/core/modules/file-storage/file-storage.service";
+import { FileUploadService } from "@/core/modules/file-upload/file-upload.service";
 import { storageContract } from "@repo/api-contracts";
-import { readFile, stat } from "fs/promises";
+import { join } from "path";
+import { UPLOADS_DIR } from "@/config/multer.config";
+import { readFile } from "fs/promises";
 
 @Controller()
 export class StorageController {
@@ -20,74 +22,54 @@ export class StorageController {
         private readonly videoProcessingService: VideoProcessingService,
         private readonly storageEventService: StorageEventService,
         private readonly ffmpegService: FfmpegService,
-        private readonly fileStorageService: FileStorageService
+        private readonly fileUploadService: FileUploadService
     ) {}
 
     /**
      * Upload image endpoint - implements ORPC contract with file upload
-     * File is parsed by FileUploadMiddleware:
-     * - input.file: Web API File object (for ORPC validation)
-     * - input._multerFiles.file: Multer metadata (for server-generated filename)
+     * File.name contains the server-generated filename from multer
      */
     @Implement(storageContract.uploadImage)
     uploadImage() {
         return implement(storageContract.uploadImage).handler(async ({ input, context }) => {
             try {
                 console.log("[StorageController] uploadImage handler called");
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-                console.log("[StorageController] Raw input keys:", Object.keys(input as any));
-                console.log("[StorageController] input.file type:", typeof input.file);
-                console.log("[StorageController] input.file constructor:", input.file.constructor.name);
-                console.log("[StorageController] input.file instanceof File:", input.file instanceof File);
-
-                // Get Multer file metadata for server-generated filename
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-                const multerMetadata = (input as any)._multerFiles?.file as { filename: string; originalname: string; path: string; size: number; mimetype: string } | undefined;
+                
+                const file: File = input;
 
                 console.log("[StorageController] File info:", {
-                    hasInputFile: !!input.file,
-                    inputFileName: input.file.name,
-                    inputFileSize: input.file.size,
-                    hasMulterMetadata: !!multerMetadata,
-                    serverFilename: multerMetadata?.filename,
+                    serverFilename: file.name,
+                    fileSize: file.size,
+                    mimeType: file.type,
                 });
 
-                if (!multerMetadata) {
-                    console.error("[StorageController] NO MULTER METADATA!");
-                    throw new ORPCError("BAD_REQUEST", {
-                        message: "No file metadata found",
-                    });
-                }
+                // Get full path from FileUploadService using file properties
+                const absoluteFilePath = this.fileUploadService.getFilePath(file.name, file.type);
+                const relativePath = this.fileUploadService.getRelativePath(file.type, file.name);
 
-                // Build file paths
-                const relativePath = this.fileMetadataService.buildRelativePath(input.file.type, multerMetadata.filename);
-                const absoluteFilePath = multerMetadata.path;
-
-                // Insert into database via service (service will extract metadata and use repository)
+                // Insert into database via service
                 const dbResult = await this.fileMetadataService.createImageFile({
                     filePath: relativePath,
                     absoluteFilePath,
-                    filename: input.file.name,
-                    storedFilename: multerMetadata.filename,
-                    mimeType: input.file.type,
-                    size: input.file.size,
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-                    uploadedBy: context.user?.id,
+                    filename: file.name,
+                    storedFilename: file.name,
+                    mimeType: file.type,
+                    size: file.size,
+                    uploadedBy: (context as { user?: { id: string } }).user?.id,
                 });
 
                 console.log("[StorageController] uploadImage successful:", {
-                    originalName: input.file.name,
-                    serverFilename: multerMetadata.filename,
-                    size: input.file.size,
-                    mimeType: input.file.type,
+                    serverFilename: file.name,
+                    size: file.size,
+                    mimeType: file.type,
                     dbFileId: dbResult.file.id,
                 });
 
                 return {
-                    filename: multerMetadata.filename,
-                    path: `/storage/files/${multerMetadata.filename}`,
-                    size: input.file.size,
-                    mimeType: input.file.type,
+                    filename: file.name,
+                    path: `/storage/files/${file.name}`,
+                    size: file.size,
+                    mimeType: file.type,
                 };
             } catch (error) {
                 console.error("[StorageController] Error in uploadImage:", error);
@@ -98,47 +80,36 @@ export class StorageController {
 
     /**
      * Upload video endpoint - implements ORPC contract with file upload
-     * File is parsed by FileUploadMiddleware:
-     * - input.file: Web API File object (for ORPC validation)
-     * - input._multerFiles.file: Multer metadata (for server-generated filename)
+     * File.name contains the server-generated filename from multer
      */
     @Implement(storageContract.uploadVideo)
     uploadVideo() {
         return implement(storageContract.uploadVideo).handler(async ({ input, context }) => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            const multerMetadata = (input as any)._multerFiles?.file as { filename: string; originalname: string; path: string; size: number; mimetype: string } | undefined;
+            const file: File = input;
 
-            if (!input.file || !multerMetadata) {
-                throw new ORPCError("BAD_REQUEST", {
-                    message: "No file uploaded",
-                });
-            }
+            // File properties from multer
+            const finalFilename = file.name;
+            const finalMimeType = file.type;
+            const finalSize = file.size;
 
-            // Convert video to H.264 format BEFORE saving to database
-            // This ensures all videos are in a consistent format for processing
-            const finalFilePath = multerMetadata.path;
-            const finalFilename = multerMetadata.filename;
-            const finalMimeType = multerMetadata.mimetype;
-            const finalSize = multerMetadata.size;
-
-            // Build file paths using the final (possibly converted) filename
-            const relativePath = this.fileMetadataService.buildRelativePath(finalMimeType, finalFilename);
+            // Get full path from FileUploadService using file properties
+            const finalFilePath = this.fileUploadService.getFilePath(finalFilename, finalMimeType);
+            const relativePath = this.fileUploadService.getRelativePath(finalMimeType, finalFilename);
 
             // Insert into database via service (service will extract metadata and use repository)
             const dbResult = await this.fileMetadataService.createVideoFile({
                 filePath: relativePath,
                 absoluteFilePath: finalFilePath,
-                filename: input.file.name,
+                filename: file.name,
                 storedFilename: finalFilename,
                 mimeType: finalMimeType,
                 size: finalSize,
-                /* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-                uploadedBy: context.user?.id,
+                uploadedBy: (context as { user?: { id: string } }).user?.id,
             });
 
             // Start async video processing in background (non-blocking)
             this.storageEventService
-                .startProcessing("videoProcessing", { videoId: dbResult.videoMetadata.id }, ({ abortSignal, emit }) => {
+                .startProcessing("videoProcessing", { fileId: dbResult.file.id }, ({ abortSignal, emit }) => {
                     return this.videoProcessingService
                         .processVideo(
                             finalFilePath,
@@ -199,7 +170,6 @@ export class StorageController {
                 });
 
             console.log("[StorageController] uploadVideo successful:", {
-                originalName: input.file.name,
                 serverFilename: finalFilename,
                 size: finalSize,
                 mimeType: finalMimeType,
@@ -223,51 +193,40 @@ export class StorageController {
 
     /**
      * Upload audio endpoint - implements ORPC contract with file upload
-     * File is parsed by FileUploadMiddleware:
-     * - input.file: Web API File object (for ORPC validation)
-     * - input._multerFiles.file: Multer metadata (for server-generated filename)
+     * File.name contains the server-generated filename from multer
      */
     @Implement(storageContract.uploadAudio)
     uploadAudio() {
         return implement(storageContract.uploadAudio).handler(async ({ input, context }) => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            const multerMetadata = (input as any)._multerFiles?.file as { filename: string; originalname: string; path: string; size: number; mimetype: string } | undefined;
+            const file: File = input;
 
-            if (!input.file || !multerMetadata) {
-                throw new ORPCError("BAD_REQUEST", {
-                    message: "No file uploaded",
-                });
-            }
+            // Get full path from FileUploadService using file properties
+            const absoluteFilePath = this.fileUploadService.getFilePath(file.name, file.type);
+            const relativePath = this.fileUploadService.getRelativePath(file.type, file.name);
 
-            // Build file paths
-            const relativePath = this.fileMetadataService.buildRelativePath(input.file.type, multerMetadata.filename);
-            const absoluteFilePath = multerMetadata.path;
-
-            // Insert into database via service (service will extract metadata and use repository)
+            // Insert into database via service
             const dbResult = await this.fileMetadataService.createAudioFile({
                 filePath: relativePath,
                 absoluteFilePath,
-                filename: input.file.name,
-                storedFilename: multerMetadata.filename,
-                mimeType: input.file.type,
-                size: input.file.size,
-                /* eslint-disable-next-line @typescript-eslint/no-unsafe-member-access */
-                uploadedBy: context.user?.id as string | undefined,
+                filename: file.name,
+                storedFilename: file.name,
+                mimeType: file.type,
+                size: file.size,
+                uploadedBy: (context as { user?: { id: string } }).user?.id,
             });
 
             console.log("[StorageController] uploadAudio successful:", {
-                originalName: input.file.name,
-                serverFilename: multerMetadata.filename,
-                size: input.file.size,
-                mimeType: input.file.type,
+                serverFilename: file.name,
+                size: file.size,
+                mimeType: file.type,
                 dbFileId: dbResult.file.id,
             });
 
             return {
-                filename: multerMetadata.filename,
-                path: `/storage/files/${multerMetadata.filename}`,
-                size: input.file.size,
-                mimeType: input.file.type,
+                filename: file.name,
+                path: `/storage/files/${file.name}`,
+                size: file.size,
+                mimeType: file.type,
             };
         });
     }
@@ -309,11 +268,11 @@ export class StorageController {
     @Implement(storageContract.getVideo)
     getVideo() {
         return implement(storageContract.getVideo).handler(async ({ input }) => {
-            const { videoId } = input;
+            const { fileId } = input;
 
             // Get video with metadata from database
-            const result = await this.fileMetadataService.getVideoByFileId(videoId);
-            if (!result || !result.file) {
+            const result = await this.fileMetadataService.getVideoByFileId(fileId);
+            if (!result?.file) {
                 throw new ORPCError("NOT_FOUND", {
                     message: "Video not found",
                 });
@@ -322,7 +281,7 @@ export class StorageController {
             const video = result.file;
 
             // Get absolute path and read file
-            const videoPath = this.fileStorageService.getAbsolutePath(video.filePath);
+            const videoPath = join(UPLOADS_DIR, video.filePath);
             const buffer = await readFile(videoPath);
 
             // Return as File object
@@ -343,11 +302,11 @@ export class StorageController {
         const storageEventService = this.storageEventService;
         const fileMetadataService = this.fileMetadataService;
         return implement(storageContract.subscribeVideoProcessing).handler(async function* ({ input }) {
-            const { videoId } = input;
+            const { fileId } = input;
 
             // Get current video processing state
-            const result = await fileMetadataService.getVideoByFileId(videoId);
-            if (!result || !result.file || !result.videoMetadata) {
+            const result = await fileMetadataService.getVideoByFileId(fileId);
+            if (!result?.file || !result.videoMetadata) {
                 throw new ORPCError("NOT_FOUND", {
                     message: "Video not found",
                 });
@@ -373,7 +332,7 @@ export class StorageController {
             };
 
             // Subscribe to video processing events
-            const subscription = storageEventService.subscribe("videoProcessing", { videoId });
+            const subscription = storageEventService.subscribe("videoProcessing", { fileId });
 
             // Yield events as they arrive - completion detected by iterator end
             for await (const event of subscription) {

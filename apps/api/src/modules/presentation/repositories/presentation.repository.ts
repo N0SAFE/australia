@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '@/core/modules/database/services/database.service';
-import { FileStorageService } from '@/core/modules/file-storage/file-storage.service';
 import { presentationVideo } from '@/config/drizzle/schema/presentation';
 import { eq } from 'drizzle-orm';
+import { join } from 'path';
+import { UPLOADS_DIR } from '@/config/multer.config';
 
 export interface PresentationVideoData {
   filePath: string;
@@ -24,7 +25,6 @@ export type PresentationVideoRecord = typeof presentationVideo.$inferSelect;
 export class PresentationRepository {
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly fileStorageService: FileStorageService,
   ) {}
 
   /**
@@ -119,7 +119,7 @@ export class PresentationRepository {
     }
 
     // Convert relative path to absolute path for FFmpeg
-    return this.fileStorageService.getAbsolutePath(result[0].filePath);
+    return join(UPLOADS_DIR, result[0].filePath);
   }
 
   /**

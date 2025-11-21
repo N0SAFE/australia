@@ -10,7 +10,7 @@ import { z } from 'zod';
  * @example
  * ```typescript
  * // Client-side subscription
- * for await (const event of client.storage.subscribeVideoProcessing({ videoId: 'uuid-123' })) {
+ * for await (const event of client.storage.subscribeVideoProcessing({ fileId: 'uuid-123' })) {
  *   console.log(`${event.progress}% - ${event.message}`);
  *   if (event.status === 'completed') break;
  * }
@@ -19,11 +19,11 @@ import { z } from 'zod';
 export const subscribeVideoProcessingContract = oc
   .route({
     method: 'GET',
-    path: '/subscribe/video/:videoId',
+    path: '/subscribe/video/:fileId',
   })
   .input(
     z.object({
-      videoId: z.string().uuid(),
+      fileId: z.string().uuid(),
     })
   )
   .output(

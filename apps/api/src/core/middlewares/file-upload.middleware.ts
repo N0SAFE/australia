@@ -28,6 +28,41 @@ export class FileUploadMiddleware implements NestMiddleware {
     });
   }
 
+  /**
+   * Create a Web API File object from multer file
+   * The file.name will be the server-generated filename for storage
+   * Controllers can access the stored file path via file.name
+   */
+  private async createWebFile(
+    multerFile: Express.Multer.File,
+    readFile: (path: string) => Promise<Buffer>
+  ): Promise<File> {
+    // For videos and large files, create File object without reading entire file
+    const isLargeFile = multerFile.size > 10 * 1024 * 1024;
+    
+    let webFile: File;
+    if (isLargeFile) {
+      // Use server-generated filename so controllers can reference it
+      webFile = new File([], multerFile.filename, {
+        type: multerFile.mimetype,
+      });
+      // Override size property to reflect actual file size
+      Object.defineProperty(webFile, 'size', {
+        value: multerFile.size,
+        writable: false,
+      });
+    } else {
+      // For small files, read into memory
+      const buffer = await readFile(multerFile.path);
+      // Use server-generated filename
+      webFile = new File([buffer], multerFile.filename, {
+        type: multerFile.mimetype,
+      });
+    }
+
+    return webFile;
+  }
+
   use(req: Request, res: Response, next: NextFunction) {
     const contentType = req.headers['content-type'] ?? '';
 
@@ -55,44 +90,32 @@ export class FileUploadMiddleware implements NestMiddleware {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           const body = ((req as any).body as Record<string, any> | undefined) ?? {};
 
-          // Convert each Multer file to Web API File object
+          // Group files by fieldname to support multiple files per field
+          const filesByField = new Map<string, Express.Multer.File[]>();
+          
           if (multerFiles && multerFiles.length > 0) {
             for (const multerFile of multerFiles) {
-              
-              // For videos and large files, create File object without reading entire file
-              const isLargeFile = multerFile.size > 10 * 1024 * 1024;
-              
-              let webFile: File;
-              if (isLargeFile) {
-                webFile = new File([], multerFile.originalname, {
-                  type: multerFile.mimetype,
-                });
-                // Override size property to reflect actual file size
-                Object.defineProperty(webFile, 'size', {
-                  value: multerFile.size,
-                  writable: false,
-                });
-              } else {
-                // For small files, read into memory as before
-                const buffer = await readFile(multerFile.path);
-                webFile = new File([buffer], multerFile.originalname, {
-                  type: multerFile.mimetype,
-                });
-              }
+              const existing = filesByField.get(multerFile.fieldname) ?? [];
+              existing.push(multerFile);
+              filesByField.set(multerFile.fieldname, existing);
+            }
+          }
 
-              // Inject the File object into the body for ORPC to parse
-              // ORPC will see this in input[fieldname]
-              body[multerFile.fieldname] = webFile;
-              
-              // Also keep multer file metadata under a special key for accessing the generated filename
-              body._multerFiles ??= {};
-              (body._multerFiles as Record<string, any>)[multerFile.fieldname] = {
-                filename: multerFile.filename,
-                originalname: multerFile.originalname,
-                path: multerFile.path,
-                size: multerFile.size,
-                mimetype: multerFile.mimetype,
-              };
+          // Convert each Multer file to Web API File object
+          for (const [fieldname, files] of filesByField.entries()) {
+            if (files.length === 1) {
+              // Single file - attach directly to field
+              const multerFile = files[0];
+              const webFile = await this.createWebFile(multerFile, readFile);
+              body[fieldname] = webFile;
+            } else {
+              // Multiple files - attach as array
+              const webFiles: File[] = [];
+              for (const multerFile of files) {
+                const webFile = await this.createWebFile(multerFile, readFile);
+                webFiles.push(webFile);
+              }
+              body[fieldname] = webFiles;
             }
           }
 

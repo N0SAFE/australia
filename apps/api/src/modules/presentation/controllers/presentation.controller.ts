@@ -2,44 +2,49 @@ import { Controller } from '@nestjs/common';
 import { Implement, implement } from '@orpc/nest';
 import { ORPCError } from '@orpc/server';
 import { PresentationService } from '../services/presentation.service';
+import { FileUploadService } from '@/core/modules/file-upload/file-upload.service';
 import { presentationContract } from '@repo/api-contracts';
 import { readFile } from 'fs/promises';
 
 @Controller()
 export class PresentationController {
   
-  constructor(private readonly presentationService: PresentationService) {}
+  constructor(
+    private readonly presentationService: PresentationService,
+    private readonly fileUploadService: FileUploadService
+  ) {}
 
   /**
    * Upload presentation video endpoint - implements ORPC contract with file upload
-   * File is parsed by FileUploadMiddleware:
-   * - input.file: Web API File object (for ORPC validation)
-   * - input._multerFiles.file: Multer metadata (for server-generated filename)
+   * File is parsed by FileUploadMiddleware which provides a clean File object
+   * with the server-generated filename as file.name
    */
   @Implement(presentationContract.upload)
   upload() {
     return implement(presentationContract.upload).handler(async ({ input }) => {
       try {
-        // Get Multer file metadata for server-generated filename
-        const multerInput = input
-        const multerMetadata = multerInput._multerFiles?.file;
+        const file: File = input;
         
-        if (!multerMetadata) {
+        if (!file) {
           throw new ORPCError('BAD_REQUEST', {
-            message: 'No file uploaded or file metadata missing',
+            message: 'No file uploaded',
           });
         }
 
-        // Create Express.Multer.File from metadata
+        // Get full path from FileUploadService using file properties
+        const fullPath = this.fileUploadService.getFilePath(file.name, file.type);
+        
+        // Create Express.Multer.File using clean File properties
+        // file.name contains the server-generated filename from multer
         const multerFile: Express.Multer.File = {
           fieldname: 'file',
-          originalname: multerMetadata.originalname,
+          originalname: file.name, // This is actually the server-generated filename
           encoding: '7bit',
-          mimetype: multerMetadata.mimetype,
-          size: multerInput.file.size,
+          mimetype: file.type,
+          size: file.size,
           destination: '',
-          filename: multerMetadata.filename,
-          path: multerMetadata.path,
+          filename: file.name, // Server-generated filename
+          path: fullPath, // Full absolute path from FileUploadService
           buffer: Buffer.from([]),
         } as Express.Multer.File;
 

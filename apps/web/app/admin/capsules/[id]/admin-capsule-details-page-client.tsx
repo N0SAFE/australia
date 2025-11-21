@@ -290,7 +290,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
                       sanitizeFilename(file.name),
                       { type: file.type },
                     );
-                    const result = await orpcWithUploads.storage.uploadImage(
+                    const result = await orpcWithUploads.storage.uploadImage.call(
                       sanitizedFile,
                       {
                         onProgress,

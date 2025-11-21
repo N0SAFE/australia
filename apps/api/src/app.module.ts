@@ -12,7 +12,7 @@ import { onError, ORPCModule } from "@orpc/nest";
 import { DATABASE_CONNECTION } from "./core/modules/database/database-connection";
 import { AuthModule } from "./core/modules/auth/auth.module";
 import { LoggerMiddleware } from "./core/middlewares/logger.middleware";
-import { FileUploadMiddleware } from "./core/middlewares/file-upload.middleware";
+import { FileUploadModule, FileUploadMiddleware } from "./core/modules/file-upload";
 import { createBetterAuth } from "./config/auth/auth";
 import { EnvService } from "./config/env/env.service";
 import { EnvModule } from "./config/env/env.module";
@@ -21,7 +21,6 @@ import { AuthGuard } from "./core/modules/auth/guards/auth.guard";
 import { RoleGuard } from "./core/modules/auth/guards/role.guard";
 import { REQUEST } from '@nestjs/core'
 import { StorageModule } from "./modules/storage/storage.module";
-import { FileStorageModule } from "./core/modules/file-storage/file-storage.module";
 import { PresentationModule } from "./modules/presentation/presentation.module";
 import { FfmpegModule } from "./core/modules/ffmpeg/ffmpeg.module";
 import { EventsModule } from "./core/modules/events/events.module";
@@ -31,7 +30,7 @@ import { EventsModule } from "./core/modules/events/events.module";
     EnvModule,
     DatabaseModule,
     EventsModule,
-    FileStorageModule,
+    FileUploadModule,
     FfmpegModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, EnvModule],

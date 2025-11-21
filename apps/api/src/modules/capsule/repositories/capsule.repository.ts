@@ -6,8 +6,9 @@ import { capsuleCreateInput, capsuleUpdateInput, capsuleListInput, capsuleFindBy
 import { z } from "zod";
 import { randomUUID } from "crypto";
 
-export type CreateCapsuleInput = z.infer<typeof capsuleCreateInput>;
-export type UpdateCapsuleInput = z.infer<typeof capsuleUpdateInput>;
+// Repository input types exclude media field (handled by service layer)
+export type CreateCapsuleInput = Omit<z.infer<typeof capsuleCreateInput>, 'media'>;
+export type UpdateCapsuleInput = Omit<z.infer<typeof capsuleUpdateInput>, 'media'>;
 export type GetCapsulesInput = z.infer<typeof capsuleListInput>;
 export type GetCapsuleOutput = z.infer<typeof capsuleFindByIdOutput>;
 

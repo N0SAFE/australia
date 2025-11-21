@@ -1,16 +1,155 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CapsuleRepository, type CreateCapsuleInput, type UpdateCapsuleInput, type GetCapsulesInput } from '../repositories/capsule.repository';
+import { CapsuleRepository, type GetCapsulesInput } from '../repositories/capsule.repository';
 import type { User } from '@repo/auth';
+import { FileUploadService } from '@/core/modules/file-upload/file-upload.service';
+import { FileMetadataService } from '@/modules/storage/services/file-metadata.service';
+import { z } from 'zod';
+import { capsuleCreateInput, capsuleUpdateInput } from '@repo/api-contracts';
+
+// Service input types include media field (from API contract)
+type CreateCapsuleInput = z.infer<typeof capsuleCreateInput>;
+type UpdateCapsuleInput = z.infer<typeof capsuleUpdateInput>;
 
 @Injectable()
 export class CapsuleService {
-  constructor(private readonly capsuleRepository: CapsuleRepository) {}
+  constructor(
+    private readonly capsuleRepository: CapsuleRepository,
+    private readonly fileUploadService: FileUploadService,
+    private readonly fileMetadataService: FileMetadataService,
+  ) {}
 
   /**
-   * Create a new capsule
+   * Upload a file and save to database
+   */
+  private async uploadAndSaveFile(file: File, type: 'image' | 'video' | 'audio'): Promise<string> {
+    // File properties from multer
+    const filename = file.name;
+    const mimeType = file.type;
+    const size = file.size;
+
+    // Get file paths
+    const absoluteFilePath = this.fileUploadService.getFilePath(filename, mimeType);
+    const relativePath = this.fileUploadService.getRelativePath(mimeType, filename);
+
+    // Save to database based on type
+    let dbResult: { file: { id: string } };
+    
+    switch (type) {
+      case 'image':
+        dbResult = await this.fileMetadataService.createImageFile({
+          filePath: relativePath,
+          absoluteFilePath,
+          filename,
+          storedFilename: filename,
+          mimeType,
+          size,
+        });
+        break;
+      
+      case 'video':
+        dbResult = await this.fileMetadataService.createVideoFile({
+          filePath: relativePath,
+          absoluteFilePath,
+          filename,
+          storedFilename: filename,
+          mimeType,
+          size,
+        });
+        break;
+      
+      case 'audio':
+        dbResult = await this.fileMetadataService.createAudioFile({
+          filePath: relativePath,
+          absoluteFilePath,
+          filename,
+          storedFilename: filename,
+          mimeType,
+          size,
+        });
+        break;
+    }
+
+    return dbResult.file.id;
+  }
+
+  /**
+   * Replace uniqueId references in Plate.js content with actual fileIds
+   */
+  private replaceUniqueIdsInContent(content: string, uniqueIdToFileIdMap: Map<string, string>): string {
+    try {
+      const plateData = JSON.parse(content);
+      
+      // Recursively traverse Plate.js content tree
+      const replaceInNode = (node: unknown): unknown => {
+        if (typeof node !== 'object' || node === null) {
+          return node;
+        }
+
+        if (Array.isArray(node)) {
+          return node.map(replaceInNode);
+        }
+
+        const obj = node as Record<string, unknown>;
+        const newObj: Record<string, unknown> = {};
+
+        for (const [key, value] of Object.entries(obj)) {
+          // Check for url properties containing uniqueIds
+          if (key === 'url' && typeof value === 'string') {
+            // Check if the URL contains a uniqueId
+            for (const [uniqueId, fileId] of uniqueIdToFileIdMap.entries()) {
+              if (value.includes(uniqueId)) {
+                // Replace uniqueId with fileId in URL
+                newObj[key] = value.replace(uniqueId, fileId);
+                continue;
+              }
+            }
+            newObj[key] = value;
+          } else if (typeof value === 'object' && value !== null) {
+            newObj[key] = replaceInNode(value);
+          } else {
+            newObj[key] = value;
+          }
+        }
+
+        return newObj;
+      };
+
+      const updatedPlateData = replaceInNode(plateData);
+      return JSON.stringify(updatedPlateData);
+    } catch (error) {
+      console.error('Error replacing uniqueIds in content:', error);
+      return content; // Return original if parsing fails
+    }
+  }
+
+  /**
+   * Create a new capsule with media handling
    */
   async createCapsule(input: CreateCapsuleInput) {
-    return await this.capsuleRepository.create(input);
+    // Handle media uploads if provided
+    const uniqueIdToFileIdMap = new Map<string, string>();
+    
+    if (input.media && input.media.added && input.media.added.length > 0) {
+      // Upload all new files
+      for (const mediaItem of input.media.added) {
+        const fileId = await this.uploadAndSaveFile(mediaItem.file, mediaItem.type);
+        uniqueIdToFileIdMap.set(mediaItem.uniqueId, fileId);
+      }
+    }
+
+    // Replace uniqueIds in content with actual fileIds
+    const processedContent = uniqueIdToFileIdMap.size > 0
+      ? this.replaceUniqueIdsInContent(input.content, uniqueIdToFileIdMap)
+      : input.content;
+
+    // Create capsule with processed content
+    // Omit media field as it's handled separately
+    const { media, ...capsuleData } = input;
+    
+    return await this.capsuleRepository.create({
+      ...capsuleData,
+      content: processedContent,
+    });
   }
 
   /**
@@ -64,7 +203,7 @@ export class CapsuleService {
   }
 
   /**
-   * Update capsule by ID
+   * Update capsule by ID with media handling
    */
   async updateCapsule(id: string, input: Omit<UpdateCapsuleInput, "id">) {
     const existingCapsule = await this.capsuleRepository.findById(id);
@@ -72,7 +211,31 @@ export class CapsuleService {
       return null;
     }
 
-    return await this.capsuleRepository.update(id, input);
+    // Handle media uploads if provided
+    const uniqueIdToFileIdMap = new Map<string, string>();
+    
+    if (input.media && input.media.added && input.media.added.length > 0) {
+      // Upload all new files
+      for (const mediaItem of input.media.added) {
+        const fileId = await this.uploadAndSaveFile(mediaItem.file, mediaItem.type);
+        uniqueIdToFileIdMap.set(mediaItem.uniqueId, fileId);
+      }
+    }
+
+    // Replace uniqueIds in content with actual fileIds (if content is being updated)
+    let processedContent = input.content;
+    if (input.content && uniqueIdToFileIdMap.size > 0) {
+      processedContent = this.replaceUniqueIdsInContent(input.content, uniqueIdToFileIdMap);
+    }
+
+    // Update capsule with processed content
+    // Omit media field as it's handled separately
+    const { media, ...capsuleData } = input;
+    
+    return await this.capsuleRepository.update(id, {
+      ...capsuleData,
+      content: processedContent,
+    });
   }
 
   /**

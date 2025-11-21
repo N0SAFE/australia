@@ -125,7 +125,7 @@ export function VideoNodeView(props: NodeViewProps) {
       {/* Video Element */}
       <div className="relative w-full overflow-hidden rounded">
         <video
-          src={resolvedSrc}
+          src={resolvedSrc || undefined}
           title={(title as string | undefined) ?? "Video"}
           controls={controls as boolean}
           height={(height as string | undefined) ?? undefined}

@@ -11,28 +11,6 @@ import {
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-
-/**
- * Sanitize filename to ASCII-safe characters for HTTP headers
- * Replaces accented characters and special chars with ASCII equivalents
- */
-function sanitizeFilename(filename: string): string {
-  // Get extension
-  const lastDotIndex = filename.lastIndexOf(".");
-  const name =
-    lastDotIndex >= 0 ? filename.substring(0, lastDotIndex) : filename;
-  const ext = lastDotIndex >= 0 ? filename.substring(lastDotIndex) : "";
-
-  // Normalize to NFD (decomposed form) and remove diacritics
-  const normalized = name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
-    .replace(/[^a-zA-Z0-9_-]/g, "_") // Replace non-ASCII with underscore
-    .replace(/_+/g, "_") // Collapse multiple underscores
-    .replace(/^_|_$/g, ""); // Remove leading/trailing underscores
-
-  return normalized + ext;
-}
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -51,8 +29,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Unlock } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import dynamic from "next/dynamic";
-import { orpc } from "@/lib/orpc";
-import { withFileUploads } from "@/lib/orpc/withFileUploads";
+import { useCapsuleMedia } from "@/hooks/useCapsuleMedia";
 
 const SimpleEditor = dynamic(
   () =>
@@ -102,8 +79,14 @@ export const AdminCapsuleDetailsPageClient: FC<{
   const { mutate: updateCapsule, isPending: isUpdating } = useUpdateCapsule();
   const router = useRouter();
   
-  // Use the enhanced ORPC client with automatic file upload handling
-  const orpcWithUploads = withFileUploads(orpc);
+  // Use the capsule media tracking hook
+  const { 
+    getUploadFunctions, 
+    getMediaForSubmit, 
+    setKeptMedia,
+    extractFileIdsFromContent,
+    resetMedia 
+  } = useCapsuleMedia();
 
   // Update local state when capsule data loads
   useEffect(() => {
@@ -145,6 +128,11 @@ export const AdminCapsuleDetailsPageClient: FC<{
         if (parsed && typeof parsed === "object") {
           setEditorValue(parsed);
           console.log("💾 [AdminCapsule] Editor value set");
+          
+          // Extract existing file IDs from content and set as kept media
+          const fileIds = extractFileIdsFromContent(capsule.content);
+          console.log("📎 [AdminCapsule] Extracted file IDs:", fileIds);
+          setKeptMedia(fileIds);
         }
       } catch (error) {
         console.error(
@@ -155,7 +143,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
         setEditorValue(getEmptyValue());
       }
     }
-  }, [capsule?.content]);
+  }, [capsule?.content, extractFileIdsFromContent, setKeptMedia]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,23 +151,25 @@ export const AdminCapsuleDetailsPageClient: FC<{
     if (!update || !capsule) return;
 
     try {
-      // Always store Tiptap content as JSON string
-      // Tiptap content can contain text, images, videos, audio, and more
-      const updateData: any = {
-        id: capsule.id,
-        openingDate: date?.toISOString() || state.openingDate,
-        content: JSON.stringify(editorValue),
-        openingMessage: state.openingMessage,
-        isLocked: isLocked,
-        lockType: lockType,
-        lockConfig: state.lockConfig,
-      };
+      // Get media data for submission
+      const mediaData = getMediaForSubmit();
+      
+      console.log("🔵 Submitting capsule update with media:", mediaData);
 
-      console.log("🔵 Submitting capsule update:", updateData);
-
-      updateCapsule(updateData, {
+      updateCapsule(
+        {
+          id: capsule.id,
+          openingDate: date?.toISOString() || state.openingDate,
+          content: JSON.stringify(editorValue),
+          openingMessage: state.openingMessage ?? undefined,
+          isLocked: isLocked,
+          lockType: lockType,
+          lockConfig: state.lockConfig,
+          media: mediaData,
+        }, {
         onSuccess: (result) => {
           console.log("✅ Capsule update successful:", result);
+          resetMedia(); // Clear tracked media
           router.push(`/admin/capsules/${capsuleId}`);
         },
         onError: (error) => {
@@ -282,56 +272,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
                     return `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`;
                   },
                 }}
-                uploadFunctions={{
-                  image: async (file, onProgress, signal) => {
-                    // Sanitize filename to ASCII-safe characters for HTTP headers
-                    const sanitizedFile = new File(
-                      [file],
-                      sanitizeFilename(file.name),
-                      { type: file.type },
-                    );
-                    const result = await orpcWithUploads.storage.uploadImage.call(
-                      sanitizedFile,
-                      {
-                        onProgress,
-                        signal,
-                      }
-                    );
-                    return result.url!;
-                  },
-                  video: async (file, onProgress, signal) => {
-                    // Sanitize filename to ASCII-safe characters for HTTP headers
-                    const sanitizedFile = new File(
-                      [file],
-                      sanitizeFilename(file.name),
-                      { type: file.type },
-                    );
-                    const result = await orpcWithUploads.storage.uploadVideo(
-                      sanitizedFile,
-                      {
-                        onProgress,
-                        signal,
-                      }
-                    );
-                    return result.url!;
-                  },
-                  audio: async (file, onProgress, signal) => {
-                    // Sanitize filename to ASCII-safe characters for HTTP headers
-                    const sanitizedFile = new File(
-                      [file],
-                      sanitizeFilename(file.name),
-                      { type: file.type },
-                    );
-                    const result = await orpcWithUploads.storage.uploadAudio(
-                      sanitizedFile,
-                      {
-                        onProgress,
-                        signal,
-                      }
-                    );
-                    return result.url!;
-                  },
-                }}
+                uploadFunctions={getUploadFunctions()}
               />
             ) : (
               <SimpleViewer

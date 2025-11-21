@@ -96,6 +96,7 @@ import { SimpleEditor } from "@/components/tiptap/editor/index";
 import { JSONContent } from "@repo/ui/tiptap-exports/react";
 import { orpc } from "@/lib/orpc";
 import { withFileUploads } from "@/lib/orpc/withFileUploads";
+import { useCapsuleMedia } from "@/hooks/useCapsuleMedia";
 
 
 /**
@@ -134,6 +135,9 @@ function CreateCapsuleDialog() {
   
   // Use the enhanced ORPC client with automatic file upload handling
   const orpcWithUploads = withFileUploads(orpc);
+  
+  // Use media tracking hook
+  const { getUploadFunctions, getMediaForSubmit, resetMedia } = useCapsuleMedia();
 
   const { mutate: createCapsule, isPending } = useCreateCapsule();
 
@@ -151,15 +155,17 @@ function CreateCapsuleDialog() {
       return;
     }
 
-    // Create capsule with editor content as JSON string
-    // Note: openingMessage is optional and can be empty
+    // Get media data for submission
+    const mediaData = getMediaForSubmit();
+
+    // Create capsule with editor content as JSON string + media
     createCapsule(
       {
-        ...formData,
         openingDate: date.toISOString(),
         content: JSON.stringify(editorValue),
-        // Only include openingMessage if it's not empty
         openingMessage: formData.openingMessage || undefined,
+        isLocked: formData.isLocked,
+        media: mediaData,
       },
       {
         onSuccess: () => {
@@ -172,6 +178,8 @@ function CreateCapsuleDialog() {
             openingMessage: "",
             isLocked: true,
           });
+          // Reset media tracking
+          resetMedia();
         },
         // Error notification is handled by the hook
       },
@@ -254,56 +262,7 @@ function CreateCapsuleDialog() {
                       return `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`;
                     },
                   }}
-                  uploadFunctions={{
-                    image: async (file, onProgress, signal) => {
-                      // Sanitize filename to ASCII-safe characters for HTTP headers
-                      const sanitizedFile = new File(
-                        [file],
-                        sanitizeFilename(file.name),
-                        { type: file.type },
-                      );
-                      const result = await orpcWithUploads.storage.uploadImage(
-                        sanitizedFile,
-                        {
-                          onProgress,
-                          signal,
-                        }
-                      );
-                      return result.url!;
-                    },
-                    video: async (file, onProgress, signal) => {
-                      // Sanitize filename to ASCII-safe characters for HTTP headers
-                      const sanitizedFile = new File(
-                        [file],
-                        sanitizeFilename(file.name),
-                        { type: file.type },
-                      );
-                      const result = await orpcWithUploads.storage.uploadVideo(
-                        sanitizedFile,
-                        {
-                          onProgress,
-                          signal,
-                        }
-                      );
-                      return result.url!;
-                    },
-                    audio: async (file, onProgress, signal) => {
-                      // Sanitize filename to ASCII-safe characters for HTTP headers
-                      const sanitizedFile = new File(
-                        [file],
-                        sanitizeFilename(file.name),
-                        { type: file.type },
-                      );
-                      const result = await orpcWithUploads.storage.uploadAudio(
-                        sanitizedFile,
-                        {
-                          onProgress,
-                          signal,
-                        }
-                      );
-                      return result.url!;
-                    },
-                  }}
+                  uploadFunctions={getUploadFunctions()}
                 />
                 </div>
               </div>

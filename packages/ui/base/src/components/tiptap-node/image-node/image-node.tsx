@@ -64,7 +64,7 @@ export function ImageNodeView(props: NodeViewProps) {
       }}
     >
       <img
-        src={resolvedSrc}
+        src={resolvedSrc || undefined}
         alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
         title={(title as string | undefined) ?? (alt as string | undefined) ?? ""}
         style={{

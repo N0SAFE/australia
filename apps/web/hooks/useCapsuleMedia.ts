@@ -1,190 +1,163 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import type { JSONContent } from '@repo/ui/tiptap-exports/react';
-import type { UploadFunction } from '@repo/ui/components/tiptap-node/image-upload-node/image-upload-node-extension';
 
 export interface TrackedMediaFile {
   file: File;
-  uniqueId: string;
+  contentMediaId: string;
   type: 'image' | 'video' | 'audio';
 }
 
-export interface MediaState {
-  kept: string[]; // File IDs to keep (for editing existing capsules)
-  added: TrackedMediaFile[]; // New files with temporary IDs
-}
-
 /**
- * Generate a unique ID for tracking media files before upload
+ * Determine media type from File object
  */
-function generateUniqueId(): string {
-  return `temp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+function getMediaType(file: File): 'image' | 'video' | 'audio' {
+  if (file.type.startsWith('image/')) return 'image';
+  if (file.type.startsWith('video/')) return 'video';
+  if (file.type.startsWith('audio/')) return 'audio';
+  return 'image'; // fallback
 }
 
 /**
  * Hook to manage media files in capsule creation/editing
  * 
- * This hook provides:
- * - Media state tracking (kept + added files)
- * - Upload functions that track files with uniqueIds instead of uploading
- * - Content extraction to get media data for API submission
+ * This hook provides functions to:
+ * - Extract media nodes with 'local' strategy from editor content
+ * - Convert local nodes to 'contentMediaId' strategy for API submission
+ * - Collect File objects and prepare media data for upload
+ * - Extract kept file IDs from nodes with 'api' strategy
+ * 
+ * Flow:
+ * 1. Upload nodes create media nodes with strategy='local' + blob URL + fileRef + contentMediaId (UUID)
+ * 2. Before submit: processContentForSubmit() extracts local nodes
+ * 3. Extracts contentMediaIds from nodes, updates nodes to strategy='contentMediaId'
+ * 4. Returns updated content + media list for API
  */
 export function useCapsuleMedia() {
-  const [mediaState, setMediaState] = useState<MediaState>({
-    kept: [],
-    added: [],
-  });
-
   /**
-   * Track a new file with a unique ID
-   * Returns the uniqueId to be used in content references
+   * Process editor content before submission:
+   * 1. Find all nodes with strategy='local' (blob URLs)
+   * 2. Extract File objects from fileRef attributes
+   * 3. Extract contentMediaIds that were generated during upload
+   * 4. Update nodes to strategy='contentMediaId' with contentMediaId in src
+   * 5. Return updated content + media list
    */
-  const trackFile = useCallback((file: File, type: 'image' | 'video' | 'audio'): string => {
-    const uniqueId = generateUniqueId();
-    
-    setMediaState(prev => ({
-      ...prev,
-      added: [...prev.added, { file, uniqueId, type }],
-    }));
-
-    return uniqueId;
-  }, []);
-
-  /**
-   * Set kept media (file IDs from existing capsule)
-   */
-  const setKeptMedia = useCallback((fileIds: string[]) => {
-    setMediaState(prev => ({
-      ...prev,
-      kept: fileIds,
-    }));
-  }, []);
-
-  /**
-   * Reset media state
-   */
-  const resetMedia = useCallback(() => {
-    setMediaState({
-      kept: [],
-      added: [],
-    });
-  }, []);
-
-  /**
-   * Get upload functions that track files instead of uploading
-   * These return temporary URLs with uniqueId for editor display
-   */
-  const getUploadFunctions = useCallback((): {
-    image: UploadFunction;
-    video: UploadFunction;
-    audio: UploadFunction;
-  } => ({
-    image: async (
-      file: File, 
-      onProgress?: (event: { progress: number }) => void, 
-      signal?: AbortSignal
-    ) => {
-      const uniqueId = trackFile(file, 'image');
-      
-      // Simulate progress callback if provided
-      if (onProgress) {
-        onProgress({ progress: 100 });
-      }
-      
-      // Return URL with uniqueId embedded (will be replaced on server)
-      return `/storage/temp/${uniqueId}`;
-    },
-    video: async (
-      file: File, 
-      onProgress?: (event: { progress: number }) => void, 
-      signal?: AbortSignal
-    ) => {
-      const uniqueId = trackFile(file, 'video');
-      
-      // Simulate progress callback if provided
-      if (onProgress) {
-        onProgress({ progress: 100 });
-      }
-      
-      // Return URL with uniqueId embedded
-      return `/storage/temp/${uniqueId}`;
-    },
-    audio: async (
-      file: File, 
-      onProgress?: (event: { progress: number }) => void, 
-      signal?: AbortSignal
-    ) => {
-      const uniqueId = trackFile(file, 'audio');
-      
-      // Simulate progress callback if provided
-      if (onProgress) {
-        onProgress({ progress: 100 });
-      }
-      
-      // Return URL with uniqueId embedded
-      return `/storage/temp/${uniqueId}`;
-    },
-  }), [trackFile]);
-
-  /**
-   * Extract media data for API submission
-   */
-  const getMediaForSubmit = useCallback(() => {
-    return {
-      kept: mediaState.kept,
-      added: mediaState.added,
+  const processContentForSubmit = useCallback((content: JSONContent[]): {
+    processedContent: JSONContent[];
+    media: {
+      kept: string[];
+      added: TrackedMediaFile[];
     };
-  }, [mediaState]);
-
-  /**
-   * Extract existing file IDs from capsule content
-   * Used when editing an existing capsule to identify kept media
-   */
-  const extractFileIdsFromContent = useCallback((content: string): string[] => {
-    try {
-      const plateData = JSON.parse(content);
-      const fileIds: string[] = [];
-
-      // Recursively traverse Plate.js content tree
-      const extractFromNode = (node: unknown): void => {
-        if (typeof node !== 'object' || node === null) {
-          return;
+  } => {
+    const addedMedia: TrackedMediaFile[] = [];
+    const keptFileIds = new Set<string>();
+    
+    // First pass: Extract files from original content (before cloning)
+    // We need to do this because fileRef is not serializable and will be lost in JSON clone
+    const fileMap = new Map<string, File>();
+    
+    const extractFiles = (node: JSONContent): void => {
+      if (node.attrs?.strategy === 'local' && node.attrs?.fileRef) {
+        const file = node.attrs.fileRef as File;
+        const blobUrl = node.attrs.src as string;
+        
+        // Validate we have a real File object
+        if (file instanceof File) {
+          console.log('📎 Extracted File:', {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            blobUrl
+          });
+          fileMap.set(blobUrl, file);
+        } else {
+          console.error('❌ Invalid file reference:', file);
         }
-
-        if (Array.isArray(node)) {
-          node.forEach(extractFromNode);
-          return;
+      }
+      
+      // Extract kept file IDs from api strategy nodes
+      if (node.attrs?.strategy === 'api' && node.attrs?.src) {
+        const match = (node.attrs.src as string).match(/\/storage\/files\/([a-zA-Z0-9-]+)/);
+        if (match?.[1]) {
+          keptFileIds.add(match[1]);
         }
-
-        const obj = node as Record<string, unknown>;
-
-        for (const [key, value] of Object.entries(obj)) {
-          // Check for url properties containing file IDs
-          if (key === 'url' && typeof value === 'string') {
-            // Extract file ID from URL (assuming format /storage/files/{fileId})
-            const match = value.match(/\/storage\/files\/([a-zA-Z0-9-]+)/);
-            if (match && match[1]) {
-              fileIds.push(match[1]);
-            }
-          } else if (typeof value === 'object' && value !== null) {
-            extractFromNode(value);
+      }
+      
+      if (node.content && Array.isArray(node.content)) {
+        node.content.forEach(extractFiles);
+      }
+    };
+    
+    content.forEach(extractFiles);
+    
+    console.log('📦 File map size:', fileMap.size);
+    
+    // Deep clone content to avoid mutations
+    const processedContent = JSON.parse(JSON.stringify(content)) as JSONContent[];
+    
+    // Second pass: Update cloned content with contentMediaIds
+    const processNode = (node: JSONContent): void => {
+      // Check if this is a media node with local strategy
+      if (node.attrs?.strategy === 'local' && node.attrs?.src) {
+        const blobUrl = node.attrs.src as string;
+        const file = fileMap.get(blobUrl);
+        
+        console.log('🔍 Looking for file with blobUrl:', blobUrl);
+        console.log('🔍 Found file:', file instanceof File ? 'YES' : 'NO', file);
+        
+        if (file) {
+          // Extract the contentMediaId that was generated during upload
+          const contentMediaId = node.attrs.contentMediaId;
+          if (!contentMediaId) {
+            console.error('❌ Missing contentMediaId for local media node');
+            return;
           }
+          
+          const type = getMediaType(file);
+          
+          console.log('✅ Adding media:', { contentMediaId, type, fileName: file.name });
+          
+          // Add to media list
+          addedMedia.push({ file, contentMediaId, type });
+          
+          // Update node to contentMediaId strategy
+          node.attrs.strategy = 'contentMediaId';
+          node.attrs.src = contentMediaId; // Store contentMediaId in src
+          delete node.attrs.fileRef; // Remove file reference (not serializable)
+        } else {
+          console.error('❌ No file found for blobUrl:', blobUrl);
         }
-      };
-
-      extractFromNode(plateData);
-      return fileIds;
-    } catch (error) {
-      console.error('Error extracting file IDs from content:', error);
-      return [];
-    }
+      }
+      
+      // Recursively process children
+      if (node.content && Array.isArray(node.content)) {
+        node.content.forEach(processNode);
+      }
+    };
+    
+    processedContent.forEach(processNode);
+    
+    console.log('📊 Final media summary:', {
+      keptCount: keptFileIds.size,
+      addedCount: addedMedia.length,
+      addedFiles: addedMedia.map(m => ({
+        contentMediaId: m.contentMediaId,
+        type: m.type,
+        fileName: m.file.name,
+        fileSize: m.file.size,
+        isFile: m.file instanceof File
+      }))
+    });
+    
+    return {
+      processedContent,
+      media: {
+        kept: Array.from(keptFileIds),
+        added: addedMedia,
+      },
+    };
   }, []);
 
   return {
-    mediaState,
-    getUploadFunctions,
-    getMediaForSubmit,
-    setKeptMedia,
-    resetMedia,
-    extractFileIdsFromContent,
+    processContentForSubmit,
   };
 }

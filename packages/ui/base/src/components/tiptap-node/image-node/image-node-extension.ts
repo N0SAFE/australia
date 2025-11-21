@@ -62,6 +62,16 @@ export const ImageNode = Node.create<ImageNodeOptions>({
       srcUrlId: {
         default: null,
       },
+      contentMediaId: {
+        default: null, // UUID linking content node to capsule media record
+      },
+      strategy: {
+        default: 'api', // 'local' for blob URLs, 'api' for server files, 'contentMediaId' for pending/uploaded
+      },
+      fileRef: {
+        default: null, // Store File reference for local strategy (not serialized)
+        rendered: false,
+      },
       alt: {
         default: null,
       },
@@ -76,6 +86,9 @@ export const ImageNode = Node.create<ImageNodeOptions>({
       },
       align: {
         default: "center",
+      },
+      meta: {
+        default: null,
       },
     }
   },

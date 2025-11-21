@@ -137,7 +137,7 @@ function CreateCapsuleDialog() {
   const orpcWithUploads = withFileUploads(orpc);
   
   // Use media tracking hook
-  const { getUploadFunctions, getMediaForSubmit, resetMedia } = useCapsuleMedia();
+  const { processContentForSubmit } = useCapsuleMedia();
 
   const { mutate: createCapsule, isPending } = useCreateCapsule();
 
@@ -155,17 +155,19 @@ function CreateCapsuleDialog() {
       return;
     }
 
-    // Get media data for submission
-    const mediaData = getMediaForSubmit();
+    // Process content: extract local nodes, convert to uniqueId strategy, collect files
+    const { processedContent, media } = processContentForSubmit(
+      Array.isArray(editorValue) ? editorValue : [editorValue]
+    );
 
-    // Create capsule with editor content as JSON string + media
+    // Create capsule with processed content + media
     createCapsule(
       {
         openingDate: date.toISOString(),
-        content: JSON.stringify(editorValue),
+        content: JSON.stringify(processedContent),
         openingMessage: formData.openingMessage || undefined,
         isLocked: formData.isLocked,
-        media: mediaData,
+        media,
       },
       {
         onSuccess: () => {
@@ -178,8 +180,6 @@ function CreateCapsuleDialog() {
             openingMessage: "",
             isLocked: true,
           });
-          // Reset media tracking
-          resetMedia();
         },
         // Error notification is handled by the hook
       },
@@ -262,7 +262,11 @@ function CreateCapsuleDialog() {
                       return `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`;
                     },
                   }}
-                  uploadFunctions={getUploadFunctions()}
+                  uploadFunctions={{
+                    image: async (file) => URL.createObjectURL(file),
+                    video: async (file) => URL.createObjectURL(file),
+                    audio: async (file) => URL.createObjectURL(file),
+                  }}
                 />
                 </div>
               </div>

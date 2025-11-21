@@ -1,7 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DatabaseService } from "../../../core/modules/database/services/database.service";
 import { capsule } from "@/config/drizzle/schema/capsule";
-import { eq, desc, asc, count, and, SQL, gte, lt, lte } from "drizzle-orm";
+import { capsuleMedia } from "@/config/drizzle/schema/capsule-media";
+import { file } from "@/config/drizzle/schema/file";
+import { imageFile } from "@/config/drizzle/schema/file";
+import { videoFile } from "@/config/drizzle/schema/file";
+import { audioFile } from "@/config/drizzle/schema/file";import { eq } from 'drizzle-orm';import { eq, desc, asc, count, and, SQL, gte, lt, lte } from "drizzle-orm";
 import { capsuleCreateInput, capsuleUpdateInput, capsuleListInput, capsuleFindByIdOutput } from "@repo/api-contracts";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -19,9 +23,108 @@ export class CapsuleRepository {
     constructor(private readonly databaseService: DatabaseService) {}
 
     /**
+     * Fetch attached media for a capsule by joining capsuleMedia → file → type-specific tables
+     */
+    private async getAttachedMedia(capsuleId: string) {
+        // Get capsuleMedia records for this capsule
+        const mediaRecords = await this.databaseService.db
+            .select()
+            .from(capsuleMedia)
+            .where(eq(capsuleMedia.capsuleId, capsuleId))
+            .orderBy(capsuleMedia.order);
+
+        // Fetch detailed metadata for each media record
+        const attachedMedia = await Promise.all(
+            mediaRecords.map(async (mediaRecord) => {
+                // Get file record
+                const fileRecord = await this.databaseService.db
+                    .select()
+                    .from(file)
+                    .where(eq(file.id, mediaRecord.fileId))
+                    .limit(1);
+
+                if (fileRecord.length === 0) {
+                    this.logger.warn(`File not found for capsuleMedia record: ${mediaRecord.id}`);
+                    return null;
+                }
+
+                const f = fileRecord[0];
+
+                // Base media object
+                const baseMedia = {
+                    contentMediaId: mediaRecord.contentMediaId,
+                    type: mediaRecord.type as 'image' | 'video' | 'audio',
+                    fileId: f.id,
+                    filePath: f.filePath,
+                    filename: f.filename,
+                    mimeType: f.mimeType,
+                    size: f.size,
+                    createdAt: f.createdAt.toISOString(),
+                };
+
+                // Fetch type-specific metadata
+                if (mediaRecord.type === 'image') {
+                    const imageRecord = await this.databaseService.db
+                        .select()
+                        .from(imageFile)
+                        .where(eq(imageFile.id, f.contentId))
+                        .limit(1);
+
+                    if (imageRecord.length > 0) {
+                        const img = imageRecord[0];
+                        return {
+                            ...baseMedia,
+                            width: img.width,
+                            height: img.height,
+                            thumbnailPath: img.thumbnailPath || null,
+                        };
+                    }
+                } else if (mediaRecord.type === 'video') {
+                    const videoRecord = await this.databaseService.db
+                        .select()
+                        .from(videoFile)
+                        .where(eq(videoFile.id, f.contentId))
+                        .limit(1);
+
+                    if (videoRecord.length > 0) {
+                        const vid = videoRecord[0];
+                        return {
+                            ...baseMedia,
+                            width: vid.width,
+                            height: vid.height,
+                            duration: vid.duration,
+                            thumbnailPath: vid.thumbnailPath || null,
+                        };
+                    }
+                } else if (mediaRecord.type === 'audio') {
+                    const audioRecord = await this.databaseService.db
+                        .select()
+                        .from(audioFile)
+                        .where(eq(audioFile.id, f.contentId))
+                        .limit(1);
+
+                    if (audioRecord.length > 0) {
+                        const aud = audioRecord[0];
+                        return {
+                            ...baseMedia,
+                            duration: aud.duration,
+                        };
+                    }
+                }
+
+                // Return base media if type-specific lookup failed
+                return baseMedia;
+            })
+        );
+
+        // Filter out nulls and return
+        return attachedMedia.filter((media): media is NonNullable<typeof media> => media !== null);
+    }
+
+    /**
      * Transform capsule object for API response (serialize dates and narrow types)
      */
-    private transformCapsule(capsule: {
+    private async transformCapsule(capsule: {
         id: string;
         openingDate: string;
         content: string;
@@ -50,12 +153,29 @@ export class CapsuleRepository {
         unlockedAt: string | null;
         openedAt: string | null;
         isOpened: boolean;
+        attachedMedia: Array<{
+            contentMediaId: string;
+            type: 'image' | 'video' | 'audio';
+            fileId: string;
+            filePath: string;
+            filename: string;
+            mimeType: string;
+            size: number;
+            width?: number;
+            height?: number;
+            duration?: number;
+            thumbnailPath?: string | null;
+            createdAt: string;
+        }>;
         createdAt: string;
         updatedAt: string;
     } | null> {
         if (!capsule) {
             return Promise.resolve(null);
         }
+        
+        // Fetch attached media for this capsule
+        const attachedMedia = await this.getAttachedMedia(capsule.id);
         
         // Return content field directly - it's already Plate.js JSON
         const result = {
@@ -74,6 +194,7 @@ export class CapsuleRepository {
             unlockedAt: capsule.unlockedAt ? capsule.unlockedAt.toISOString() : null,
             openedAt: capsule.openedAt ? capsule.openedAt.toISOString() : null,
             isOpened: capsule.openedAt !== null, // Derived field: true if openedAt is not null
+            attachedMedia, // Include attached media in response
             createdAt: capsule.createdAt.toISOString(),
             updatedAt: capsule.updatedAt.toISOString(),
         };

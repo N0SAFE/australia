@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { orpc } from '@/lib/orpc'
+import { withFileUploads } from '@/lib/orpc/withFileUploads'
 import { toast } from 'sonner'
+
+// Create wrapped ORPC client for file uploads
+const orpcWithUploads = withFileUploads(orpc)
 
 /**
  * Query hook to fetch all capsules with pagination and sorting
@@ -87,7 +91,7 @@ export function useRecentCapsules(options?: { enabled?: boolean }) {
 export function useCreateCapsule() {
   const queryClient = useQueryClient()
   
-  return useMutation(orpc.capsule.create.mutationOptions({
+  return useMutation(orpcWithUploads.capsule.create.mutationOptions({
     onSuccess: (newCapsule) => {
       // Invalidate all capsule list queries
       queryClient.invalidateQueries({ 
@@ -121,7 +125,7 @@ export function useCreateCapsule() {
 export function useUpdateCapsule() {
   const queryClient = useQueryClient()
   
-  return useMutation(orpc.capsule.update.mutationOptions({
+  return useMutation(orpcWithUploads.capsule.update.mutationOptions({
     onSuccess: (updatedCapsule, variables) => {
       // Invalidate the specific capsule query
       queryClient.invalidateQueries({ 

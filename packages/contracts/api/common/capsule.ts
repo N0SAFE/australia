@@ -55,11 +55,28 @@ export const lockConfigSchema = z.union([
   timeBasedLockConfigSchema,
 ]);
 
+// Attached media schema for capsule responses
+export const attachedMediaSchema = z.object({
+  contentMediaId: z.string(), // UUID linking content node to media record
+  type: z.enum(['image', 'video', 'audio']),
+  fileId: z.string(), // File ID in the file table
+  filePath: z.string(), // Path to the file
+  filename: z.string(), // Original filename
+  mimeType: z.string(),
+  size: z.number(),
+  // Type-specific metadata can be added as needed
+  width: z.number().nullable().optional(),
+  height: z.number().nullable().optional(),
+  duration: z.number().nullable().optional(), // For video/audio
+  thumbnailPath: z.string().nullable().optional(), // For video
+  createdAt: z.iso.datetime(),
+});
+
 export const capsuleSchema = z.object({
   id: z.string(),
   openingDate: z.string(), // YYYY-MM-DD format
   
-  // Plate.js content (JSON string that can contain text, images, videos, audio, etc.)
+  // Plate.js content (JSON string with contentMediaId references in media nodes)
   content: z.string(), // Stores Plate.js Value as JSON string
   
   openingMessage: z.string().nullable(),
@@ -71,6 +88,9 @@ export const capsuleSchema = z.object({
   unlockedAt: z.iso.datetime().nullable(),
   openedAt: z.iso.datetime().nullable(),
   isOpened: z.boolean(), // Derived from openedAt: true if openedAt is not null
+  
+  // Attached media - No need to parse content to find media
+  attachedMedia: z.array(attachedMediaSchema),
   
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),

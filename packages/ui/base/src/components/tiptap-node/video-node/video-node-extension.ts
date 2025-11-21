@@ -70,6 +70,16 @@ export const VideoNode = Node.create<VideoNodeOptions>({
       srcUrlId: {
         default: null,
       },
+      contentMediaId: {
+        default: null, // UUID linking content node to capsule media record
+      },
+      strategy: {
+        default: 'api', // 'local' for blob URLs, 'api' for server files, 'contentMediaId' for pending/uploaded
+      },
+      fileRef: {
+        default: null, // Store File reference for local strategy (not serialized)
+        rendered: false,
+      },
       title: {
         default: null,
       },
@@ -84,6 +94,9 @@ export const VideoNode = Node.create<VideoNodeOptions>({
       },
       align: {
         default: "center",
+      },
+      meta: {
+        default: null,
       },
     }
   },

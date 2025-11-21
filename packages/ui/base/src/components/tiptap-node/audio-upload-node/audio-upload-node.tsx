@@ -439,44 +439,46 @@ export const AudioUploadNode: React.FC<NodeViewProps> = (props) => {
     onError: extension.options.onError,
   }
 
-  const { fileItems, uploadFiles, removeFileItem, clearAllFiles } =
+  const { fileItems, removeFileItem, clearAllFiles } =
     useFileUpload(uploadOptions)
 
-  const handleUpload = async (files: File[]) => {
+  const handleUpload = (files: File[]) => {
     // Prepare files before upload (e.g., sanitize filenames)
     const preparedFiles = extension.options.prepareForUpload
       ? files.map(file => extension.options.prepareForUpload!(file))
       : files
     
-    const urls = await uploadFiles(preparedFiles)
+    // Don't upload - just create local blob URLs with contentMediaId
+    const pos = props.getPos()
 
-    if (urls.length > 0) {
-      const pos = props.getPos()
+    if (isValidPosition(pos)) {
+      const audioNodes = preparedFiles.map((file) => {
+        const blobUrl = URL.createObjectURL(file)
+        const filename = file.name.replace(/\.[^/.]+$/, "") ?? "unknown"
+        const contentMediaId = crypto.randomUUID() // Generate UUID for linking
+        
+        return {
+          type: extension.options.type,
+          attrs: {
+            ...extension.options,
+            src: blobUrl,
+            contentMediaId, // UUID linking content node to capsule media
+            strategy: 'local' as const,
+            fileRef: file, // Store File reference
+            alt: filename,
+            title: filename,
+          },
+        }
+      })
 
-      if (isValidPosition(pos)) {
-        const audioNodes = urls.map((url, index) => {
-          const filename =
-            preparedFiles[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
-          return {
-            type: extension.options.type,
-            attrs: {
-              ...extension.options,
-              src: url,
-              alt: filename,
-              title: filename,
-            },
-          }
-        })
+      props.editor
+        .chain()
+        .focus()
+        .deleteRange({ from: pos, to: pos + props.node.nodeSize })
+        .insertContentAt(pos, audioNodes)
+        .run()
 
-        props.editor
-          .chain()
-          .focus()
-          .deleteRange({ from: pos, to: pos + props.node.nodeSize })
-          .insertContentAt(pos, audioNodes)
-          .run()
-
-        focusNextNode(props.editor)
-      }
+      focusNextNode(props.editor)
     }
   }
 

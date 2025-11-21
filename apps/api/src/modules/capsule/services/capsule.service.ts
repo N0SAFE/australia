@@ -3,6 +3,9 @@ import { CapsuleRepository, type GetCapsulesInput } from '../repositories/capsul
 import type { User } from '@repo/auth';
 import { FileUploadService } from '@/core/modules/file-upload/file-upload.service';
 import { FileMetadataService } from '@/modules/storage/services/file-metadata.service';
+import { DatabaseService } from '@/core/modules/database/services/database.service';
+import { capsuleMedia } from '@/config/drizzle/schema/capsule-media';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { capsuleCreateInput, capsuleUpdateInput } from '@repo/api-contracts';
 
@@ -16,12 +19,19 @@ export class CapsuleService {
     private readonly capsuleRepository: CapsuleRepository,
     private readonly fileUploadService: FileUploadService,
     private readonly fileMetadataService: FileMetadataService,
+    private readonly databaseService: DatabaseService,
   ) {}
 
   /**
-   * Upload a file and save to database
+   * Upload a file, save to database, and create capsuleMedia junction record
    */
-  private async uploadAndSaveFile(file: File, type: 'image' | 'video' | 'audio'): Promise<string> {
+  private async uploadAndSaveFile(
+    file: File,
+    type: 'image' | 'video' | 'audio',
+    contentMediaId: string,
+    capsuleId: string,
+    order: number
+  ): Promise<string> {
     // File properties from multer
     const filename = file.name;
     const mimeType = file.type;
@@ -69,87 +79,51 @@ export class CapsuleService {
         break;
     }
 
-    return dbResult.file.id;
+    const fileId = dbResult.file.id;
+
+    // Create capsuleMedia junction record
+    await this.databaseService.db
+      .insert(capsuleMedia)
+      .values({
+        capsuleId,
+        fileId,
+        contentMediaId,
+        type,
+        order,
+      });
+
+    return fileId;
   }
 
-  /**
-   * Replace uniqueId references in Plate.js content with actual fileIds
-   */
-  private replaceUniqueIdsInContent(content: string, uniqueIdToFileIdMap: Map<string, string>): string {
-    try {
-      const plateData = JSON.parse(content);
-      
-      // Recursively traverse Plate.js content tree
-      const replaceInNode = (node: unknown): unknown => {
-        if (typeof node !== 'object' || node === null) {
-          return node;
-        }
 
-        if (Array.isArray(node)) {
-          return node.map(replaceInNode);
-        }
-
-        const obj = node as Record<string, unknown>;
-        const newObj: Record<string, unknown> = {};
-
-        for (const [key, value] of Object.entries(obj)) {
-          // Check for url properties containing uniqueIds
-          if (key === 'url' && typeof value === 'string') {
-            // Check if the URL contains a uniqueId
-            for (const [uniqueId, fileId] of uniqueIdToFileIdMap.entries()) {
-              if (value.includes(uniqueId)) {
-                // Replace uniqueId with fileId in URL
-                newObj[key] = value.replace(uniqueId, fileId);
-                continue;
-              }
-            }
-            newObj[key] = value;
-          } else if (typeof value === 'object' && value !== null) {
-            newObj[key] = replaceInNode(value);
-          } else {
-            newObj[key] = value;
-          }
-        }
-
-        return newObj;
-      };
-
-      const updatedPlateData = replaceInNode(plateData);
-      return JSON.stringify(updatedPlateData);
-    } catch (error) {
-      console.error('Error replacing uniqueIds in content:', error);
-      return content; // Return original if parsing fails
-    }
-  }
 
   /**
    * Create a new capsule with media handling
    */
   async createCapsule(input: CreateCapsuleInput) {
-    // Handle media uploads if provided
-    const uniqueIdToFileIdMap = new Map<string, string>();
-    
-    if (input.media && input.media.added && input.media.added.length > 0) {
-      // Upload all new files
-      for (const mediaItem of input.media.added) {
-        const fileId = await this.uploadAndSaveFile(mediaItem.file, mediaItem.type);
-        uniqueIdToFileIdMap.set(mediaItem.uniqueId, fileId);
+    // Create capsule first to get ID
+    const { media, ...capsuleData } = input;
+    const capsule = await this.capsuleRepository.create(capsuleData);
+
+    if (!capsule) {
+      throw new Error('Failed to create capsule');
+    }
+
+    // Upload files and create capsuleMedia junction records
+    if (media && media.added && media.added.length > 0) {
+      for (let i = 0; i < media.added.length; i++) {
+        const mediaItem = media.added[i];
+        await this.uploadAndSaveFile(
+          mediaItem.file,
+          mediaItem.type,
+          mediaItem.contentMediaId,
+          capsule.id,
+          i
+        );
       }
     }
 
-    // Replace uniqueIds in content with actual fileIds
-    const processedContent = uniqueIdToFileIdMap.size > 0
-      ? this.replaceUniqueIdsInContent(input.content, uniqueIdToFileIdMap)
-      : input.content;
-
-    // Create capsule with processed content
-    // Omit media field as it's handled separately
-    const { media, ...capsuleData } = input;
-    
-    return await this.capsuleRepository.create({
-      ...capsuleData,
-      content: processedContent,
-    });
+    return capsule;
   }
 
   /**
@@ -211,31 +185,48 @@ export class CapsuleService {
       return null;
     }
 
-    // Handle media uploads if provided
-    const uniqueIdToFileIdMap = new Map<string, string>();
-    
-    if (input.media && input.media.added && input.media.added.length > 0) {
-      // Upload all new files
-      for (const mediaItem of input.media.added) {
-        const fileId = await this.uploadAndSaveFile(mediaItem.file, mediaItem.type);
-        uniqueIdToFileIdMap.set(mediaItem.uniqueId, fileId);
+    // Handle media deletion (remove capsuleMedia records not in kept list)
+    if (input.media) {
+      const keptContentMediaIds = new Set(input.media.kept || []);
+      
+      // Get existing capsuleMedia records for this capsule
+      const existingMedia = await this.databaseService.db
+        .select()
+        .from(capsuleMedia)
+        .where(eq(capsuleMedia.capsuleId, id));
+      
+      // Delete capsuleMedia records that are not in the kept list
+      for (const media of existingMedia) {
+        if (!keptContentMediaIds.has(media.contentMediaId)) {
+          await this.databaseService.db
+            .delete(capsuleMedia)
+            .where(eq(capsuleMedia.id, media.id));
+          // File will be cascade deleted if no other capsules reference it
+        }
+      }
+
+      // Upload new files and create capsuleMedia records
+      if (input.media.added && input.media.added.length > 0) {
+        const currentMaxOrder = existingMedia.length > 0 
+          ? Math.max(...existingMedia.map(m => m.order || 0))
+          : -1;
+        
+        for (let i = 0; i < input.media.added.length; i++) {
+          const mediaItem = input.media.added[i];
+          await this.uploadAndSaveFile(
+            mediaItem.file,
+            mediaItem.type,
+            mediaItem.contentMediaId,
+            id,
+            currentMaxOrder + i + 1
+          );
+        }
       }
     }
 
-    // Replace uniqueIds in content with actual fileIds (if content is being updated)
-    let processedContent = input.content;
-    if (input.content && uniqueIdToFileIdMap.size > 0) {
-      processedContent = this.replaceUniqueIdsInContent(input.content, uniqueIdToFileIdMap);
-    }
-
-    // Update capsule with processed content
-    // Omit media field as it's handled separately
+    // Update capsule (content already contains contentMediaId references)
     const { media, ...capsuleData } = input;
-    
-    return await this.capsuleRepository.update(id, {
-      ...capsuleData,
-      content: processedContent,
-    });
+    return await this.capsuleRepository.update(id, capsuleData);
   }
 
   /**

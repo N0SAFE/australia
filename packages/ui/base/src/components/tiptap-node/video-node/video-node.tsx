@@ -24,10 +24,11 @@ interface ProcessingProgress {
 
 export function VideoNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
-  const { src, srcUrlId, title, controls = true, width, height, align = "center" } = node.attrs
+  const { src, srcUrlId, title, controls = true, width, height, align = "center", meta } = node.attrs
   
-  // State for resolved URL
-  const [resolvedSrc, setResolvedSrc] = useState<string>(src as string)
+  // State for resolved URL - start with null to avoid empty string warning
+  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
   
   // State for processing progress
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null)
@@ -40,28 +41,47 @@ export function VideoNodeView(props: NodeViewProps) {
   // Resolve the final URL asynchronously
   useEffect(() => {
     const resolve = async () => {
-      const resolved = await resolveMediaUrl(src as string, srcUrlId as string | null, injectMediaUrl)
+      setIsLoading(true)
+      const resolved = await resolveMediaUrl(
+        src as string, 
+        srcUrlId as string | null, 
+        injectMediaUrl,
+        meta as { strategy?: string; contentMediaId?: string } | null
+      )
+      console.log('🎥 Video URL resolved:', {
+        strategy: (meta as { strategy?: string })?.strategy,
+        contentMediaId: (meta as { contentMediaId?: string })?.contentMediaId,
+        srcUrlId,
+        resolvedUrl: resolved,
+        width: node.attrs.width as number | undefined,
+        height: node.attrs.height as number | undefined
+      })
       setResolvedSrc(resolved)
+      setIsLoading(false)
     }
     void resolve()
-  }, [src, srcUrlId, injectMediaUrl])
+  }, [src, srcUrlId, injectMediaUrl, meta, node.attrs.width, node.attrs.height])
   
-  // Subscribe to processing progress and auto-enable when node appears in edit mode
+  // Handle progress tracking for video processing
   useEffect(() => {
-    const onProgressUpdate = videoExtension?.options.onProgressUpdate
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const enableProgress = videoExtension?.options.enableProgress
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const disableProgress = videoExtension?.options.disableProgress
     
     // Store references for this specific video node
-    const nodeId = srcUrlId || src
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const nodeId = srcUrlId ?? src
     if (!nodeId || !onProgressUpdate) return
     
     // Automatically enable progress tracking for this video when it appears in edit mode
     if (editor.isEditable && enableProgress) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       enableProgress(nodeId as string)
     }
     
     // Register this node for progress updates
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
     const unsubscribe = onProgressUpdate(nodeId as string, (progress: ProcessingProgress) => {
       setProcessingProgress(progress)
       setShowProgress(progress.status === 'processing')
@@ -76,12 +96,14 @@ export function VideoNodeView(props: NodeViewProps) {
     
     return () => {
       // Cleanup: unsubscribe and optionally disable progress tracking
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       unsubscribe?.()
       if (disableProgress) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         disableProgress(nodeId as string)
       }
     }
-  }, [src, srcUrlId, videoExtension, editor.isEditable])
+  }, [src, srcUrlId, videoExtension, onProgressUpdate, editor.isEditable])
 
   const alignmentStyles = {
     left: "flex justify-start",
@@ -116,29 +138,51 @@ export function VideoNodeView(props: NodeViewProps) {
       {showProgress && processingProgress && (
         <div className="absolute top-0 left-0 right-0 z-10 bg-blue-600 h-1 transition-all duration-300"
           style={{
-            width: `${processingProgress.progress}%`,
+            width: `${String(processingProgress.progress)}%`,
           }}
-          title={processingProgress.message || `Processing: ${processingProgress.progress}%`}
+          title={processingProgress.message ?? `Processing: ${String(processingProgress.progress)}%`}
         />
       )}
       
       {/* Video Element */}
       <div className="relative w-full overflow-hidden rounded">
-        <video
-          src={resolvedSrc || undefined}
-          title={(title as string | undefined) ?? "Video"}
-          controls={controls as boolean}
-          height={(height as string | undefined) ?? undefined}
-          style={{
-            width: "100%",
-            height: (height as string | undefined) ?? "auto",
-            display: "block",
-          }}
-          className="rounded"
-        >
-          <track kind="captions" />
-          Your browser does not support the video tag.
-        </video>
+        {isLoading ? (
+          <div 
+            className="flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded"
+            style={{ 
+              minHeight: "300px",
+              width: "100%"
+            }}
+          >
+            <div className="text-gray-400">Loading video...</div>
+          </div>
+        ) : resolvedSrc ? (
+          <video
+            src={resolvedSrc}
+            title={(title as string | undefined) ?? "Video"}
+            controls={controls as boolean}
+            height={(height as string | undefined) ?? undefined}
+            style={{
+              width: "100%",
+              height: (height as string | undefined) ?? "auto",
+              display: "block",
+            }}
+            className="rounded"
+          >
+            <track kind="captions" />
+            Your browser does not support the video tag.
+          </video>
+        ) : (
+          <div 
+            className="flex items-center justify-center bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800"
+            style={{ 
+              minHeight: "300px",
+              width: "100%"
+            }}
+          >
+            <div className="text-red-500">Failed to load video</div>
+          </div>
+        )}
       </div>
     </div>
   )

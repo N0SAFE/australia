@@ -26,12 +26,13 @@ function addDays(date: Date, days: number): Date {
 }
 
 // Helper function to upload a seed asset file using the FileMetadataService
+// Returns both the file ID and the path for backward compatibility
 async function uploadSeedAsset(
   fileMetadataService: FileMetadataService,
   assetFilename: string,
   type: 'image' | 'video' | 'audio',
   uploadedById?: string
-): Promise<string> {
+): Promise<{ fileId: string; path: string }> {
   try {
     // __dirname in dev: /app/apps/api/src/cli/commands
     // __dirname in prod: /app/apps/api/dist/cli/commands
@@ -116,8 +117,11 @@ async function uploadSeedAsset(
     
     console.log(`✅ Uploaded ${type} as: ${storedFilename} (File ID: ${dbResult.file.id})`);
 
-    // Return the path that will be served by the API
-    return `/storage/files/${storedFilename}`;
+    // Return both fileId and path
+    return {
+      fileId: dbResult.file.id,
+      path: `/storage/files/${storedFilename}`,
+    };
   } catch (error) {
     console.error(`❌ Failed to upload ${type} asset ${assetFilename}:`, error);
     throw error;
@@ -255,12 +259,28 @@ export class SeedCommand extends CommandRunner {
         unlockedAt?: Date | null;
         openedAt?: Date | null;
       }[] = [];
+      
+      // NEW: Track capsuleMedia junction records for contentMediaId resolution
+      const capsuleMediaRecords: {
+        id: string;
+        capsuleId: string;
+        fileId: string;
+        contentMediaId: string;
+        type: 'image' | 'video' | 'audio';
+        order: number | null;
+        createdAt: Date;
+      }[] = [];
 
       // 1. TEXT CONTENT WITH FILE LINKS - Past opening date (already unlocked AND opened)
       // Upload seed files for demonstration
       const demoImage = await uploadSeedAsset(this.fileMetadataService, 'mountain-sunset.jpg', 'image', defaultAdminResult.user.id);
       const demoVideo = await uploadSeedAsset(this.fileMetadataService, 'big-buck-bunny.mp4', 'video', defaultAdminResult.user.id);
       const demoAudio = await uploadSeedAsset(this.fileMetadataService, 'soundhelix-song-1.mp3', 'audio', defaultAdminResult.user.id);
+      
+      // Store for link creation (backward compatibility - using paths in text links)
+      const demoImagePath = demoImage.path;
+      const demoVideoPath = demoVideo.path;
+      const demoAudioPath = demoAudio.path;
       
       capsulesData.push({
         id: randomUUID(),
@@ -303,7 +323,7 @@ export class SeedCommand extends CommandRunner {
                   type: 'text',
                   marks: [{
                     type: 'link',
-                    attrs: {href: demoImage, target: '_blank'}
+                    attrs: {href: demoImagePath, target: '_blank'}
                   }],
                   text: 'Download Mountain Sunset Image'
                 },
@@ -318,7 +338,7 @@ export class SeedCommand extends CommandRunner {
                   type: 'text',
                   marks: [{
                     type: 'link',
-                    attrs: {href: demoVideo, target: '_blank'}
+                    attrs: {href: demoVideoPath, target: '_blank'}
                   }],
                   text: 'Download Big Buck Bunny Video'
                 },
@@ -333,7 +353,7 @@ export class SeedCommand extends CommandRunner {
                   type: 'text',
                   marks: [{
                     type: 'link',
-                    attrs: {href: demoAudio, target: '_blank'}
+                    attrs: {href: demoAudioPath, target: '_blank'}
                   }],
                   text: 'Download Audio Track'
                 },
@@ -454,9 +474,12 @@ export class SeedCommand extends CommandRunner {
       });
 
       // 1d. PAST CAPSULE - Was locked, unlocked but not opened
-      const pastImagePath = await uploadSeedAsset(this.fileMetadataService, 'forest-trail.jpg', 'image', defaultAdminResult.user.id);
+      const pastImageUpload = await uploadSeedAsset(this.fileMetadataService, 'forest-trail.jpg', 'image', defaultAdminResult.user.id);
+      const pastImageContentMediaId = randomUUID();
+      const pastImageCapsuleId = randomUUID();
+      
       capsulesData.push({
-        id: randomUUID(),
+        id: pastImageCapsuleId,
         openingDate: formatDate(addDays(today, -10)),
         content: JSON.stringify({
           type: 'doc',
@@ -469,11 +492,13 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'image',
               attrs: {
-                src: pastImagePath,
-                srcUrlId: 'api',
                 alt: 'Forest Trail - A serene path through the forest',
                 width: 1920,
-                height: 1280
+                height: 1280,
+                meta: {
+                  strategy: 'contentMediaId',
+                  contentMediaId: pastImageContentMediaId
+                }
               }
             },
             {
@@ -488,20 +513,34 @@ export class SeedCommand extends CommandRunner {
           ]
         }),
         openingMessage: 'Unlocked 10 days ago - Content still waiting to be discovered',
-        isLocked: false, // Fixed: unlocked capsules should have isLocked:false
-        lockType: 'code', // Keep track of original lock type
+        isLocked: false,
+        lockType: 'code',
         lockConfig: JSON.stringify({
           type: 'code',
-          code: '5678', // Code that was used to unlock
+          code: '5678',
         }),
-        unlockedAt: addDays(today, -10), // Unlocked
-        openedAt: null, // But never opened
+        unlockedAt: addDays(today, -10),
+        openedAt: null,
+      });
+      
+      capsuleMediaRecords.push({
+        id: randomUUID(),
+        capsuleId: pastImageCapsuleId,
+        fileId: pastImageUpload.fileId,
+        contentMediaId: pastImageContentMediaId,
+        type: 'image',
+        order: null,
+        createdAt: new Date(),
       });
 
       // 2. IMAGE CONTENT - Locked with CODE (simple)
-      const image1Path = await uploadSeedAsset(this.fileMetadataService, 'mountain-sunset.jpg', 'image', defaultAdminResult.user.id);
+      // NEW PATTERN: Generate contentMediaId UUID and create junction record
+      const image1Upload = await uploadSeedAsset(this.fileMetadataService, 'mountain-sunset.jpg', 'image', defaultAdminResult.user.id);
+      const image1ContentMediaId = randomUUID();
+      const image1CapsuleId = randomUUID();
+      
       capsulesData.push({
-        id: randomUUID(),
+        id: image1CapsuleId,
         openingDate: formatDate(addDays(today, 7)),
         content: JSON.stringify({
           type: 'doc',
@@ -509,7 +548,9 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'image',
               attrs: {
-                src: image1Path,                srcUrlId: 'api',                alt: 'Mountain Sunset - A beautiful sunset over mountain peaks',
+                strategy: 'contentMediaId',              // NEW: Use contentMediaId resolution strategy
+                contentMediaId: image1ContentMediaId,    // NEW: UUID linking to capsuleMedia
+                alt: 'Mountain Sunset - A beautiful sunset over mountain peaks',
                 width: 1920,
                 height: 1080
               }
@@ -525,11 +566,25 @@ export class SeedCommand extends CommandRunner {
         }),
         unlockedAt: null,
       });
+      
+      // NEW: Create capsuleMedia junction record
+      capsuleMediaRecords.push({
+        id: randomUUID(),
+        capsuleId: image1CapsuleId,
+        fileId: image1Upload.fileId,
+        contentMediaId: image1ContentMediaId,
+        type: 'image',
+        order: null,
+        createdAt: new Date(),
+      });
 
       // 3. VIDEO CONTENT - Locked with VOICE
-      const video1Path = await uploadSeedAsset(this.fileMetadataService, 'big-buck-bunny.mp4', 'video', defaultAdminResult.user.id);
+      const video1Upload = await uploadSeedAsset(this.fileMetadataService, 'big-buck-bunny.mp4', 'video', defaultAdminResult.user.id);
+      const video1ContentMediaId = randomUUID();
+      const video1CapsuleId = randomUUID();
+      
       capsulesData.push({
-        id: randomUUID(),
+        id: video1CapsuleId,
         openingDate: formatDate(addDays(today, 14)),
         content: JSON.stringify({
           type: 'doc',
@@ -537,8 +592,8 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'video',
               attrs: {
-                src: video1Path,
-                srcUrlId: 'api',
+                strategy: 'contentMediaId',
+                contentMediaId: video1ContentMediaId,
                 title: 'Mixed Content Video',
                 width: 1920,
                 height: 1080,
@@ -557,11 +612,24 @@ export class SeedCommand extends CommandRunner {
         }),
         unlockedAt: null,
       });
+      
+      capsuleMediaRecords.push({
+        id: randomUUID(),
+        capsuleId: video1CapsuleId,
+        fileId: video1Upload.fileId,
+        contentMediaId: video1ContentMediaId,
+        type: 'video',
+        order: null,
+        createdAt: new Date(),
+      });
 
       // 4. AUDIO CONTENT - Locked with DEVICE_SHAKE
-      const audio1Path = await uploadSeedAsset(this.fileMetadataService, 'soundhelix-song-1.mp3', 'audio', defaultAdminResult.user.id);
+      const audio1Upload = await uploadSeedAsset(this.fileMetadataService, 'soundhelix-song-1.mp3', 'audio', defaultAdminResult.user.id);
+      const audio1ContentMediaId = randomUUID();
+      const audio1CapsuleId = randomUUID();
+      
       capsulesData.push({
-        id: randomUUID(),
+        id: audio1CapsuleId,
         openingDate: formatDate(addDays(today, 21)),
         content: JSON.stringify({
           type: 'doc',
@@ -569,8 +637,8 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'audio',
               attrs: {
-                src: audio1Path,
-                srcUrlId: 'api',
+                strategy: 'contentMediaId',
+                contentMediaId: audio1ContentMediaId,
                 title: 'Sample Audio - Soundhelix Song',
                 controls: true
               }
@@ -585,6 +653,16 @@ export class SeedCommand extends CommandRunner {
           threshold: 15,
         }),
         unlockedAt: null,
+      });
+      
+      capsuleMediaRecords.push({
+        id: randomUUID(),
+        capsuleId: audio1CapsuleId,
+        fileId: audio1Upload.fileId,
+        contentMediaId: audio1ContentMediaId,
+        type: 'audio',
+        order: null,
+        createdAt: new Date(),
       });
 
       // 5. TEXT CONTENT - Locked with DEVICE_TILT
@@ -637,9 +715,12 @@ export class SeedCommand extends CommandRunner {
       });
 
       // 6. IMAGE CONTENT - Locked with DEVICE_TAP
-      const image2Path = await uploadSeedAsset(this.fileMetadataService, 'forest-trail.jpg', 'image', defaultAdminResult.user.id);
+      const image2Upload = await uploadSeedAsset(this.fileMetadataService, 'forest-trail.jpg', 'image', defaultAdminResult.user.id);
+      const image2ContentMediaId = randomUUID();
+      const image2CapsuleId = randomUUID();
+      
       capsulesData.push({
-        id: randomUUID(),
+        id: image2CapsuleId,
         openingDate: formatDate(addDays(today, 35)),
         content: JSON.stringify({
           type: 'doc',
@@ -647,11 +728,13 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'image',
               attrs: {
-                src: image2Path,
-                srcUrlId: 'api',
                 alt: 'Forest Trail - A serene path through the forest',
                 width: 1920,
-                height: 1280
+                height: 1280,
+                meta: {
+                  strategy: 'contentMediaId',
+                  contentMediaId: image2ContentMediaId
+                }
               }
             }
           ]
@@ -666,11 +749,24 @@ export class SeedCommand extends CommandRunner {
         }),
         unlockedAt: null,
       });
+      
+      capsuleMediaRecords.push({
+        id: randomUUID(),
+        capsuleId: image2CapsuleId,
+        fileId: image2Upload.fileId,
+        contentMediaId: image2ContentMediaId,
+        type: 'image',
+        order: null,
+        createdAt: new Date(),
+      });
 
       // 7. VIDEO CONTENT - Locked with API
-      const video2Path = await uploadSeedAsset(this.fileMetadataService, 'elephants-dream.mp4', 'video', defaultAdminResult.user.id);
+      const video2Upload = await uploadSeedAsset(this.fileMetadataService, 'elephants-dream.mp4', 'video', defaultAdminResult.user.id);
+      const video2ContentMediaId = randomUUID();
+      const video2CapsuleId = randomUUID();
+      
       capsulesData.push({
-        id: randomUUID(),
+        id: video2CapsuleId,
         openingDate: formatDate(addDays(today, 42)),
         content: JSON.stringify({
           type: 'doc',
@@ -678,8 +774,11 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'video',
               attrs: {
-                src: video2Path,
-                srcUrlId: 'api'
+                controls: true,
+                meta: {
+                  strategy: 'contentMediaId',
+                  contentMediaId: video2ContentMediaId
+                }
               }
             }
           ]
@@ -694,11 +793,24 @@ export class SeedCommand extends CommandRunner {
         }),
         unlockedAt: null,
       });
+      
+      capsuleMediaRecords.push({
+        id: randomUUID(),
+        capsuleId: video2CapsuleId,
+        fileId: video2Upload.fileId,
+        contentMediaId: video2ContentMediaId,
+        type: 'video',
+        order: null,
+        createdAt: new Date(),
+      });
 
       // 8. AUDIO CONTENT - No lock, future opening
-      const audio2Path = await uploadSeedAsset(this.fileMetadataService, 'soundhelix-song-2.mp3', 'audio', defaultAdminResult.user.id);
+      const audio2Upload = await uploadSeedAsset(this.fileMetadataService, 'soundhelix-song-2.mp3', 'audio', defaultAdminResult.user.id);
+      const audio2ContentMediaId = randomUUID();
+      const audio2CapsuleId = randomUUID();
+      
       capsulesData.push({
-        id: randomUUID(),
+        id: audio2CapsuleId,
         openingDate: formatDate(addDays(today, 49)),
         content: JSON.stringify({
           type: 'doc',
@@ -706,8 +818,11 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'audio',
               attrs: {
-                src: audio2Path,
-                srcUrlId: 'api'
+                controls: true,
+                meta: {
+                  strategy: 'contentMediaId',
+                  contentMediaId: audio2ContentMediaId
+                }
               }
             }
           ]
@@ -717,6 +832,16 @@ export class SeedCommand extends CommandRunner {
         lockType: null,
         lockConfig: null,
         unlockedAt: null,
+      });
+      
+      capsuleMediaRecords.push({
+        id: randomUUID(),
+        capsuleId: audio2CapsuleId,
+        fileId: audio2Upload.fileId,
+        contentMediaId: audio2ContentMediaId,
+        type: 'audio',
+        order: null,
+        createdAt: new Date(),
       });
 
       // 9. TEXT CONTENT - Past opening date (already unlocked), week ago
@@ -773,9 +898,12 @@ export class SeedCommand extends CommandRunner {
       });
 
       // 10. IMAGE CONTENT - Opening today, no lock
-      const image3Path = await uploadSeedAsset(this.fileMetadataService, 'ocean-waves.jpg', 'image', defaultAdminResult.user.id);
+      const image3Upload = await uploadSeedAsset(this.fileMetadataService, 'ocean-waves.jpg', 'image', defaultAdminResult.user.id);
+      const image3ContentMediaId = randomUUID();
+      const image3CapsuleId = randomUUID();
+      
       capsulesData.push({
-        id: randomUUID(),
+        id: image3CapsuleId,
         openingDate: formatDate(today),
         content: JSON.stringify({
           type: 'doc',
@@ -783,11 +911,13 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'image',
               attrs: {
-                src: image3Path,
-                srcUrlId: 'api',
                 alt: 'Ocean Waves - Powerful waves crashing on the shore',
                 width: 1920,
-                height: 1280
+                height: 1280,
+                meta: {
+                  strategy: 'contentMediaId',
+                  contentMediaId: image3ContentMediaId
+                }
               }
             }
           ]
@@ -797,6 +927,16 @@ export class SeedCommand extends CommandRunner {
         lockType: null,
         lockConfig: null,
         unlockedAt: null,
+      });
+      
+      capsuleMediaRecords.push({
+        id: randomUUID(),
+        capsuleId: image3CapsuleId,
+        fileId: image3Upload.fileId,
+        contentMediaId: image3ContentMediaId,
+        type: 'image',
+        order: null,
+        createdAt: new Date(),
       });
 
       // 11. TEXT CONTENT - Locked with CODE (alphanumeric)
@@ -846,9 +986,12 @@ export class SeedCommand extends CommandRunner {
       });
 
       // 12. VIDEO CONTENT - Far future, no lock
-      const video3Path = await uploadSeedAsset(this.fileMetadataService, 'for-bigger-blazes.mp4', 'video', defaultAdminResult.user.id);
+      const video3Upload = await uploadSeedAsset(this.fileMetadataService, 'for-bigger-blazes.mp4', 'video', defaultAdminResult.user.id);
+      const video3ContentMediaId = randomUUID();
+      const video3CapsuleId = randomUUID();
+      
       capsulesData.push({
-        id: randomUUID(),
+        id: video3CapsuleId,
         openingDate: formatDate(addDays(today, 90)),
         content: JSON.stringify({
           type: 'doc',
@@ -856,8 +999,11 @@ export class SeedCommand extends CommandRunner {
             {
               type: 'video',
               attrs: {
-                src: video3Path,
-                srcUrlId: 'api'
+                controls: true,
+                meta: {
+                  strategy: 'contentMediaId',
+                  contentMediaId: video3ContentMediaId
+                }
               }
             }
           ]
@@ -868,6 +1014,16 @@ export class SeedCommand extends CommandRunner {
         lockConfig: null,
         unlockedAt: null,
       });
+      
+      capsuleMediaRecords.push({
+        id: randomUUID(),
+        capsuleId: video3CapsuleId,
+        fileId: video3Upload.fileId,
+        contentMediaId: video3ContentMediaId,
+        type: 'video',
+        order: null,
+        createdAt: new Date(),
+      });
 
       // Insert all capsules
       await this.databaseService.db.insert(schema.capsule).values(capsulesData);
@@ -877,6 +1033,16 @@ export class SeedCommand extends CommandRunner {
       console.log(`   - Past capsules (unlocked but not opened): ${String(capsulesData.filter(c => c.unlockedAt && !c.openedAt && new Date(c.openingDate) < today).length)}`);
       console.log(`   - Past capsules (still locked): ${String(capsulesData.filter(c => c.isLocked && !c.unlockedAt && new Date(c.openingDate) < today).length)}`);
       console.log(`   - Future capsules: ${String(capsulesData.filter(c => new Date(c.openingDate) > today).length)}`);
+      
+      // NEW: Insert capsuleMedia junction records for contentMediaId resolution
+      if (capsuleMediaRecords.length > 0) {
+        await this.databaseService.db.insert(schema.capsuleMedia).values(capsuleMediaRecords);
+        console.log(`✅ Created ${String(capsuleMediaRecords.length)} capsuleMedia junction records`);
+        console.log(`📋 Content Resolution:`);
+        console.log(`   - Images with contentMediaId: ${String(capsuleMediaRecords.filter(r => r.type === 'image').length)}`);
+        console.log(`   - Videos with contentMediaId: ${String(capsuleMediaRecords.filter(r => r.type === 'video').length)}`);
+        console.log(`   - Audio with contentMediaId: ${String(capsuleMediaRecords.filter(r => r.type === 'audio').length)}`);
+      }
 
       // Record that this seed version has been applied
       await this.databaseService.db.insert(schema.seedVersion).values({

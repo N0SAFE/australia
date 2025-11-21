@@ -30,6 +30,7 @@ import { ArrowLeft, Lock, Unlock } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import dynamic from "next/dynamic";
 import { useCapsuleMedia } from "@/hooks/useCapsuleMedia";
+import { AttachedMediaProvider } from "@/contexts/AttachedMediaContext";
 
 const SimpleEditor = dynamic(
   () =>
@@ -80,13 +81,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
   const router = useRouter();
   
   // Use the capsule media tracking hook
-  const { 
-    getUploadFunctions, 
-    getMediaForSubmit, 
-    setKeptMedia,
-    extractFileIdsFromContent,
-    resetMedia 
-  } = useCapsuleMedia();
+  const { processContentForSubmit } = useCapsuleMedia();
 
   // Update local state when capsule data loads
   useEffect(() => {
@@ -128,11 +123,6 @@ export const AdminCapsuleDetailsPageClient: FC<{
         if (parsed && typeof parsed === "object") {
           setEditorValue(parsed);
           console.log("💾 [AdminCapsule] Editor value set");
-          
-          // Extract existing file IDs from content and set as kept media
-          const fileIds = extractFileIdsFromContent(capsule.content);
-          console.log("📎 [AdminCapsule] Extracted file IDs:", fileIds);
-          setKeptMedia(fileIds);
         }
       } catch (error) {
         console.error(
@@ -143,7 +133,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
         setEditorValue(getEmptyValue());
       }
     }
-  }, [capsule?.content, extractFileIdsFromContent, setKeptMedia]);
+  }, [capsule?.content]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,25 +141,25 @@ export const AdminCapsuleDetailsPageClient: FC<{
     if (!update || !capsule) return;
 
     try {
-      // Get media data for submission
-      const mediaData = getMediaForSubmit();
+      // Process content: extract local nodes, convert to uniqueId strategy, collect files
+      const contentArray = Array.isArray(editorValue) ? editorValue : [editorValue];
+      const { processedContent, media } = processContentForSubmit(contentArray);
       
-      console.log("🔵 Submitting capsule update with media:", mediaData);
+      console.log("🔵 Submitting capsule update with media:", media);
 
       updateCapsule(
         {
           id: capsule.id,
           openingDate: date?.toISOString() || state.openingDate,
-          content: JSON.stringify(editorValue),
+          content: JSON.stringify(processedContent),
           openingMessage: state.openingMessage ?? undefined,
           isLocked: isLocked,
           lockType: lockType,
           lockConfig: state.lockConfig,
-          media: mediaData,
+          media: media,
         }, {
         onSuccess: (result) => {
           console.log("✅ Capsule update successful:", result);
-          resetMedia(); // Clear tracked media
           router.push(`/admin/capsules/${capsuleId}`);
         },
         onError: (error) => {
@@ -187,9 +177,10 @@ export const AdminCapsuleDetailsPageClient: FC<{
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <AttachedMediaProvider attachedMedia={capsule.attachedMedia || []}>
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Link
@@ -271,8 +262,38 @@ export const AdminCapsuleDetailsPageClient: FC<{
                     );
                     return `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`;
                   },
+                  contentMediaId: async (contentMediaId: string) => {
+                    console.log(
+                      "🔍 [injectMediaUrl] Resolving contentMediaId:",
+                      contentMediaId,
+                    );
+                    console.log(
+                      "📋 [injectMediaUrl] Available attachedMedia:",
+                      capsule?.attachedMedia,
+                    );
+
+                    const media = capsule?.attachedMedia?.find(
+                      (m) => m.contentMediaId === contentMediaId,
+                    );
+
+                    if (!media) {
+                      console.error(
+                        "❌ [injectMediaUrl] No media found for contentMediaId:",
+                        contentMediaId,
+                      );
+                      throw new Error(`Media not found: ${contentMediaId}`);
+                    }
+
+                    const url = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005"}/storage/files/${media.filePath}`;
+                    console.log("✅ [injectMediaUrl] Resolved to URL:", url);
+                    return url;
+                  },
                 }}
-                uploadFunctions={getUploadFunctions()}
+                uploadFunctions={{
+                  image: async (file) => URL.createObjectURL(file),
+                  video: async (file) => URL.createObjectURL(file),
+                  audio: async (file) => URL.createObjectURL(file),
+                }}
               />
             ) : (
               <SimpleViewer
@@ -280,6 +301,15 @@ export const AdminCapsuleDetailsPageClient: FC<{
                 injectMediaUrl={{
                   api: (src) =>
                     `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`,
+                  contentMediaId: async (contentMediaId: string) => {
+                    const media = capsule?.attachedMedia?.find(
+                      (m) => m.contentMediaId === contentMediaId,
+                    );
+                    if (!media) {
+                      throw new Error(`Media not found: ${contentMediaId}`);
+                    }
+                    return `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3005"}/storage/files/${media.filePath}`;
+                  },
                 }}
               />
             )}
@@ -610,6 +640,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
           </Field>
         )}
       </form>
-    </div>
+      </div>
+    </AttachedMediaProvider>
   );
 };

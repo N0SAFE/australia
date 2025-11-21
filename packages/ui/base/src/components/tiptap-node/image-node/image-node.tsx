@@ -17,10 +17,11 @@ import { resolveMediaUrl } from "@/lib/media-url-resolver"
 
 export function ImageNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
-  const { src, srcUrlId, alt, title, width, align = "center" } = node.attrs
+  const { src, srcUrlId, alt, title, width, align = "center", meta } = node.attrs
   
-  // State for resolved URL
-  const [resolvedSrc, setResolvedSrc] = useState<string>(src as string)
+  // State for resolved URL - start with null to avoid empty string warning
+  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
   
   // Get injected media URL resolvers from extension options
   const injectMediaUrl = editor.extensionManager.extensions.find(ext => ext.name === 'image')?.options.injectMediaUrl
@@ -28,11 +29,32 @@ export function ImageNodeView(props: NodeViewProps) {
   // Resolve the final URL asynchronously
   useEffect(() => {
     const resolve = async () => {
-      const resolved = await resolveMediaUrl(src as string, srcUrlId as string | null, injectMediaUrl)
+      setIsLoading(true)
+      
+      // Debug: Log what we're receiving
+      console.log('🔍 [ImageNode] node.attrs:', node.attrs)
+      console.log('🔍 [ImageNode] meta value:', meta)
+      console.log('🔍 [ImageNode] injectMediaUrl:', injectMediaUrl)
+      
+      const resolved = await resolveMediaUrl(
+        src as string, 
+        srcUrlId as string | null, 
+        injectMediaUrl,
+        meta as { strategy?: string; contentMediaId?: string } | null
+      )
+      console.log('🖼️ Image URL resolved:', {
+        strategy: (meta as { strategy?: string })?.strategy,
+        contentMediaId: (meta as { contentMediaId?: string })?.contentMediaId,
+        srcUrlId,
+        resolvedUrl: resolved,
+        width: node.attrs.width,
+        height: node.attrs.height
+      })
       setResolvedSrc(resolved)
+      setIsLoading(false)
     }
     void resolve()
-  }, [src, srcUrlId, injectMediaUrl])
+  }, [src, srcUrlId, injectMediaUrl, meta])
 
   const alignmentStyles = {
     left: "flex justify-start",
@@ -63,17 +85,39 @@ export function ImageNodeView(props: NodeViewProps) {
         maxWidth: "100%",
       }}
     >
-      <img
-        src={resolvedSrc || undefined}
-        alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
-        title={(title as string | undefined) ?? (alt as string | undefined) ?? ""}
-        style={{
-          width: "100%",
-          height: "auto",
-          display: "block",
-        }}
-        className="rounded"
-      />
+      {isLoading ? (
+        <div 
+          className="flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded"
+          style={{ 
+            minHeight: "200px",
+            width: "100%"
+          }}
+        >
+          <div className="text-gray-400">Loading image...</div>
+        </div>
+      ) : resolvedSrc ? (
+        <img
+          src={resolvedSrc}
+          alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
+          title={(title as string | undefined) ?? (alt as string | undefined) ?? ""}
+          style={{
+            width: "100%",
+            height: "auto",
+            display: "block",
+          }}
+          className="rounded"
+        />
+      ) : (
+        <div 
+          className="flex items-center justify-center bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800"
+          style={{ 
+            minHeight: "200px",
+            width: "100%"
+          }}
+        >
+          <div className="text-red-500">Failed to load image</div>
+        </div>
+      )}
     </div>
   )
 

@@ -5,13 +5,13 @@ import { capsuleSchema, lockTypeSchema, lockConfigSchema } from "@repo/api-contr
 // Media schema for capsule updates
 const addedMediaSchema = z.object({
   file: z.file(), // The actual file to upload
-  uniqueId: z.string(), // Temporary unique ID used in content references
+  contentMediaId: z.string(), // UUID generated on client, embedded in content nodes
   type: z.enum(['image', 'video', 'audio']), // Media type
 });
 
 const mediaSchema = z.object({
-  kept: z.array(z.string()), // Array of file IDs to keep from existing content
-  added: z.array(addedMediaSchema), // New files with temporary IDs to upload
+  kept: z.array(z.string()), // Array of contentMediaIds to keep from existing content
+  added: z.array(addedMediaSchema), // New files with contentMediaIds to upload
 });
 
 // Define the input for updating a capsule

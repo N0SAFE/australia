@@ -14,8 +14,8 @@ const addedMediaSchema = z.object({
 });
 
 const mediaSchema = z.object({
-  kept: z.array(z.string()), // Array of contentMediaIds to keep from existing content
-  added: z.array(addedMediaSchema), // New files with contentMediaIds to upload
+  kept: z.array(z.string()).optional().default([]), // Array of contentMediaIds to keep from existing content
+  added: z.array(addedMediaSchema).optional().default([]), // New files with contentMediaIds to upload
 });
 
 // Define the input for creating a capsule
@@ -28,12 +28,12 @@ export const capsuleCreateInput = z.object({
   openingMessage: z.string().optional(),
   
   // Lock mechanism (optional)
-  isLocked: z.coerce.boolean().default(false),
+  isLocked: z.coerce.boolean().optional().default(false),
   lockType: lockTypeSchema.optional(),
   lockConfig: lockConfigSchema.optional(),
   
-  // Media field for handling file uploads
-  media: mediaSchema,
+  // Media field for handling file uploads (optional, with defaults)
+  media: mediaSchema.optional().default({ kept: [], added: [] }),
 });
 
 // Define the output

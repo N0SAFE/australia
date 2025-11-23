@@ -213,7 +213,7 @@ export class CapsuleService {
    * Optionally accepts operationId for progress tracking
    */
   async createCapsule(input: CreateCapsuleInput & { operationId?: string }) {
-    const { media, operationId, ...capsuleData } = input;
+    const { media = { kept: [], added: [] }, operationId, ...capsuleData } = input;
     
     try {
       // Emit creating_capsule stage
@@ -225,7 +225,7 @@ export class CapsuleService {
           timestamp: new Date().toISOString(),
         });
       }
-
+      
       // Create capsule first to get ID
       const capsule = await this.capsuleRepository.create(capsuleData);
 

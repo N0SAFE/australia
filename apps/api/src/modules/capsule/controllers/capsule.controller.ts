@@ -95,6 +95,7 @@ export class CapsuleController {
   @Implement(capsuleContract.create)
   create() {
     return implement(capsuleContract.create).handler(async ({ input }) => {
+      // Pass the entire input including operationId for progress tracking
       const capsule = await this.capsuleService.createCapsule(input);
       return capsule;
     });

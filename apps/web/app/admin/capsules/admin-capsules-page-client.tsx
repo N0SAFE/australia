@@ -93,7 +93,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { SimpleEditor } from "@/components/tiptap/editor/index";
+import { TipTapContentRenderer } from "@/components/tiptap/common";
 import { JSONContent } from "@repo/ui/tiptap-exports/react";
 import { orpc } from "@/lib/orpc";
 import { withFileUploads } from "@/lib/orpc/withFileUploads";
@@ -102,67 +102,23 @@ import { useCapsuleMedia } from "@/hooks/capsules/media";
 // Create Capsule Dialog Component
 function CreateCapsuleDialog() {
   const [open, setOpen] = useState(false);
-  const [editorValue, setEditorValue] = useState<JSONContent>([
-    { type: "paragraph", content: [{ type: "text", text: "" }] },
-  ]);
   const [date, setDate] = useState<Date>();
   const [formData, setFormData] = useState({
     openingMessage: "",
     isLocked: true,
   });
   
-  // Track blob URLs for cleanup
-  const blobUrlsRef = useRef<Set<string>>(new Set());
+  // Default empty Tiptap value (proper doc structure)
+  const getEmptyValue = () => ({
+    type: "doc",
+    content: [{ type: "paragraph" }],
+  });
+
+  const [editorValue, setEditorValue] = useState<any>(getEmptyValue());
+  const [isEditorReady, setIsEditorReady] = useState(false);
   
   // Use media tracking hook
   const { processContentForSubmit } = useCapsuleMedia();
-  
-  // Cleanup blob URLs on unmount or when closing the dialog
-  useEffect(() => {
-    if (!open) {
-      // Revoke all blob URLs when dialog closes
-      blobUrlsRef.current.forEach(url => {
-        URL.revokeObjectURL(url);
-      });
-      blobUrlsRef.current.clear();
-    }
-  }, [open]);
-  
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      blobUrlsRef.current.forEach(url => {
-        URL.revokeObjectURL(url);
-      });
-      blobUrlsRef.current.clear();
-    };
-  }, []);
-
-  // Media URL resolution strategies using contentMediaId
-  // For new capsules, we don't have attachedMedia yet, so these will return empty
-  // The actual URLs are handled by local blob URLs during editing
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-  
-  const imageStrategy = async (meta: any) => {
-    // During creation, return empty - blob URLs are used
-    if (!meta?.contentMediaId) return "";
-    return ""; // New capsule has no attached media yet
-  };
-  
-  const videoStrategy = async (meta: any) => {
-    if (!meta?.contentMediaId) return "";
-    return "";
-  };
-  
-  const audioStrategy = async (meta: any) => {
-    if (!meta?.contentMediaId) return "";
-    return "";
-  };
-  
-  const fileStrategy = async (meta: any) => {
-    if (!meta?.contentMediaId) return "";
-    return "";
-  };
 
   const { mutate: createCapsule, isPending } = useCreateCapsule();
 
@@ -181,17 +137,17 @@ function CreateCapsuleDialog() {
     }
 
     // Process content: extract local nodes, convert to uniqueId strategy, collect files
-    const { processedContent, media } = processContentForSubmit(
-      Array.isArray(editorValue) ? editorValue : [editorValue]
-    );
+    const contentArray = Array.isArray(editorValue) ? editorValue : [editorValue];
+    const { processedContent, media } = processContentForSubmit(contentArray);
 
     // Create capsule with processed content + media
+    // Note: Explicitly convert boolean to ensure proper multipart/form-data handling
     createCapsule(
       {
         openingDate: date.toISOString(),
         content: JSON.stringify(processedContent),
         openingMessage: formData.openingMessage || undefined,
-        isLocked: formData.isLocked,
+        isLocked: Boolean(formData.isLocked), // Explicit boolean conversion
         media,
       },
       {
@@ -199,7 +155,7 @@ function CreateCapsuleDialog() {
           // Toast notification is handled by the hook
           setOpen(false);
           // Reset form
-          setEditorValue([{ type: "p", children: [{ text: "" }] }]);
+          setEditorValue(getEmptyValue());
           setDate(undefined);
           setFormData({
             openingMessage: "",
@@ -267,49 +223,38 @@ function CreateCapsuleDialog() {
                     </p>
                   </div>
                 </div>
-                <div className="border rounded-lg shadow-sm bg-background">
-                  <SimpleEditor
-                    value={editorValue}
-                    onChange={(newValue) => {
-                      console.log(
-                        "📝 [SimpleEditor] Content changed:",
-                        JSON.stringify(newValue, null, 2),
-                      );
-                      setEditorValue(newValue);
-                    }}
-                    editable={true}
-                    placeholder="Écrivez le contenu de votre capsule temporelle..."
-                    imageStrategy={imageStrategy}
-                    videoStrategy={videoStrategy}
-                    audioStrategy={audioStrategy}
-                    fileStrategy={fileStrategy}
-                    uploadFunctions={{
-                      image: async (file) => {
-                        const url = URL.createObjectURL(file);
-                        blobUrlsRef.current.add(url);
-                        return {
-                          url,
-                          meta: { strategy: 'local', contentMediaId: crypto.randomUUID() }
-                        };
-                      },
-                      video: async (file) => {
-                        const url = URL.createObjectURL(file);
-                        blobUrlsRef.current.add(url);
-                        return {
-                          url,
-                          meta: { strategy: 'local', contentMediaId: crypto.randomUUID() }
-                        };
-                      },
-                      audio: async (file) => {
-                        const url = URL.createObjectURL(file);
-                        blobUrlsRef.current.add(url);
-                        return {
-                          url,
-                          meta: { strategy: 'local', contentMediaId: crypto.randomUUID() }
-                        };
-                      },
-                    }}
-                  />
+                <div 
+                  className="border rounded-lg overflow-hidden"
+                  role="region"
+                  aria-label="Contenu de la capsule"
+                  tabIndex={0}
+                >
+                  {!isEditorReady && (
+                    <div className="p-4 space-y-3 animate-pulse">
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                      <div className="h-4 bg-muted rounded w-full"></div>
+                      <div className="h-4 bg-muted rounded w-5/6"></div>
+                    </div>
+                  )}
+                  <div className={!isEditorReady ? 'hidden' : ''}>
+                    <TipTapContentRenderer
+                      mode="editor"
+                      value={editorValue}
+                      onChange={(newValue) => {
+                        console.log(
+                          "📝 [TipTap] Content changed:",
+                          JSON.stringify(newValue, null, 2),
+                        );
+                        setEditorValue(newValue);
+                      }}
+                      capsule={undefined}
+                      placeholder="Écrivez le contenu de votre capsule temporelle..."
+                      onEditorReady={() => {
+                        console.log("✅ [TipTap] Editor is ready");
+                        setIsEditorReady(true);
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 

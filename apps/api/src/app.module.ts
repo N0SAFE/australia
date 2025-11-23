@@ -46,9 +46,9 @@ import { EventsModule } from "./core/modules/events/events.module";
       useFactory: (request: Request) => ({
         interceptors: [
           onError((error, _ctx) => {
-            console.error(
+            console.error(  
               "oRPC Error:",
-              error
+              JSON.stringify(error)
             );
           })
         ],

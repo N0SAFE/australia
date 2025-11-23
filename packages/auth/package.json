@@ -18,10 +18,11 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@better-auth/passkey": "^1.4.1",
     "better-auth": "catalog:auth",
-    "zod": "catalog:utils",
     "react": "catalog:react",
-    "sonner": "catalog:ui"
+    "sonner": "catalog:ui",
+    "zod": "catalog:utils"
   },
   "devDependencies": {
     "eslint": "catalog:linting",

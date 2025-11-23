@@ -371,6 +371,7 @@ print_header "🔒 SSL Certificate Setup"
 # Check if certificates already exist
 APP_CERT_EXISTS=false
 API_CERT_EXISTS=false
+DETECTED_EMAIL=""
 
 if [ -d "/etc/letsencrypt/live/app.gossip-club.sebille.net" ]; then
     APP_CERT_EXISTS=true
@@ -382,26 +383,63 @@ if [ -d "/etc/letsencrypt/live/api.gossip-club.sebille.net" ]; then
     print_success "SSL certificate already exists for api.gossip-club.sebille.net"
 fi
 
-# Only prompt if at least one certificate is missing
-if [ "$APP_CERT_EXISTS" = false ] || [ "$API_CERT_EXISTS" = false ]; then
-    print_info "Do you want to obtain SSL certificates now? (y/n)"
+# Try to detect email from existing certificates
+if [ "$APP_CERT_EXISTS" = true ] || [ "$API_CERT_EXISTS" = true ]; then
+    # Try to extract email from certbot config
+    if [ -f "/etc/letsencrypt/renewal/app.gossip-club.sebille.net.conf" ]; then
+        DETECTED_EMAIL=$(grep "account =" /etc/letsencrypt/renewal/app.gossip-club.sebille.net.conf | sed 's/.*\/accounts\/acme-v02.api.letsencrypt.org\/directory\///' | sed 's/\/.*//')
+    elif [ -f "/etc/letsencrypt/renewal/api.gossip-club.sebille.net.conf" ]; then
+        DETECTED_EMAIL=$(grep "account =" /etc/letsencrypt/renewal/api.gossip-club.sebille.net.conf | sed 's/.*\/accounts\/acme-v02.api.letsencrypt.org\/directory\///' | sed 's/\/.*//')
+    fi
+    
+    # Alternative: try to get email from certbot accounts
+    if [ -z "$DETECTED_EMAIL" ] && [ -d "/etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory" ]; then
+        # Get the most recent account directory
+        ACCOUNT_DIR=$(ls -t /etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory/ | head -1)
+        if [ -f "/etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory/$ACCOUNT_DIR/meta.json" ]; then
+            DETECTED_EMAIL=$(grep -o '"contact":\s*\["mailto:[^"]*"' "/etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory/$ACCOUNT_DIR/meta.json" | sed 's/.*mailto:\([^"]*\).*/\1/')
+        fi
+    fi
+    
+    if [ -n "$DETECTED_EMAIL" ]; then
+        print_info "Detected email from existing certificates: $DETECTED_EMAIL"
+    fi
+fi
+
+# Prompt for SSL certificate action
+if [ "$APP_CERT_EXISTS" = true ] && [ "$API_CERT_EXISTS" = true ]; then
+    print_info "All SSL certificates already exist. Do you want to renew/update them? (y/n)"
+    read -r OBTAIN_SSL
+elif [ "$APP_CERT_EXISTS" = true ] || [ "$API_CERT_EXISTS" = true ]; then
+    print_info "Some SSL certificates exist. Do you want to obtain missing ones? (y/n)"
     read -r OBTAIN_SSL
 else
-    print_success "All SSL certificates are already configured"
-    OBTAIN_SSL="n"
+    print_info "Do you want to obtain SSL certificates now? (y/n)"
+    read -r OBTAIN_SSL
 fi
 
 if [[ "$OBTAIN_SSL" =~ ^[Yy]$ ]]; then
-    print_info "Enter your email address for Let's Encrypt notifications:"
-    read -r EMAIL
+    # Use detected email or prompt for new one
+    if [ -n "$DETECTED_EMAIL" ]; then
+        print_info "Enter your email address for Let's Encrypt notifications (press Enter to use: $DETECTED_EMAIL):"
+        read -r EMAIL
+        # If no email entered, use the detected one
+        if [ -z "$EMAIL" ]; then
+            EMAIL="$DETECTED_EMAIL"
+            print_info "Using detected email: $EMAIL"
+        fi
+    else
+        print_info "Enter your email address for Let's Encrypt notifications:"
+        read -r EMAIL
+    fi
     
     if [ -z "$EMAIL" ]; then
         print_warning "No email provided, skipping SSL certificate setup"
         print_info "You can run ./setup-ssl.sh later to obtain certificates"
     else
-        print_info "Obtaining SSL certificates..."
+        print_info "Obtaining SSL certificates with email: $EMAIL..."
         
-        # Obtain certificate for Australia app (only if not exists)
+        # Obtain or renew certificate for Australia app
         if [ "$APP_CERT_EXISTS" = false ]; then
             print_info "Obtaining certificate for app.gossip-club.sebille.net..."
             if certbot certonly --webroot -w /var/www/certbot \
@@ -416,10 +454,21 @@ if [[ "$OBTAIN_SSL" =~ ^[Yy]$ ]]; then
                 print_info "Make sure DNS is properly configured and ports 80/443 are open"
             fi
         else
-            print_info "Skipping app.gossip-club.sebille.net (certificate already exists)"
+            print_info "Renewing certificate for app.gossip-club.sebille.net..."
+            if certbot certonly --webroot -w /var/www/certbot \
+                -d app.gossip-club.sebille.net \
+                --email "$EMAIL" \
+                --agree-tos \
+                --non-interactive \
+                --force-renewal; then
+                print_success "Certificate renewed for app.gossip-club.sebille.net"
+            else
+                print_warning "Failed to renew certificate for app.gossip-club.sebille.net"
+                print_info "The existing certificate will continue to work until it expires"
+            fi
         fi
         
-        # Obtain certificate for API (only if not exists)
+        # Obtain or renew certificate for API
         if [ "$API_CERT_EXISTS" = false ]; then
             print_info "Obtaining certificate for api.gossip-club.sebille.net..."
             if certbot certonly --webroot -w /var/www/certbot \
@@ -434,7 +483,18 @@ if [[ "$OBTAIN_SSL" =~ ^[Yy]$ ]]; then
                 print_info "Make sure DNS is properly configured and ports 80/443 are open"
             fi
         else
-            print_info "Skipping api.gossip-club.sebille.net (certificate already exists)"
+            print_info "Renewing certificate for api.gossip-club.sebille.net..."
+            if certbot certonly --webroot -w /var/www/certbot \
+                -d api.gossip-club.sebille.net \
+                --email "$EMAIL" \
+                --agree-tos \
+                --non-interactive \
+                --force-renewal; then
+                print_success "Certificate renewed for api.gossip-club.sebille.net"
+            else
+                print_warning "Failed to renew certificate for api.gossip-club.sebille.net"
+                print_info "The existing certificate will continue to work until it expires"
+            fi
         fi
         
         # Enable auto-renewal

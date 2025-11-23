@@ -121,3 +121,12 @@ const serializeNode = (node: any): string => {
 export function toAbsoluteUrl(path: string) {
     return `${(process.env.NEXT_PUBLIC_APP_URL ?? '').replace(/\/$/, '')}${path}`
 }
+
+/**
+ * Generate a unique operation ID with a prefix
+ * @param prefix - Prefix for the operation ID (e.g., 'upload', 'capsule')
+ * @returns Unique operation ID string
+ */
+export function generateOperationId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+}

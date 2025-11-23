@@ -37,7 +37,7 @@ type FileUploadResult = {
  * Generate unique upload ID
  */
 function generateUploadId(): string {
-  return `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  return `upload_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
 }
 
 /**

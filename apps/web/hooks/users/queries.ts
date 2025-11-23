@@ -10,7 +10,7 @@ export async function getUsers(params: {
   
   return orpc.user.list.call({
     pagination: { limit: pageSize, offset: (page - 1) * pageSize },
-    sort: { field: params.sort?.field as any || 'name', direction: params.sort?.direction || 'asc' },
+    sort: { field: params.sort?.field ?? 'name', direction: params.sort?.direction || 'asc' },
     filter: params.filter,
   })
 }

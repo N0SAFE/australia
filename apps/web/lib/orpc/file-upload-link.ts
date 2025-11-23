@@ -280,7 +280,7 @@ function uploadWithWorker(
 ): Promise<Response> {
   return new Promise((resolve, reject) => {
     const worker = getUploadWorker();
-    const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const uploadId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     
     // Extract file info for tracking
     let fileName = 'unknown';

@@ -7,6 +7,7 @@ import { withFileUploads } from '@/lib/orpc/withFileUploads'
 import { toast } from 'sonner'
 import type { CapsuleUploadProgressEvent } from '@repo/api-contracts'
 import type { Capsule } from '@/types/capsule'
+import { generateOperationId } from '@/lib/utils'
 
 /**
  * Query hook to fetch all capsules with pagination and sorting
@@ -401,7 +402,7 @@ export function useCreateCapsuleWithProgress(options?: {
   const uploadMutation = useMutation({
     mutationFn: async (variables: Parameters<typeof orpc.capsule.create.call>[0]) => {
       // Generate unique operation ID
-      const opId = `capsule-${Date.now()}-${Math.random().toString(36).substring(7)}`
+      const opId = generateOperationId('capsule')
       setOperationId(opId)
       setUploadProgress(0)
       setUploadStage('creating_capsule')
@@ -622,7 +623,7 @@ export function useUpdateCapsuleWithProgress(options?: {
   const uploadMutation = useMutation({
     mutationFn: async (variables: Parameters<typeof orpc.capsule.update.call>[0]) => {
       // Generate unique operation ID
-      const opId = `capsule-update-${Date.now()}-${Math.random().toString(36).substring(7)}`
+      const opId = generateOperationId('capsule-update')
       setOperationId(opId)
       setUploadProgress(0)
       setUploadStage('creating_capsule')

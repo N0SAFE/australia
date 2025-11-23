@@ -12,7 +12,7 @@ import {
   ColumnFiltersState,
 } from "@tanstack/react-table";
 import { flexRender, useReactTable } from "@tanstack/react-table";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useCapsules, useDeleteCapsule, useCapsuleVideoProcessing } from "@/hooks/capsules/hooks";
 import { Capsule } from "@/types/capsule";
@@ -111,8 +111,32 @@ function CreateCapsuleDialog() {
     isLocked: true,
   });
   
+  // Track blob URLs for cleanup
+  const blobUrlsRef = useRef<Set<string>>(new Set());
+  
   // Use media tracking hook
   const { processContentForSubmit } = useCapsuleMedia();
+  
+  // Cleanup blob URLs on unmount or when closing the dialog
+  useEffect(() => {
+    if (!open) {
+      // Revoke all blob URLs when dialog closes
+      blobUrlsRef.current.forEach(url => {
+        URL.revokeObjectURL(url);
+      });
+      blobUrlsRef.current.clear();
+    }
+  }, [open]);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach(url => {
+        URL.revokeObjectURL(url);
+      });
+      blobUrlsRef.current.clear();
+    };
+  }, []);
 
   // Media URL resolution strategies using contentMediaId
   // For new capsules, we don't have attachedMedia yet, so these will return empty
@@ -261,20 +285,26 @@ function CreateCapsuleDialog() {
                     fileStrategy={fileStrategy}
                     uploadFunctions={{
                       image: async (file) => {
+                        const url = URL.createObjectURL(file);
+                        blobUrlsRef.current.add(url);
                         return {
-                          url: URL.createObjectURL(file),
+                          url,
                           meta: { strategy: 'local', contentMediaId: crypto.randomUUID() }
                         };
                       },
                       video: async (file) => {
+                        const url = URL.createObjectURL(file);
+                        blobUrlsRef.current.add(url);
                         return {
-                          url: URL.createObjectURL(file),
+                          url,
                           meta: { strategy: 'local', contentMediaId: crypto.randomUUID() }
                         };
                       },
                       audio: async (file) => {
+                        const url = URL.createObjectURL(file);
+                        blobUrlsRef.current.add(url);
                         return {
-                          url: URL.createObjectURL(file),
+                          url,
                           meta: { strategy: 'local', contentMediaId: crypto.randomUUID() }
                         };
                       },

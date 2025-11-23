@@ -2,12 +2,8 @@
 
 import { FC, useMemo } from 'react';
 import { Capsule } from '@/types/capsule';
-import dynamic from 'next/dynamic';
-
-const SimpleViewer = dynamic(
-  () => import('@/components/tiptap/viewer').then(mod => ({ default: mod.SimpleViewer })),
-  { ssr: false }
-);
+import { SimpleViewer } from '@/components/tiptap/viewer';
+import { VideoProgressTracker } from '@/components/video-progress/VideoProgressTracker';
 
 // AttachedMedia type from API response
 type AttachedMedia = {
@@ -47,44 +43,70 @@ export const ContentRenderer: FC<{
   // Media URL resolution strategies using contentMediaId
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
   
+  console.log('🔵 [ContentRenderer] Attached media:', attachedMedia.length, attachedMedia);
+  
   const imageStrategy = async (meta: any) => {
-    if (!meta?.contentMediaId) return "";
+    console.log('🔵 [ContentRenderer] imageStrategy called with meta:', meta);
+    if (!meta?.contentMediaId) {
+      console.warn('⚠️ Image strategy: no contentMediaId in meta');
+      return "";
+    }
     const media = attachedMedia.find(m => m.contentMediaId === meta.contentMediaId);
     if (!media) {
       console.warn('⚠️ Image not found for contentMediaId:', meta.contentMediaId);
       return "";
     }
-    return `${API_URL}/storage/image/${media.fileId}`;
+    const url = `${API_URL}/storage/image/${media.fileId}`;
+    console.log('✅ [ContentRenderer] Image URL resolved:', url);
+    return url;
   };
   
   const videoStrategy = async (meta: any) => {
-    if (!meta?.contentMediaId) return "";
+    console.log('🔵 [ContentRenderer] videoStrategy called with meta:', meta);
+    if (!meta?.contentMediaId) {
+      console.warn('⚠️ Video strategy: no contentMediaId in meta');
+      return "";
+    }
     const media = attachedMedia.find(m => m.contentMediaId === meta.contentMediaId);
     if (!media) {
       console.warn('⚠️ Video not found for contentMediaId:', meta.contentMediaId);
       return "";
     }
-    return `${API_URL}/storage/video/${media.fileId}`;
+    const url = `${API_URL}/storage/video/${media.fileId}`;
+    console.log('✅ [ContentRenderer] Video URL resolved:', url);
+    return url;
   };
   
   const audioStrategy = async (meta: any) => {
-    if (!meta?.contentMediaId) return "";
+    console.log('🔵 [ContentRenderer] audioStrategy called with meta:', meta);
+    if (!meta?.contentMediaId) {
+      console.warn('⚠️ Audio strategy: no contentMediaId in meta');
+      return "";
+    }
     const media = attachedMedia.find(m => m.contentMediaId === meta.contentMediaId);
     if (!media) {
       console.warn('⚠️ Audio not found for contentMediaId:', meta.contentMediaId);
       return "";
     }
-    return `${API_URL}/storage/audio/${media.fileId}`;
+    const url = `${API_URL}/storage/audio/${media.fileId}`;
+    console.log('✅ [ContentRenderer] Audio URL resolved:', url);
+    return url;
   };
   
   const fileStrategy = async (meta: any) => {
-    if (!meta?.contentMediaId) return "";
+    console.log('🔵 [ContentRenderer] fileStrategy called with meta:', meta);
+    if (!meta?.contentMediaId) {
+      console.warn('⚠️ File strategy: no contentMediaId in meta');
+      return "";
+    }
     const media = attachedMedia.find(m => m.contentMediaId === meta.contentMediaId);
     if (!media) {
       console.warn('⚠️ File not found for contentMediaId:', meta.contentMediaId);
       return "";
     }
-    return `${API_URL}/storage/file/${media.fileId}`;
+    const url = `${API_URL}/storage/file/${media.fileId}`;
+    console.log('✅ [ContentRenderer] File URL resolved:', url);
+    return url;
   };
 
   return (
@@ -96,6 +118,7 @@ export const ContentRenderer: FC<{
       videoStrategy={videoStrategy}
       audioStrategy={audioStrategy}
       fileStrategy={fileStrategy}
+      VideoProgressComponent={VideoProgressTracker}
     />
   );
 };

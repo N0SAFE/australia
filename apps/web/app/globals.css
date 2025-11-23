@@ -6,7 +6,8 @@
 @import "@repo/ui/styles/_variables.scss";
 @import "@repo/ui/styles/_keyframe-animations.scss";
 
-@custom-variant dark (&:is(.dark *));
+/* Force class-based dark mode only - disable media query detection */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --color-background: var(--background); 

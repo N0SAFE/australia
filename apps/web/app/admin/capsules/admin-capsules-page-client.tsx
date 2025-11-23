@@ -99,28 +99,6 @@ import { orpc } from "@/lib/orpc";
 import { withFileUploads } from "@/lib/orpc/withFileUploads";
 import { useCapsuleMedia } from "@/hooks/capsules/media";
 
-/**
- * Sanitize filename to ASCII-safe characters for HTTP headers
- * Replaces accented characters and special chars with ASCII equivalents
- */
-function sanitizeFilename(filename: string): string {
-  // Get extension
-  const lastDotIndex = filename.lastIndexOf(".");
-  const name =
-    lastDotIndex >= 0 ? filename.substring(0, lastDotIndex) : filename;
-  const ext = lastDotIndex >= 0 ? filename.substring(lastDotIndex) : "";
-
-  // Normalize to NFD (decomposed form) and remove diacritics
-  const normalized = name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
-    .replace(/[^a-zA-Z0-9_-]/g, "_") // Replace non-ASCII with underscore
-    .replace(/_+/g, "_") // Collapse multiple underscores
-    .replace(/^_|_$/g, ""); // Remove leading/trailing underscores
-
-  return normalized + ext;
-}
-
 // Create Capsule Dialog Component
 function CreateCapsuleDialog() {
   const [open, setOpen] = useState(false);
@@ -132,9 +110,6 @@ function CreateCapsuleDialog() {
     openingMessage: "",
     isLocked: true,
   });
-  
-  // Use the enhanced ORPC client with automatic file upload handling
-  const orpcWithUploads = withFileUploads(orpc);
   
   // Use media tracking hook
   const { processContentForSubmit } = useCapsuleMedia();

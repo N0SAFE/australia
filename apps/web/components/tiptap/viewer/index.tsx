@@ -2,24 +2,7 @@
 
 import { useEffect } from "react"
 import { EditorContent, useEditor, type JSONContent } from "@repo/ui/tiptap-exports/react"
-
-// --- Tiptap Core Extensions ---
-import { StarterKit } from "@repo/ui/tiptap-exports/starter-kit"
-import { TaskItem, TaskList } from "@repo/ui/tiptap-exports/extension-list"
-import { TextAlign } from "@repo/ui/tiptap-exports/extension-text-align"
-import { Typography } from "@repo/ui/tiptap-exports/extension-typography"
-import { Highlight } from "@repo/ui/tiptap-exports/extension-highlight"
-import { Subscript } from "@repo/ui/tiptap-exports/extension-subscript"
-import { Superscript } from "@repo/ui/tiptap-exports/extension-superscript"
-import { TextStyle } from '@repo/ui/tiptap-exports/extension-text-style'
-import { Color } from '@repo/ui/tiptap-exports/extension-color'
-
-// --- Tiptap Node Extensions (read-only versions) ---
-import { ImageNode } from "@repo/ui/components/tiptap-node/image-node/image-node-extension"
-import { VideoNode } from "@repo/ui/components/tiptap-node/video-node/video-node-extension"
-import { AudioNode } from "@repo/ui/components/tiptap-node/audio-node/audio-node-extension"
-import { FileNode } from "@repo/ui/components/tiptap-node/file-node/file-node-extension"
-import { HorizontalRule } from "@repo/ui/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension"
+import { useSharedTipTapExtensions } from "../common"
 
 // --- Styles ---
 import "@repo/ui/components/tiptap-node/blockquote-node/blockquote-node.scss"
@@ -47,7 +30,7 @@ export interface SimpleViewerProps {
   /**
    * Component to render video processing progress
    */
-  VideoProgressComponent?: import("react").ComponentType<import("@repo/ui/tiptap-node/video-node-extension").VideoProgressComponentProps>
+  VideoProgressComponent?: import("react").ComponentType<any>
 }
 
 /**
@@ -64,6 +47,41 @@ export function SimpleViewer({
   fileStrategy,
   VideoProgressComponent,
 }: SimpleViewerProps) {
+  console.log('🔵 [SimpleViewer] Initializing with:', {
+    hasValue: !!value,
+    valueType: typeof value,
+    value: value,
+    className,
+    hasVideoStrategy: !!videoStrategy,
+    hasImageStrategy: !!imageStrategy,
+    hasAudioStrategy: !!audioStrategy,
+    hasFileStrategy: !!fileStrategy,
+    hasVideoProgressComponent: !!VideoProgressComponent,
+  })
+
+  const sharedExtensions = useSharedTipTapExtensions({
+    openLinksOnClick: true, // Allow clicking links in view mode
+    imageStrategy,
+    videoStrategy,
+    audioStrategy,
+    fileStrategy,
+    VideoProgressComponent,
+  })
+
+  console.log('🔵 [SimpleViewer] Shared extensions:', {
+    extensionsCount: sharedExtensions.length,
+    extensions: sharedExtensions.map(ext => ext.name),
+  })
+
+  // Check each extension individually
+  sharedExtensions.forEach((ext, i) => {
+    if (!ext) {
+      console.error(`❌ [SimpleViewer] Extension at index ${i} is undefined!`)
+    } else if (!(ext as any).type && !(ext as any).config) {
+      console.error(`❌ [SimpleViewer] Extension at index ${i} (${ext.name}) has no type or config:`, ext)
+    }
+  })
+
   const editor = useEditor({
     immediatelyRender: false,
     editable: false, // Read-only mode
@@ -72,47 +90,40 @@ export function SimpleViewer({
         class: `simple-viewer ${className || ''}`,
       },
     },
-    extensions: [
-      StarterKit.configure({
-        horizontalRule: false,
-        link: {
-          openOnClick: true, // Allow clicking links in view mode
-        },
-      }),
-      HorizontalRule,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Highlight.configure({ multicolor: true }),
-      Typography,
-      Superscript,
-      Subscript,
-      TextStyle,
-      Color,
-      // Display nodes for media with URL injection
-      ImageNode.configure({
-        imageStrategy,
-      }),
-      VideoNode.configure({
-        videoStrategy,
-        VideoProgressComponent,
-      }),
-      AudioNode.configure({
-        audioStrategy,
-      }),
-      FileNode.configure({
-        fileStrategy,
-      }),
-    ],
-    content: value ?? [{ type: "paragraph", children: [{ text: "" }] }],
+    extensions: sharedExtensions,
+    // Handle both array and direct doc format
+    content: Array.isArray(value) ? value[0] : (value ?? { type: "doc", content: [{ type: "paragraph" }] }),
+  })
+  
+
+  console.log('🔵 [SimpleViewer] Editor created:', {
+    hasEditor: !!editor,
+    isDestroyed: editor?.isDestroyed,
   })
 
   // Update editor content when value prop changes
   useEffect(() => {
+    console.log('🔵 [SimpleViewer] Content update effect:', {
+      hasEditor: !!editor,
+      hasValue: !!value,
+      editorIsDestroyed: editor?.isDestroyed,
+    })
+    
     if (editor && value && JSON.stringify(editor.getJSON()) !== JSON.stringify(value)) {
-      editor.commands.setContent(value, { emitUpdate: false })
+      console.log('🔵 [SimpleViewer] Updating content')
+      try {
+        editor.commands.setContent(value, { emitUpdate: false })
+        console.log('✅ [SimpleViewer] Content updated successfully')
+      } catch (error) {
+        console.error('❌ [SimpleViewer] Failed to update content:', error)
+      }
     }
   }, [editor, value])
+
+  console.log('🔵 [SimpleViewer] Rendering, editor:', {
+    hasEditor: !!editor,
+    editorIsDestroyed: editor?.isDestroyed,
+  })
 
   return (
     <div className="simple-viewer-wrapper">

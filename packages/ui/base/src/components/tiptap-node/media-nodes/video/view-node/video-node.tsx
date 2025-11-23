@@ -48,8 +48,8 @@ export function VideoNodeView(props: NodeViewProps) {
         return
       }
       
-      // Pass the whole node to the strategy resolver
-      const resolved = await videoStrategy(node)
+      // Pass strategy.meta to the strategy resolver
+      const resolved = await videoStrategy(strategy.meta)
       setResolvedSrc(resolved)
     }
     void resolve()

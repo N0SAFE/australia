@@ -44,8 +44,8 @@ export function ImageNodeView(props: NodeViewProps) {
         return
       }
       
-      // Pass the whole node to the strategy resolver
-      const resolved = await imageStrategy(node)
+      // Pass strategy.meta to the strategy resolver
+      const resolved = await imageStrategy(strategy.meta)
       setResolvedSrc(resolved)
     }
     void resolve()

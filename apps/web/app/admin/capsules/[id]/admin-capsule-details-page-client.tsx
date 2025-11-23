@@ -29,25 +29,9 @@ import { useCapsule, useUpdateCapsule } from "@/hooks/capsules/hooks";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Unlock } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import dynamic from "next/dynamic";
 import { useCapsuleMedia } from "@/hooks/capsules/media";
 import { AttachedMediaProvider } from "@/contexts/AttachedMediaContext";
-
-const SimpleEditor = dynamic(
-  () =>
-    import("@/components/tiptap/editor").then(
-      (mod) => ({ default: mod.SimpleEditor }),
-    ),
-  { ssr: false },
-)
-
-const SimpleViewer = dynamic(
-  () =>
-    import("@/components/tiptap/viewer").then(
-      (mod) => ({ default: mod.SimpleViewer }),
-    ),
-  { ssr: false },
-);
+import { TipTapContentRenderer } from "@/components/tiptap/common";
 
 export const AdminCapsuleDetailsPageClient: FC<{
   capsuleId: string;
@@ -72,9 +56,6 @@ export const AdminCapsuleDetailsPageClient: FC<{
 
   const [editorValue, setEditorValue] = useState<any>(getEmptyValue());
   
-  // Map to store blob URLs temporarily for newly uploaded files
-  // Key: contentMediaId, Value: blob URL string
-  const [blobUrlMap, setBlobUrlMap] = useState<Map<string, string>>(new Map());
   const [date, setDate] = useState<Date | undefined>(
     capsule?.openingDate ? new Date(capsule.openingDate) : new Date(),
   );
@@ -88,61 +69,6 @@ export const AdminCapsuleDetailsPageClient: FC<{
   
   // Use the capsule media tracking hook
   const { processContentForSubmit } = useCapsuleMedia();
-
-  // Single URL resolver function using strategy switch
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-  
-  /**
-   * Resolve media URL based on strategy
-   * @param mediaType - Type of media (image, video, audio, file)
-   * @param node - The media node with attrs.temp and attrs.strategy
-   */
-  const resolveMediaUrl = async (mediaType: 'image' | 'video' | 'audio' | 'file', node: any): Promise<string> => {
-    // Access temp and strategy from attrs (where TipTap stores them)
-    const temp = node.attrs?.temp as { blobUrl?: string } | undefined;
-    const strategy = node.attrs?.strategy as { name?: string; meta?: { contentMediaId?: string } } | undefined;
-    
-    // Check if we have a temporary blob URL (newly uploaded, not saved yet)
-    if (temp?.blobUrl) {
-      console.log(`🗺️ [${mediaType}] Using temp blob URL:`, temp.blobUrl);
-      return temp.blobUrl;
-    }
-    
-    // Use strategy to build URL from API
-    if (!strategy) {
-      console.warn(`⚠️ [${mediaType}] No strategy found`);
-      return "";
-    }
-    
-    switch (strategy.name) {
-      case 'api': {
-        const contentMediaId = strategy.meta?.contentMediaId;
-        if (!contentMediaId) {
-          console.warn(`⚠️ [${mediaType}] API strategy missing contentMediaId`);
-          return "";
-        }
-        
-        // Look up in attachedMedia to get fileId
-        const media = capsule?.attachedMedia?.find((m: any) => m.contentMediaId === contentMediaId);
-        if (media) {
-          return `${API_URL}/storage/${mediaType}/${media.fileId}`;
-        }
-        
-        console.warn(`⚠️ [${mediaType}] contentMediaId not found in attachedMedia:`, contentMediaId);
-        return "";
-      }
-      
-      default:
-        console.warn(`⚠️ [${mediaType}] Unknown strategy:`, strategy.name);
-        return "";
-    }
-  };
-  
-  // Strategy functions for each media type (delegate to resolveMediaUrl)
-  const imageStrategy = async (node: any) => resolveMediaUrl('image', node);
-  const videoStrategy = async (node: any) => resolveMediaUrl('video', node);
-  const audioStrategy = async (node: any) => resolveMediaUrl('audio', node);
-  const fileStrategy = async (node: any) => resolveMediaUrl('file', node);
 
   // Update local state when capsule data loads
   useEffect(() => {
@@ -309,88 +235,19 @@ export const AdminCapsuleDetailsPageClient: FC<{
             readOnly
           />
           <div className="border rounded-lg overflow-hidden">
-            {update ? (
-              <SimpleEditor
-                // value={[]}
-                value={editorValue}
-                onChange={(newValue) => {
-                  console.log(
-                    "📝 [SimpleEditor] Content changed:",
-                    JSON.stringify(newValue, null, 2),
-                  );
-                  setEditorValue(newValue);
-                }}
-                editable={update}
-                placeholder="Écrivez le contenu de votre capsule temporelle..."
-                imageStrategy={imageStrategy}
-                videoStrategy={videoStrategy}
-                audioStrategy={audioStrategy}
-                fileStrategy={fileStrategy}
-                uploadFunctions={{
-                  image: async (file) => {
-                    const contentMediaId = crypto.randomUUID();
-                    const blobUrl = URL.createObjectURL(file);
-                    
-                    console.log('📤 [Image Upload] Created blob URL:', { contentMediaId, blobUrl });
-                    
-                    return {
-                      url: blobUrl,
-                      meta: {
-                        // For useFileUpload validation
-                        contentMediaId,
-                        // For BaseUploadNode to build strategy structure
-                        strategyName: 'api',
-                        strategyMeta: { contentMediaId }
-                      }
-                    };
-                  },
-                  video: async (file) => {
-                    const contentMediaId = crypto.randomUUID();
-                    const blobUrl = URL.createObjectURL(file);
-                    
-                    console.log('📤 [Video Upload] Created blob URL:', { contentMediaId, blobUrl });
-                    
-                    return {
-                      url: blobUrl,
-                      meta: {
-                        // For useFileUpload validation
-                        contentMediaId,
-                        // For BaseUploadNode to build strategy structure
-                        strategyName: 'api',
-                        strategyMeta: { contentMediaId }
-                      }
-                    };
-                  },
-                  audio: async (file) => {
-                    const contentMediaId = crypto.randomUUID();
-                    const blobUrl = URL.createObjectURL(file);
-                    
-                    console.log('📤 [Audio Upload] Created blob URL:', { contentMediaId, blobUrl });
-                    
-                    return {
-                      url: blobUrl,
-                      meta: {
-                        // For useFileUpload validation
-                        contentMediaId,
-                        // For BaseUploadNode to build strategy structure
-                        strategyName: 'api',
-                        strategyMeta: { contentMediaId }
-                      }
-                    };
-                  },
-                }}
-                VideoProgressComponent={VideoProgressTracker}
-              />
-            ) : (
-              <SimpleViewer
-                value={editorValue}
-                imageStrategy={imageStrategy}
-                videoStrategy={videoStrategy}
-                audioStrategy={audioStrategy}
-                fileStrategy={fileStrategy}
-                VideoProgressComponent={VideoProgressTracker}
-              />
-            )}
+            <TipTapContentRenderer
+              mode={update ? 'editor' : 'viewer'}
+              value={editorValue}
+              onChange={(newValue) => {
+                console.log(
+                  "📝 [TipTap] Content changed:",
+                  JSON.stringify(newValue, null, 2),
+                );
+                setEditorValue(newValue);
+              }}
+              capsule={capsule}
+              placeholder="Écrivez le contenu de votre capsule temporelle..."
+            />
           </div>
         </Field>
 

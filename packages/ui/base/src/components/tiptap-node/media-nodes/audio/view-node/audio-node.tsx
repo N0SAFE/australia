@@ -44,8 +44,8 @@ export function AudioNodeView(props: NodeViewProps) {
         return
       }
       
-      // Pass the whole node to the strategy resolver
-      const resolved = await audioStrategy(node)
+      // Pass strategy.meta to the strategy resolver
+      const resolved = await audioStrategy(strategy.meta)
       setResolvedSrc(resolved)
     }
     void resolve()

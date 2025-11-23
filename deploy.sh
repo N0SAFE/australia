@@ -281,18 +281,6 @@ print_info "  Database URL: postgresql://$DB_USER:****@host.docker.internal:5432
 # Set proper ownership for project files
 chown -R "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_DIR"
 
-# Install project dependencies
-print_header "📦 Installing Project Dependencies"
-cd "$PROJECT_DIR"
-
-if [ -f "package.json" ]; then
-    print_info "Installing dependencies with Bun..."
-    su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && $ACTUAL_HOME/.bun/bin/bun ci"
-    print_success "Dependencies installed"
-else
-    print_warning "No package.json found, skipping dependency installation"
-fi
-
 # Configure Nginx (HTTP-only first, SSL later)
 print_header "🌐 Configuring Nginx"
 
@@ -380,8 +368,28 @@ fi
 # SSL Certificate setup
 print_header "🔒 SSL Certificate Setup"
 
-print_info "Do you want to obtain SSL certificates now? (y/n)"
-read -r OBTAIN_SSL
+# Check if certificates already exist
+APP_CERT_EXISTS=false
+API_CERT_EXISTS=false
+
+if [ -d "/etc/letsencrypt/live/app.gossip-club.sebille.net" ]; then
+    APP_CERT_EXISTS=true
+    print_success "SSL certificate already exists for app.gossip-club.sebille.net"
+fi
+
+if [ -d "/etc/letsencrypt/live/api.gossip-club.sebille.net" ]; then
+    API_CERT_EXISTS=true
+    print_success "SSL certificate already exists for api.gossip-club.sebille.net"
+fi
+
+# Only prompt if at least one certificate is missing
+if [ "$APP_CERT_EXISTS" = false ] || [ "$API_CERT_EXISTS" = false ]; then
+    print_info "Do you want to obtain SSL certificates now? (y/n)"
+    read -r OBTAIN_SSL
+else
+    print_success "All SSL certificates are already configured"
+    OBTAIN_SSL="n"
+fi
 
 if [[ "$OBTAIN_SSL" =~ ^[Yy]$ ]]; then
     print_info "Enter your email address for Let's Encrypt notifications:"
@@ -393,46 +401,63 @@ if [[ "$OBTAIN_SSL" =~ ^[Yy]$ ]]; then
     else
         print_info "Obtaining SSL certificates..."
         
-        # Obtain certificate for Australia app
-        if certbot certonly --webroot -w /var/www/certbot \
-            -d app.gossip-club.sebille.net \
-            --email "$EMAIL" \
-            --agree-tos \
-            --non-interactive; then
-            print_success "Certificate obtained for app.gossip-club.sebille.net"
+        # Obtain certificate for Australia app (only if not exists)
+        if [ "$APP_CERT_EXISTS" = false ]; then
+            print_info "Obtaining certificate for app.gossip-club.sebille.net..."
+            if certbot certonly --webroot -w /var/www/certbot \
+                -d app.gossip-club.sebille.net \
+                --email "$EMAIL" \
+                --agree-tos \
+                --non-interactive; then
+                print_success "Certificate obtained for app.gossip-club.sebille.net"
+                APP_CERT_EXISTS=true
+            else
+                print_warning "Failed to obtain certificate for app.gossip-club.sebille.net"
+                print_info "Make sure DNS is properly configured and ports 80/443 are open"
+            fi
         else
-            print_warning "Failed to obtain certificate for app.gossip-club.sebille.net"
-            print_info "Make sure DNS is properly configured and ports 80/443 are open"
+            print_info "Skipping app.gossip-club.sebille.net (certificate already exists)"
         fi
         
-        # Obtain certificate for API
-        if certbot certonly --webroot -w /var/www/certbot \
-            -d api.gossip-club.sebille.net \
-            --email "$EMAIL" \
-            --agree-tos \
-            --non-interactive; then
-            print_success "Certificate obtained for api.gossip-club.sebille.net"
+        # Obtain certificate for API (only if not exists)
+        if [ "$API_CERT_EXISTS" = false ]; then
+            print_info "Obtaining certificate for api.gossip-club.sebille.net..."
+            if certbot certonly --webroot -w /var/www/certbot \
+                -d api.gossip-club.sebille.net \
+                --email "$EMAIL" \
+                --agree-tos \
+                --non-interactive; then
+                print_success "Certificate obtained for api.gossip-club.sebille.net"
+                API_CERT_EXISTS=true
+            else
+                print_warning "Failed to obtain certificate for api.gossip-club.sebille.net"
+                print_info "Make sure DNS is properly configured and ports 80/443 are open"
+            fi
         else
-            print_warning "Failed to obtain certificate for api.gossip-club.sebille.net"
-            print_info "Make sure DNS is properly configured and ports 80/443 are open"
+            print_info "Skipping api.gossip-club.sebille.net (certificate already exists)"
         fi
         
         # Enable auto-renewal
         systemctl enable certbot.timer
         systemctl start certbot.timer
         
-        # Install full SSL Nginx configuration
-        print_info "Installing full SSL Nginx configuration..."
-        if [ -f "$PROJECT_DIR/nginx.conf" ]; then
-            cp "$PROJECT_DIR/nginx.conf" /etc/nginx/sites-available/gossip-club
-            
-            if nginx -t; then
-                systemctl reload nginx
-                print_success "Full SSL Nginx configuration installed and activated"
-            else
-                print_warning "Full SSL configuration test failed, keeping temporary HTTP configuration"
-                print_info "You may need to manually update the configuration later"
+        # Install full SSL Nginx configuration (only if both certificates exist)
+        if [ "$APP_CERT_EXISTS" = true ] && [ "$API_CERT_EXISTS" = true ]; then
+            print_info "Installing full SSL Nginx configuration..."
+            if [ -f "$PROJECT_DIR/nginx.conf" ]; then
+                cp "$PROJECT_DIR/nginx.conf" /etc/nginx/sites-available/gossip-club
+                
+                if nginx -t; then
+                    systemctl reload nginx
+                    print_success "Full SSL Nginx configuration installed and activated"
+                else
+                    print_warning "Full SSL configuration test failed, keeping temporary HTTP configuration"
+                    print_info "You may need to manually update the configuration later"
+                fi
             fi
+        else
+            print_warning "Not all certificates obtained, keeping HTTP-only configuration"
+            print_info "Run ./setup-ssl.sh after obtaining all certificates to enable HTTPS"
         fi
         
         print_success "SSL certificates configured"

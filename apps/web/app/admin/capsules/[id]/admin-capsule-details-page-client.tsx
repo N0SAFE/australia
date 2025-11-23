@@ -12,28 +12,6 @@ import {
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-
-/**
- * Sanitize filename to ASCII-safe characters for HTTP headers
- * Replaces accented characters and special chars with ASCII equivalents
- */
-function sanitizeFilename(filename: string): string {
-  // Get extension
-  const lastDotIndex = filename.lastIndexOf(".");
-  const name =
-    lastDotIndex >= 0 ? filename.substring(0, lastDotIndex) : filename;
-  const ext = lastDotIndex >= 0 ? filename.substring(lastDotIndex) : "";
-
-  // Normalize to NFD (decomposed form) and remove diacritics
-  const normalized = name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
-    .replace(/[^a-zA-Z0-9_-]/g, "_") // Replace non-ASCII with underscore
-    .replace(/_+/g, "_") // Collapse multiple underscores
-    .replace(/^_|_$/g, ""); // Remove leading/trailing underscores
-
-  return normalized + ext;
-}
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -47,28 +25,13 @@ import Link from "next/link";
 import { Capsule, LockType } from "@/types/capsule";
 
 import { Calendar } from "@/components/ui/calendar";
-import { useCapsule, useUpdateCapsule } from "@/hooks/useCapsules";
+import { useCapsule, useUpdateCapsule } from "@/hooks/capsules/hooks";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Lock, Unlock } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import dynamic from "next/dynamic";
-import { useStorage } from "@/hooks/useStorage";
-
-const SimpleEditor = dynamic(
-  () =>
-    import("@/components/tiptap/editor").then(
-      (mod) => ({ default: mod.SimpleEditor }),
-    ),
-  { ssr: false },
-)
-
-const SimpleViewer = dynamic(
-  () =>
-    import("@/components/tiptap/viewer").then(
-      (mod) => ({ default: mod.SimpleViewer }),
-    ),
-  { ssr: false },
-);
+import { useCapsuleMedia } from "@/hooks/capsules/media";
+import { AttachedMediaProvider } from "@/contexts/AttachedMediaContext";
+import { TipTapContentRenderer } from "@/components/tiptap/common";
 
 export const AdminCapsuleDetailsPageClient: FC<{
   capsuleId: string;
@@ -85,12 +48,14 @@ export const AdminCapsuleDetailsPageClient: FC<{
       } as Capsule),
   );
 
-  // Default empty Tiptap value (empty paragraph)
-  const getEmptyValue = () => [
-    { type: "paragraph", content: [{ type: "text", text: "" }] },
-  ];
+  // Default empty Tiptap value (proper doc structure)
+  const getEmptyValue = () => ({
+    type: "doc",
+    content: [{ type: "paragraph" }],
+  });
 
   const [editorValue, setEditorValue] = useState<any>(getEmptyValue());
+  
   const [date, setDate] = useState<Date | undefined>(
     capsule?.openingDate ? new Date(capsule.openingDate) : new Date(),
   );
@@ -101,30 +66,9 @@ export const AdminCapsuleDetailsPageClient: FC<{
 
   const { mutate: updateCapsule, isPending: isUpdating } = useUpdateCapsule();
   const router = useRouter();
-  const storage = useStorage();
-
-  // Media URL resolution strategies
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
   
-  const imageStrategy = async (meta: any) => {
-    if (!meta?.fileId) return "";
-    return `${API_URL}/storage/image/${meta.fileId}`;
-  };
-  
-  const videoStrategy = async (meta: any) => {
-    if (!meta?.fileId) return "";
-    return `${API_URL}/storage/video/${meta.fileId}`;
-  };
-  
-  const audioStrategy = async (meta: any) => {
-    if (!meta?.fileId) return "";
-    return `${API_URL}/storage/audio/${meta.fileId}`;
-  };
-  
-  const fileStrategy = async (meta: any) => {
-    if (!meta?.fileId) return "";
-    return `${API_URL}/storage/file/${meta.fileId}`;
-  };
+  // Use the capsule media tracking hook
+  const { processContentForSubmit } = useCapsuleMedia();
 
   // Update local state when capsule data loads
   useEffect(() => {
@@ -164,8 +108,14 @@ export const AdminCapsuleDetailsPageClient: FC<{
 
         // Tiptap content can be an object with type: 'doc' or directly the content array
         if (parsed && typeof parsed === "object") {
-          setEditorValue(parsed);
-          console.log("💾 [AdminCapsule] Editor value set");
+          // Normalize content: if it's an array with a doc wrapper, unwrap it
+          let normalizedContent = parsed;
+          if (Array.isArray(parsed) && parsed.length === 1 && parsed[0]?.type === 'doc') {
+            normalizedContent = parsed[0];
+            console.log("🔧 [AdminCapsule] Unwrapped array-wrapped doc");
+          }
+          setEditorValue(normalizedContent);
+          console.log("💾 [AdminCapsule] Editor value set", normalizedContent);
         }
       } catch (error) {
         console.error(
@@ -184,21 +134,23 @@ export const AdminCapsuleDetailsPageClient: FC<{
     if (!update || !capsule) return;
 
     try {
-      // Always store Tiptap content as JSON string
-      // Tiptap content can contain text, images, videos, audio, and more
-      const updateData: any = {
-        id: capsule.id,
-        openingDate: date?.toISOString() || state.openingDate,
-        content: JSON.stringify(editorValue),
-        openingMessage: state.openingMessage,
-        isLocked: isLocked,
-        lockType: lockType,
-        lockConfig: state.lockConfig,
-      };
+      // Process content: extract local nodes, convert to uniqueId strategy, collect files
+      const contentArray = Array.isArray(editorValue) ? editorValue : [editorValue];
+      const { processedContent, media } = processContentForSubmit(contentArray);
+      
+      console.log("🔵 Submitting capsule update with media:", media);
 
-      console.log("🔵 Submitting capsule update:", updateData);
-
-      updateCapsule(updateData, {
+      updateCapsule(
+        {
+          id: capsule.id,
+          openingDate: date?.toISOString() || state.openingDate,
+          content: JSON.stringify(processedContent),
+          openingMessage: state.openingMessage ?? undefined,
+          isLocked: isLocked,
+          lockType: lockType,
+          lockConfig: state.lockConfig,
+          media: media,
+        }, {
         onSuccess: (result) => {
           console.log("✅ Capsule update successful:", result);
           router.push(`/admin/capsules/${capsuleId}`);
@@ -218,9 +170,10 @@ export const AdminCapsuleDetailsPageClient: FC<{
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <AttachedMediaProvider attachedMedia={capsule.attachedMedia || []}>
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Link
@@ -282,92 +235,19 @@ export const AdminCapsuleDetailsPageClient: FC<{
             readOnly
           />
           <div className="border rounded-lg overflow-hidden">
-            {update ? (
-              <SimpleEditor
-                // value={[]}
-                value={editorValue}
-                onChange={(newValue) => {
-                  console.log(
-                    "📝 [SimpleEditor] Content changed:",
-                    JSON.stringify(newValue, null, 2),
-                  );
-                  setEditorValue(newValue);
-                }}
-                editable={update}
-                placeholder="Écrivez le contenu de votre capsule temporelle..."
-                // Media URL resolution strategies
-                imageStrategy={imageStrategy}
-                videoStrategy={videoStrategy}
-                audioStrategy={audioStrategy}
-                fileStrategy={fileStrategy}
-                uploadFunctions={{
-                  image: async (file, onProgress, signal) => {
-                    // Sanitize filename to ASCII-safe characters for HTTP headers
-                    const sanitizedFile = new File(
-                      [file],
-                      sanitizeFilename(file.name),
-                      { type: file.type },
-                    );
-                    const result = await storage.uploadImageAsync(
-                      sanitizedFile,
-                      onProgress,
-                    );
-                    return {
-                      meta: {
-                        srcResolveStrategy: 'image',
-                        fileId: result.fileId!,
-                      },
-                    };
-                  },
-                  video: async (file, onProgress, signal) => {
-                    // Sanitize filename to ASCII-safe characters for HTTP headers
-                    const sanitizedFile = new File(
-                      [file],
-                      sanitizeFilename(file.name),
-                      { type: file.type },
-                    );
-                    const result = await storage.uploadVideoAsync(
-                      sanitizedFile,
-                      onProgress,
-                    );
-                    return {
-                      meta: {
-                        srcResolveStrategy: 'video',
-                        fileId: result.fileId!,
-                      },
-                    };
-                  },
-                  audio: async (file, onProgress, signal) => {
-                    // Sanitize filename to ASCII-safe characters for HTTP headers
-                    const sanitizedFile = new File(
-                      [file],
-                      sanitizeFilename(file.name),
-                      { type: file.type },
-                    );
-                    const result = await storage.uploadAudioAsync(
-                      sanitizedFile,
-                      onProgress,
-                    );
-                    return {
-                      meta: {
-                        srcResolveStrategy: 'audio',
-                        fileId: result.fileId!,
-                      },
-                    };
-                  },
-                }}
-                VideoProgressComponent={VideoProgressTracker}
-              />
-            ) : (
-              <SimpleViewer
-                value={editorValue}
-                // Media URL resolution strategies
-                imageStrategy={imageStrategy}
-                videoStrategy={videoStrategy}
-                audioStrategy={audioStrategy}
-                fileStrategy={fileStrategy}
-              />
-            )}
+            <TipTapContentRenderer
+              mode={update ? 'editor' : 'viewer'}
+              value={editorValue}
+              onChange={(newValue) => {
+                console.log(
+                  "📝 [TipTap] Content changed:",
+                  JSON.stringify(newValue, null, 2),
+                );
+                setEditorValue(newValue);
+              }}
+              capsule={capsule}
+              placeholder="Écrivez le contenu de votre capsule temporelle..."
+            />
           </div>
         </Field>
 
@@ -695,6 +575,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
           </Field>
         )}
       </form>
-    </div>
+      </div>
+    </AttachedMediaProvider>
   );
 };

@@ -17,6 +17,6 @@ export const getVideoDataContract = oc
   }))
   .output(
     z.object({
-      isProcessed: z.boolean()
+      isProcessed: z.coerce.boolean()
     })
   );

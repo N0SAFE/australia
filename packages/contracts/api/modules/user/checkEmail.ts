@@ -1,12 +1,12 @@
 import { oc } from "@orpc/contract";
-import { z } from "zod/v4";
+import z from "zod/v4";
 
 export const userCheckEmailInput = z.object({
   email: z.email(),
 });
 
 export const userCheckEmailOutput = z.object({
-  exists: z.boolean(),
+  exists: z.coerce.boolean(),
 });
 
 export const userCheckEmailContract = oc

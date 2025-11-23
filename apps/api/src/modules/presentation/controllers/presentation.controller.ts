@@ -3,49 +3,42 @@ import { Implement, implement } from '@orpc/nest';
 import { ORPCError } from '@orpc/server';
 import { PresentationService } from '../services/presentation.service';
 import { presentationContract } from '@repo/api-contracts';
-import { readFile } from 'fs/promises';
 
 @Controller()
 export class PresentationController {
   
-  constructor(private readonly presentationService: PresentationService) {}
+  constructor(
+    private readonly presentationService: PresentationService
+  ) {}
 
   /**
    * Upload presentation video endpoint - implements ORPC contract with file upload
-   * File is parsed by FileUploadMiddleware:
-   * - input.file: Web API File object (for ORPC validation)
-   * - input._multerFiles.file: Multer metadata (for server-generated filename)
+   * File is parsed by ORPC which provides a clean File object with proper type coercion
    */
   @Implement(presentationContract.upload)
   upload() {
     return implement(presentationContract.upload).handler(async ({ input }) => {
       try {
-        // Get Multer file metadata for server-generated filename
-        const multerInput = input
-        const multerMetadata = multerInput._multerFiles?.file;
-        
-        if (!multerMetadata) {
-          throw new ORPCError('BAD_REQUEST', {
-            message: 'No file uploaded or file metadata missing',
-          });
-        }
+        const file: File = input.file;
 
-        // Create Express.Multer.File from metadata
-        const multerFile: Express.Multer.File = {
-          fieldname: 'file',
-          originalname: multerMetadata.originalname,
-          encoding: '7bit',
-          mimetype: multerMetadata.mimetype,
-          size: multerInput.file.size,
-          destination: '',
-          filename: multerMetadata.filename,
-          path: multerMetadata.path,
-          buffer: Buffer.from([]),
-        } as Express.Multer.File;
-
-        const result = await this.presentationService.uploadVideo(multerFile);
+        // Pass File object directly to service
+        const result = await this.presentationService.uploadVideo(file);
         
-        return result;
+        // Flatten nested structure for API response
+        return {
+          id: result.id,
+          filename: result.file.filename,
+          filePath: result.file.filePath,
+          mimeType: result.file.mimeType,
+          size: result.file.size,
+          duration: result.video.duration,
+          width: result.video.width,
+          height: result.video.height,
+          thumbnailPath: result.video.thumbnailPath,
+          uploadedAt: result.uploadedAt,
+          updatedAt: result.updatedAt,
+          url: result.url,
+        };
       } catch (error) {
         console.error('[PresentationController] Error in upload:', error);
         throw error;
@@ -59,7 +52,30 @@ export class PresentationController {
   @Implement(presentationContract.getCurrent)
   getCurrent() {
     return implement(presentationContract.getCurrent).handler(async () => {
-      return await this.presentationService.getCurrentVideo();
+      const result = await this.presentationService.getCurrentVideo();
+      
+      if (!result) {
+        return null;
+      }
+      
+      // Flatten nested structure for API response
+      return {
+        id: result.id,
+        filename: result.file.filename,
+        filePath: result.file.filePath,
+        mimeType: result.file.mimeType,
+        size: result.file.size,
+        duration: result.video.duration,
+        width: result.video.width,
+        height: result.video.height,
+        thumbnailPath: result.video.thumbnailPath,
+        uploadedAt: result.uploadedAt,
+        updatedAt: result.updatedAt,
+        url: result.url,
+        isProcessed: result.video.isProcessed,
+        processingProgress: result.video.processingProgress,
+        processingError: result.video.processingError,
+      };
     });
   }
 
@@ -70,7 +86,6 @@ export class PresentationController {
   getVideo() {
     return implement(presentationContract.getVideo).handler(async () => {
       try {
-        const videoPath = await this.presentationService.getVideoPath();
         const currentVideo = await this.presentationService.getCurrentVideo();
         
         if (!currentVideo) {
@@ -79,12 +94,19 @@ export class PresentationController {
           });
         }
         
-        // Read file
-        const buffer = await readFile(videoPath);
+        // Get file stream using FileUploadService
+        const { stream } = await this.presentationService.getVideoStream();
+        
+        // Convert stream to buffer
+        const chunks: any[] = [];
+        for await (const chunk of stream) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        }
+        const buffer = Buffer.concat(chunks as Buffer[]);
         
         // Return as File object
-        return new File([buffer], currentVideo.filename, { 
-          type: currentVideo.mimeType 
+        return new File([buffer], currentVideo.file.filename, { 
+          type: currentVideo.file.mimeType 
         });
       } catch (error) {
         console.error('[PresentationController] Error in getVideo:', error);

@@ -14,7 +14,7 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui/components/shadcn/card';
 import Link from 'next/link';
-import { useUser, useUpdateUser } from '@/hooks/useUsers';
+import { useUser, useUpdateUser } from '@/hooks/users/hooks';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save, User as UserIcon, Lock } from 'lucide-react';
 

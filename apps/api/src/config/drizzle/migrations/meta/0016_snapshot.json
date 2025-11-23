@@ -1,5 +1,5 @@
 {
-  "id": "8fd48575-161d-4207-8715-0cad2b804fab",
+  "id": "0c6430ad-aa4c-4998-a273-6472fe1265ad",
   "prevId": "ac91c6a6-5173-4281-996a-2f0b36796f30",
   "version": "7",
   "dialect": "postgresql",
@@ -615,6 +615,105 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.capsule_media": {
+      "name": "capsule_media",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "capsule_id": {
+          "name": "capsule_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_id": {
+          "name": "file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content_media_id": {
+          "name": "content_media_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "order": {
+          "name": "order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "capsule_media_capsule_id_capsule_id_fk": {
+          "name": "capsule_media_capsule_id_capsule_id_fk",
+          "tableFrom": "capsule_media",
+          "tableTo": "capsule",
+          "columnsFrom": [
+            "capsule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "capsule_media_file_id_file_id_fk": {
+          "name": "capsule_media_file_id_file_id_fk",
+          "tableFrom": "capsule_media",
+          "tableTo": "file",
+          "columnsFrom": [
+            "file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "capsule_media_content_media_id_unique": {
+          "name": "capsule_media_content_media_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "content_media_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

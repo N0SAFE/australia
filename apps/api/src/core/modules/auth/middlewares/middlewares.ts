@@ -21,7 +21,7 @@ export function SkipBodyParsingMiddleware(basePath = "/api/auth") {
 			return;
 		}
 		
-		// Skip body parsing for multipart/form-data - FileUploadMiddleware will handle it
+		// Skip body parsing for multipart/form-data - ORPC will handle it natively
 		const contentType = req.headers['content-type'] ?? '';
 		if (contentType.includes('multipart/form-data')) {
 			next();

@@ -3,12 +3,12 @@ import { PresentationService } from './services/presentation.service';
 import { PresentationRepository } from './repositories/presentation.repository';
 import { PresentationController } from './controllers/presentation.controller';
 import { PresentationEventService } from './events/presentation.event';
-import { StorageModule } from '../storage/storage.module';
+import { FileUploadModule } from '@/core/modules/file-upload/file-upload.module';
 import { VideoProcessingModule } from '@/core/modules/video-processing';
 
 @Module({
   imports: [
-    StorageModule,
+    FileUploadModule,
     VideoProcessingModule,
   ],
   providers: [PresentationService, PresentationRepository, PresentationEventService],

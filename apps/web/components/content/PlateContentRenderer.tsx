@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Download, ZoomIn, ZoomOut, Maximize2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { useResolveMediaUrl } from '@/contexts/AttachedMediaContext';
 
 interface PlateContentRendererProps {
   content: string; // JSON string containing Plate.js Value
@@ -29,6 +30,12 @@ interface PlateNode {
   underline?: boolean;
   strikethrough?: boolean;
   code?: boolean;
+  attrs?: {
+    strategy?: 'local' | 'api' | 'contentMediaId' | 'external';
+    contentMediaId?: string;
+    src?: string;
+    [key: string]: unknown;
+  };
 }
 
 /**
@@ -124,10 +131,40 @@ function NodeRenderer({ node }: { node: PlateNode }) {
 function ImageNode({ node }: { node: PlateNode }) {
   const [zoom, setZoom] = React.useState(1);
   const [fullscreen, setFullscreen] = React.useState(false);
+  const resolveMediaUrl = useResolveMediaUrl();
+
+  // Resolve URL based on strategy
+  const imageUrl = React.useMemo(() => {
+    // Check if node uses contentMediaId strategy
+    if (node.attrs?.strategy === 'contentMediaId' && node.attrs?.contentMediaId) {
+      const resolved = resolveMediaUrl(node.attrs.contentMediaId);
+      if (resolved) {
+        console.log('✅ Resolved contentMediaId to URL:', { 
+          contentMediaId: node.attrs.contentMediaId, 
+          url: resolved 
+        });
+        return resolved;
+      }
+      console.warn('⚠️ Failed to resolve contentMediaId:', node.attrs.contentMediaId);
+    }
+    
+    // Fallback to node.url (for api/external strategies)
+    return node.url || null;
+  }, [node.attrs, node.url, resolveMediaUrl]);
 
   const handleDownload = () => {
-    window.open(node.url!, '_blank');
+    if (imageUrl) {
+      window.open(imageUrl, '_blank');
+    }
   };
+
+  if (!imageUrl) {
+    return (
+      <div className="flex items-center justify-center p-8 bg-gray-100 rounded-lg my-8">
+        <p className="text-gray-500">Image non disponible</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -142,7 +179,7 @@ function ImageNode({ node }: { node: PlateNode }) {
           >
             {node.width && node.height ? (
               <Image
-                src={node.url!}
+                src={imageUrl}
                 alt={node.alt || 'Capsule image'}
                 width={node.width}
                 height={node.height}
@@ -150,7 +187,7 @@ function ImageNode({ node }: { node: PlateNode }) {
               />
             ) : (
               <img
-                src={node.url!}
+                src={imageUrl}
                 alt={node.alt || 'Capsule image'}
                 className="max-w-full h-auto rounded-xl"
               />
@@ -233,7 +270,7 @@ function ImageNode({ node }: { node: PlateNode }) {
             <X className="w-6 h-6" />
           </Button>
           <img
-            src={node.url!}
+            src={imageUrl}
             alt={node.alt || 'Capsule image'}
             className="w-full h-full object-contain"
           />
@@ -248,6 +285,34 @@ function ImageNode({ node }: { node: PlateNode }) {
  */
 function VideoNode({ node }: { node: PlateNode }) {
   const [fullscreen, setFullscreen] = React.useState(false);
+  const resolveMediaUrl = useResolveMediaUrl();
+
+  // Resolve URL based on strategy
+  const videoUrl = React.useMemo(() => {
+    // Check if node uses contentMediaId strategy
+    if (node.attrs?.strategy === 'contentMediaId' && node.attrs?.contentMediaId) {
+      const resolved = resolveMediaUrl(node.attrs.contentMediaId);
+      if (resolved) {
+        console.log('✅ Resolved video contentMediaId to URL:', { 
+          contentMediaId: node.attrs.contentMediaId, 
+          url: resolved 
+        });
+        return resolved;
+      }
+      console.warn('⚠️ Failed to resolve video contentMediaId:', node.attrs.contentMediaId);
+    }
+    
+    // Fallback to node.url (for api/external strategies)
+    return node.url || null;
+  }, [node.attrs, node.url, resolveMediaUrl]);
+
+  if (!videoUrl) {
+    return (
+      <div className="flex items-center justify-center p-8 bg-gray-100 rounded-lg my-8">
+        <p className="text-gray-500">Vidéo non disponible</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -261,7 +326,7 @@ function VideoNode({ node }: { node: PlateNode }) {
             className="w-full"
             poster={node.thumbnail}
           >
-            <source src={node.url!} type={node.mimeType || 'video/mp4'} />
+            <source src={videoUrl} type={node.mimeType || 'video/mp4'} />
             Votre navigateur ne supporte pas la lecture vidéo.
           </video>
         </div>
@@ -310,7 +375,7 @@ function VideoNode({ node }: { node: PlateNode }) {
             className="w-full h-full object-contain"
             poster={node.thumbnail}
           >
-            <source src={node.url!} type={node.mimeType || 'video/mp4'} />
+            <source src={videoUrl} type={node.mimeType || 'video/mp4'} />
             Votre navigateur ne supporte pas la lecture vidéo.
           </video>
         </DialogContent>
@@ -324,6 +389,34 @@ function VideoNode({ node }: { node: PlateNode }) {
  */
 function AudioNode({ node }: { node: PlateNode }) {
   const [fullscreen, setFullscreen] = React.useState(false);
+  const resolveMediaUrl = useResolveMediaUrl();
+
+  // Resolve URL based on strategy
+  const audioUrl = React.useMemo(() => {
+    // Check if node uses contentMediaId strategy
+    if (node.attrs?.strategy === 'contentMediaId' && node.attrs?.contentMediaId) {
+      const resolved = resolveMediaUrl(node.attrs.contentMediaId);
+      if (resolved) {
+        console.log('✅ Resolved audio contentMediaId to URL:', { 
+          contentMediaId: node.attrs.contentMediaId, 
+          url: resolved 
+        });
+        return resolved;
+      }
+      console.warn('⚠️ Failed to resolve audio contentMediaId:', node.attrs.contentMediaId);
+    }
+    
+    // Fallback to node.url (for api/external strategies)
+    return node.url || null;
+  }, [node.attrs, node.url, resolveMediaUrl]);
+
+  if (!audioUrl) {
+    return (
+      <div className="flex items-center justify-center p-8 bg-gray-100 rounded-lg my-8">
+        <p className="text-gray-500">Audio non disponible</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -351,7 +444,7 @@ function AudioNode({ node }: { node: PlateNode }) {
             controls
             className="w-full"
           >
-            <source src={node.url!} type={node.mimeType || 'audio/mpeg'} />
+            <source src={audioUrl} type={node.mimeType || 'audio/mpeg'} />
             Votre navigateur ne supporte pas la lecture audio.
           </audio>
         </div>
@@ -409,7 +502,7 @@ function AudioNode({ node }: { node: PlateNode }) {
                 autoPlay
                 className="w-full"
               >
-                <source src={node.url!} type={node.mimeType || 'audio/mpeg'} />
+                <source src={audioUrl} type={node.mimeType || 'audio/mpeg'} />
                 Votre navigateur ne supporte pas la lecture audio.
               </audio>
             </div>

@@ -1,6 +1,6 @@
 import { HomePage } from '@/components/pages/home';
 import { Capsule } from '@/types/capsule';
-import { getRecentCapsules } from '@/hooks/useCapsules';
+import { getRecentCapsules } from '@/hooks/capsules/queries';
 import { connection } from 'next/server';
 
 export default async function Home() {

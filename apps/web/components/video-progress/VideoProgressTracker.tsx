@@ -10,14 +10,13 @@
  * 4. Success: Shows toast + success icon, disappears after 3 seconds
  * 5. Error: Shows error icon, logs to console, stays for 10 seconds
  */
-"use client";
 
 import { useState, useEffect, type ComponentType } from "react";
 import type {
   ProcessingProgress,
   VideoProgressComponentProps,
 } from "@repo/ui/components/tiptap-node/video-node";
-import { useVideoProcessing } from "@/hooks/useStorage";
+import { useVideoProcessing } from "@/hooks/storage/hooks";
 import { toast } from "sonner";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -47,10 +46,27 @@ export const VideoProgressTracker: ComponentType<
 
   const [isVisible, setIsVisible] = useState(true);
   
-  console.log('call useVideoProcessing', !!(fileId && fileData && !fileData.isProcessed))
-  console.log({
-    fileId, fileData, isProcessed: fileData?.isProcessed
-  })
+  // Reset visibility when fileId changes or when processing state changes
+  useEffect(() => {
+    console.log('[VideoProgressTracker] Visibility check:', {
+      fileId,
+      hasFileData: !!fileData,
+      isProcessed: fileData?.isProcessed,
+      shouldBeVisible: !!(fileId && fileData && !fileData.isProcessed)
+    });
+    
+    if (fileId && fileData && !fileData.isProcessed) {
+      console.log('[VideoProgressTracker] Setting visible to TRUE');
+      setIsVisible(true);
+    }
+  }, [fileId, fileData?.isProcessed]);
+  
+  console.log('[VideoProgressTracker] Enabled check:', {
+    fileId,
+    hasFileData: !!fileData,
+    isProcessed: fileData?.isProcessed,
+    enabled: !!(fileId && fileData && !fileData.isProcessed)
+  });
 
   // Subscribe to video processing progress via ORPC SSE
   const {
@@ -62,11 +78,12 @@ export const VideoProgressTracker: ComponentType<
     enabled: !!(fileId && fileData && !fileData.isProcessed),
   });
 
-  console.log({
+  console.log('[VideoProgressTracker] Processing state:', {
     processingData,
     isFetching,
     isError,
     error,
+    isVisible,
   });
 
   // Handle completion - 3 second timeout
@@ -111,10 +128,36 @@ export const VideoProgressTracker: ComponentType<
     }
   }, [isError, error, fileId]);
 
-  // Don't render if not visible or no data
-  if (!isVisible || !processingData) {
+  // Don't render if not visible, or if processing is not needed
+  if (!isVisible) {
+    console.log('[VideoProgressTracker] Not rendering: isVisible =', isVisible);
     return null;
   }
+  
+  // Don't render if file is already processed
+  if (fileData && fileData.isProcessed) {
+    console.log('[VideoProgressTracker] Not rendering: file already processed');
+    return null;
+  }
+  
+  // Show loading state while fetching initial data
+  if (isFetching && !processingData) {
+    console.log('[VideoProgressTracker] Rendering: Connecting state');
+    const progress: ProcessingProgress = {
+      progress: 0,
+      status: "processing",
+      message: "Connecting to processing stream...",
+    };
+    return <>{renderProgress(progress, isVisible)}</>;
+  }
+  
+  // Don't render if no data yet
+  if (!processingData) {
+    console.log('[VideoProgressTracker] Not rendering: no processingData yet');
+    return null;
+  }
+  
+  console.log('[VideoProgressTracker] Rendering progress:', processingData);
 
   // Convert processing data to ProcessingProgress format
   // Infer status from query state: pending, error, or completed

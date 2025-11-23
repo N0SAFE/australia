@@ -1,128 +1,212 @@
-@use "tailwindcss";
+@reference "tailwindcss";
 
 .simple-viewer-wrapper {
-  @apply w-full max-w-full;
-  
+  @apply w-full max-w-full px-4 py-6 sm:py-10;
+  background: radial-gradient(circle at 20% 0%, rgba(255, 182, 219, 0.22), transparent 58%);
+
+  .dark & {
+    background: radial-gradient(circle at 20% 0%, rgba(255, 182, 219, 0.08), transparent 60%);
+  }
+
   .simple-viewer-content {
-    @apply w-full max-w-4xl mx-auto px-4 py-8;
+    @apply w-full max-w-4xl mx-auto px-2 sm:px-0;
 
     .tiptap {
-      @apply outline-none p-4;
-      
-      /* Prose-like styling optimized for pink background */
-      p {
-        @apply mb-4 leading-7 text-gray-800 dark:text-gray-100 font-medium;
+      --viewer-surface: #ffffff;
+      --viewer-surface-dark: rgba(15, 23, 42, 0.92);
+      --viewer-border: rgba(190, 24, 93, 0.12);
+      --viewer-shadow: rgba(255, 0, 119, 0.12);
+      --viewer-muted: #475467;
+      --viewer-muted-dark: #e2e8f0;
+      --viewer-accent-strong: #9e0250;
+      --viewer-accent: #b6025d;
+      --viewer-accent-soft: #c2185b;
+      --viewer-link: #9e0250;
+      --viewer-link-hover: #7d013d;
+      --viewer-link-underline: rgba(158, 2, 80, 0.4);
+      --viewer-link-focus: rgba(158, 2, 80, 0.5);
+      --viewer-highlight: rgba(255, 228, 244, 0.85);
+      --viewer-highlight-dark: rgba(219, 39, 119, 0.35);
+      --viewer-inline-bg: rgba(255, 255, 255, 0.9);
+      --viewer-inline-bg-dark: rgba(15, 15, 23, 0.65);
+
+      @apply relative outline-none p-6 sm:p-8 border rounded-[32px] transition-all duration-300;
+      background: var(--viewer-surface);
+      border-color: var(--viewer-border);
+      box-shadow: 0 25px 60px var(--viewer-shadow);
+      color: #0f172a;
+
+      .dark & {
+        background: var(--viewer-surface-dark);
+        border-color: rgba(251, 207, 232, 0.25);
+        box-shadow: 0 30px 70px rgba(5, 5, 15, 0.55);
+        color: #f8fafc;
       }
 
-      /* Override TipTap node default colors for pink background */
       &.pink-theme {
-        // Override CSS variables for pink theme
-        --tt-inline-code-bg-color: rgba(255, 255, 255, 0.8);
-        --tt-inline-code-text-color: #be185d; /* pink-700 */
-        --tt-inline-code-border-color: rgba(236, 72, 153, 0.2);
-        --tt-codeblock-bg: rgba(255, 255, 255, 0.9);
-        --tt-codeblock-text: #1f2937; /* gray-800 */
-        --tt-codeblock-border: rgba(236, 72, 153, 0.2);
-        --blockquote-bg-color: #FF0077; /* pink-dark custom color */
-        --link-text-color: #FF0077; /* pink-dark custom color */
+        --viewer-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 236, 247, 0.94));
+        --viewer-surface-dark: linear-gradient(135deg, rgba(26, 9, 23, 0.94), rgba(56, 16, 46, 0.9));
+        --viewer-border: rgba(182, 2, 93, 0.2);
+        --viewer-shadow: rgba(255, 0, 119, 0.2);
+        --viewer-inline-bg: rgba(255, 255, 255, 0.92);
+        --viewer-inline-bg-dark: rgba(20, 7, 18, 0.7);
+        --viewer-highlight: rgba(255, 224, 241, 0.9);
+        --viewer-highlight-dark: rgba(219, 39, 119, 0.45);
+        --tt-inline-code-bg-color: var(--viewer-inline-bg);
+        --tt-inline-code-text-color: #8f0444;
+        --tt-inline-code-border-color: rgba(182, 2, 93, 0.25);
+        --tt-codeblock-bg: rgba(255, 255, 255, 0.95);
+        --tt-codeblock-text: #1f2937;
+        --tt-codeblock-border: rgba(182, 2, 93, 0.25);
+        --blockquote-bg-color: var(--viewer-accent);
+        --link-text-color: var(--viewer-link);
 
         .dark & {
-          --tt-inline-code-bg-color: rgba(0, 0, 0, 0.4);
-          --tt-inline-code-text-color: #fbcfe8; /* pink-200 */
-          --tt-inline-code-border-color: rgba(249, 168, 212, 0.3);
-          --tt-codeblock-bg: rgba(0, 0, 0, 0.5);
-          --tt-codeblock-text: #f3f4f6; /* gray-100 */
-          --tt-codeblock-border: rgba(249, 168, 212, 0.3);
-          --blockquote-bg-color: #fbcfe8; /* pink-200 */
-          --link-text-color: #fbcfe8; /* pink-200 */
+          --tt-inline-code-bg-color: var(--viewer-inline-bg-dark);
+          --tt-inline-code-text-color: #ffd9ec;
+          --tt-inline-code-border-color: rgba(251, 207, 232, 0.3);
+          --tt-codeblock-bg: rgba(10, 10, 22, 0.85);
+          --tt-codeblock-text: #f3f4f6;
+          --tt-codeblock-border: rgba(251, 207, 232, 0.25);
+          --blockquote-bg-color: #fbcfe8;
+          --link-text-color: #ffd9ec;
+        }
+      }
+
+      /* Typography */
+      p {
+        @apply mb-5 text-base leading-8 font-normal text-slate-900;
+      }
+
+      @media (min-width: 640px) {
+        p {
+          font-size: 1.125rem;
+          line-height: calc(1.75 / 1.125);
         }
       }
 
       h1 {
-        @apply text-4xl font-bold mt-8 mb-6 leading-tight;
-        color: #FF0077; /* pink-dark */
-        
-        @media (prefers-color-scheme: dark) {
-          color: #fbcfe8; /* pink-200 */
+        @apply text-4xl font-bold mt-8 mb-6 leading-tight tracking-tight;
+        color: var(--viewer-accent-strong);
+
+        .dark & {
+          color: #ffd9ec;
         }
       }
 
       h2 {
-        @apply text-3xl font-semibold mt-6 mb-4 leading-snug text-pink-600;
+        @apply text-3xl font-semibold mt-7 mb-4 leading-snug;
+        color: var(--viewer-accent);
         
-        @media (prefers-color-scheme: dark) {
-          color: #fbcfe8; /* pink-200 */
+        .dark & {
+          color: #ffc3e0;
         }
       }
 
       h3 {
-        @apply text-2xl font-medium mt-4 mb-3 leading-normal text-pink-600;
+        @apply text-2xl font-semibold mt-6 mb-3 leading-snug;
+        color: var(--viewer-accent-soft);
         
-        @media (prefers-color-scheme: dark) {
-          color: #fbcfe8; /* pink-200 */
+        .dark & {
+          color: #ffcee7;
         }
       }
 
       h4 {
-        @apply text-xl font-medium mt-4 mb-2 text-pink-500;
+        @apply text-xl font-semibold mt-5 mb-2;
+        color: var(--viewer-accent-soft);
         
-        @media (prefers-color-scheme: dark) {
-          color: #f9a8d4; /* pink-300 */
+        .dark & {
+          color: #ffe1f0;
         }
       }
 
       ul, ol {
-        @apply my-4 pl-6;
+        @apply my-4 pl-6 text-base sm:text-lg leading-7 text-slate-900 dark:text-slate-100;
         
         li {
-          @apply mb-2 text-gray-800 dark:text-gray-100;
+          @apply mb-2;
         }
       }
 
       blockquote {
-        @apply my-6;
+        @apply my-8 rounded-2xl border border-pink-500/10 bg-white/85 dark:bg-slate-900/70 px-6 py-5 text-lg leading-relaxed dark:text-slate-100;
+        box-shadow: inset 0 0 0 1px rgba(255, 0, 119, 0.05);
+        color: #1e293b;
+
+        p {
+          @apply dark:text-slate-100;
+          color: #1e293b;
+        }
       }
 
       code {
-        @apply font-mono bg-white/70 dark:bg-black/40 text-pink-700 dark:text-pink-200 px-1.5 py-0.5 rounded text-sm border border-pink-500/20 dark:border-pink-300/30;
+        @apply font-mono text-sm px-2 py-1 rounded-md border;
+        background-color: var(--viewer-inline-bg);
+        border-color: var(--tt-inline-code-border-color, rgba(182, 2, 93, 0.2));
+        color: var(--tt-inline-code-text-color, var(--viewer-accent-strong));
+
+        .dark & {
+          background-color: var(--viewer-inline-bg-dark);
+        }
       }
 
       pre {
-        @apply my-6 overflow-x-auto bg-white/90 dark:bg-black/50 p-4 rounded-lg border border-pink-500/20 dark:border-pink-300/30;
+        @apply my-6 overflow-x-auto p-4 rounded-2xl border text-sm leading-relaxed;
+        background: var(--tt-codeblock-bg, rgba(255, 255, 255, 0.95));
+        border-color: var(--tt-codeblock-border, rgba(182, 2, 93, 0.2));
+        color: var(--tt-codeblock-text, #1f2937);
         
         code {
-          @apply bg-transparent border-0 p-0;
+          @apply bg-transparent border-0 p-0 text-inherit;
+        }
+
+        .dark & {
+          background: var(--tt-codeblock-bg, rgba(10, 10, 22, 0.85));
         }
       }
 
       a {
-        @apply underline cursor-pointer font-semibold;
-        color: #FF0077; /* pink-dark */
-        
+        @apply underline decoration-1 font-semibold transition-colors duration-200;
+        color: var(--link-text-color, var(--viewer-link));
+        text-decoration-color: var(--viewer-link-underline);
+        text-underline-offset: 0.2em;
+
         &:hover {
           text-decoration-thickness: 2px;
-          color: #db2777; /* pink-600 */
+          color: var(--viewer-link-hover);
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--viewer-link-focus);
+          outline-offset: 3px;
+          border-radius: 0.25rem;
         }
         
-        @media (prefers-color-scheme: dark) {
-          color: #fbcfe8; /* pink-200 */
+        .dark & {
+          color: #ffd9ec;
+          text-decoration-color: rgba(255, 217, 236, 0.7);
           
           &:hover {
-            color: #fce7f3; /* pink-100 */
+            color: #ffe5f1;
+          }
+          
+          &:focus-visible {
+            outline-color: rgba(255, 217, 236, 0.6);
           }
         }
       }
 
       strong, b {
-        @apply text-pink-700 dark:text-pink-100 font-bold;
+        @apply font-semibold text-slate-900 dark:text-slate-100;
       }
 
       em, i {
-        @apply text-pink-600 dark:text-pink-200;
+        @apply text-slate-800 dark:text-slate-50;
       }
 
       img, video, audio {
-        @apply max-w-full h-auto rounded-lg my-6 shadow-md;
+        @apply max-w-full h-auto rounded-2xl my-6 shadow-xl border border-white/50 dark:border-slate-800/70;
       }
 
       /* Task list styling */
@@ -130,16 +214,16 @@
         @apply list-none pl-0;
 
         li {
-          @apply flex items-start text-gray-800 dark:text-gray-100;
+          @apply flex items-start gap-3 py-1 text-slate-900 dark:text-slate-100;
 
           > label {
-            @apply flex-none mr-2 select-none;
+            @apply flex-none select-none;
             
             input[type="checkbox"] {
-              accent-color: #FF0077; /* pink-dark */
+              accent-color: var(--viewer-accent);
               
-              @media (prefers-color-scheme: dark) {
-                accent-color: #fbcfe8; /* pink-200 */
+              .dark & {
+                accent-color: #fbcfe8;
               }
             }
           }
@@ -152,22 +236,22 @@
 
       /* Horizontal rule */
       hr {
-        @apply my-8 border-0 border-t-2;
-        border-color: rgba(255, 0, 119, 0.3); /* pink-dark with 30% opacity */
+        @apply my-10 border-0 border-t-2;
+        border-color: rgba(182, 2, 93, 0.35);
         
-        @media (prefers-color-scheme: dark) {
-          border-color: rgba(251, 207, 232, 0.4); /* pink-200 with 40% opacity */
+        .dark & {
+          border-color: rgba(251, 207, 232, 0.4);
         }
       }
 
       /* Highlight marks */
       mark {
-        @apply text-pink-700 px-1 py-0.5 rounded-sm;
-        background-color: rgba(255, 212, 228, 0.6); /* pink-light with 60% opacity */
+        @apply px-1 py-0.5 rounded-sm font-semibold dark:text-pink-50;
+        background-color: var(--viewer-highlight);
+        color: #0f172a;
         
-        @media (prefers-color-scheme: dark) {
-          background-color: rgba(219, 39, 119, 0.4); /* pink-600 with 40% opacity */
-          color: #fce7f3; /* pink-100 */
+        .dark & {
+          background-color: var(--viewer-highlight-dark);
         }
       }
     }

@@ -23,18 +23,18 @@ export const subscribeVideoProcessingContract = oc
   })
   .input(
     z.object({
-      fileId: z.string().uuid(),
+      fileId: z.uuid(),
     })
   )
   .output(
     eventIterator(
       z.object({
-        progress: z.number().min(0).max(100),
+        progress: z.coerce.number().min(0).max(100),
         message: z.string(),
         metadata: z.object({
-          duration: z.number(),
-          width: z.number(),
-          height: z.number(),
+          duration: z.coerce.number(),
+          width: z.coerce.number(),
+          height: z.coerce.number(),
           codec: z.string(),
         }).optional(),
         timestamp: z.string(),

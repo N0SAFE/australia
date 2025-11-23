@@ -1,54 +1,18 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod/v4';
-
-// Custom schema that validates File-like objects (more flexible than instanceof)
-const fileSchema = z.custom<File>(
-  (val) => {
-    // Check if it's a File-like object
-    return (
-      val instanceof File ||
-      (typeof val === 'object' &&
-        val !== null &&
-        'name' in val &&
-        'size' in val &&
-        'type' in val &&
-        typeof (val as any).name === 'string' &&
-        typeof (val as any).size === 'number' &&
-        typeof (val as any).type === 'string')
-    );
-  },
-  {
-    message: 'Must be a File object',
-  }
-);
+import { videoSchema } from '../../common/utils/file';
 
 export const uploadVideoInput = z.object({
-  file: fileSchema
-    .refine(
-      file => /\.(mp4|webm|ogg)$/i.test(file.name),
-      {
-        message: 'Only video files (mp4, webm, ogg) are allowed',
-      }
-    ),
-  _multerFiles: z.record(
-    z.string(),
-    z.object({
-      filename: z.string(),
-      originalname: z.string(),
-      path: z.string(),
-      size: z.number(),
-      mimetype: z.string(),
-    })
-  ).optional(),
+  file: videoSchema,
 });
 
 export const uploadVideoOutput = z.object({
   filename: z.string(),
-  size: z.number(),
+  size: z.coerce.number(),
   mimeType: z.string(),
   fileId: z.uuid(),
   videoId: z.uuid(),
-  isProcessed: z.boolean(),
+  isProcessed: z.coerce.boolean(),
   message: z.string().optional(),
 });
 

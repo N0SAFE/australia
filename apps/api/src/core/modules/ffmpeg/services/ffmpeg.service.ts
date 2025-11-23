@@ -329,13 +329,14 @@ export class FfmpegService {
         .join('\n');
       await fs.writeFile(concatListPath, concatList);
 
-      const finalOutputPath = `${originalPath}.final.mp4`;
+      // Create temp output in the temp directory (ffmpeg needs it accessible)
+      const tempOutputPath = path.join(tempDir, 'output.mp4');
       await new Promise<void>((resolve, reject) => {
         ffmpeg()
           .input(concatListPath)
           .inputOptions(['-f', 'concat', '-safe', '0'])
           .outputOptions(['-c', 'copy']) // Just copy, no re-encoding
-          .save(finalOutputPath)
+          .save(tempOutputPath)
           .on('end', () => {
             this.logger.log('Concatenation completed');
             onProgress?.(100); // Report 100% progress
@@ -346,15 +347,12 @@ export class FfmpegService {
           });
       });
 
-      // Delete original file
-      await fs.unlink(originalPath);
+      // Atomically replace original file with converted version
+      // Move from temp directory to final location (overwrites original)
+      await fs.rename(tempOutputPath, originalPath);
 
-      // Rename final file to target path
-      const outputPath = originalPath.replace(/\.[^.]+$/, '.mp4');
-      await fs.rename(finalOutputPath, outputPath);
-
-      this.logger.log(`Video converted and replaced: ${outputPath}`);
-      return outputPath; // Return new path with .mp4 extension
+      this.logger.log(`Video converted in-place: ${originalPath}`);
+      return originalPath; // Return same path (file replaced in-place)
     } catch (error) {
       this.logger.error('Video conversion failed', error);
       throw error;

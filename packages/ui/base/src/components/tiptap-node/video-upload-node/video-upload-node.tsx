@@ -136,17 +136,30 @@ function useFileUpload(options: UploadOptions) {
         abortController.signal
       )
 
-      if (!result?.meta?.fileId) throw new Error("Upload failed: No fileId returned in meta")
+      // For blob URL strategy (local editing), meta.contentMediaId is returned
+      // For API strategy (immediate upload), meta.fileId is returned
+      if (!result.meta) {
+        throw new Error("Upload failed: No meta object returned")
+      }
+      
+      const meta = result.meta as Record<string, unknown>
+      const hasValidId = Boolean(meta.fileId ?? meta.contentMediaId)
+      
+      if (!hasValidId) {
+        throw new Error("Upload failed: No fileId or contentMediaId returned in meta")
+      }
 
       if (!abortController.signal.aborted) {
         setFileItems((prev) =>
           prev.map((item) =>
             item.id === fileId
-              ? { ...item, status: "success", meta: result.meta, progress: 100 }
+              ? { ...item, status: "success", meta: result.meta, url: result.url, progress: 100 }
               : item
           )
         )
-        options.onSuccess?.(result.meta.fileId)
+        // Pass fileId if available (API strategy), otherwise contentMediaId (local strategy)
+        const identifier = (meta.fileId ?? meta.contentMediaId) as string
+        options.onSuccess?.(identifier)
         return result
       }
 
@@ -474,14 +487,24 @@ export const VideoUploadNode: React.FC<NodeViewProps> = (props) => {
           const filename =
             preparedFiles[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
           
+          // Extract strategy from meta to determine if we need fileRef
+          const meta = (result.meta as Record<string, unknown>) || {}
+          const isLocalStrategy = meta.strategy === 'local'
+          
+          // Build meta object carefully - explicitly set each property
+          const nodeMeta = {
+            srcResolveStrategy: 'video',
+            strategy: meta.strategy,
+            contentMediaId: meta.contentMediaId,
+            blobUrl: result.url,
+          };
+          
           return {
             type: extension.options.type,
             attrs: {
-              ...extension.options,
-              meta: {
-                srcResolveStrategy: 'video',
-                ...(result.meta as object || {}),
-              },
+              meta: nodeMeta,
+              // For local strategy, store File object for later upload
+              ...(isLocalStrategy && preparedFiles[index] ? { fileRef: preparedFiles[index] } : {}),
               alt: filename,
               title: filename,
             },

@@ -1,4 +1,4 @@
-export * from './useCapsules'
+export * from './capsules'
 export * from './useStorage'
 export * from './useUsers'
 export * from './useInvitation'

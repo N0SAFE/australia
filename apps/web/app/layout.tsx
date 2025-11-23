@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import localFont from "next/font/local";
-import { ReactNode, Suspense } from "react";
+import { ReactNode } from "react";
 import { Toaster } from "@repo/ui/components/shadcn/sonner";
 import ReactQueryProviders from "@/utils/providers/ReactQueryProviders";
 import { DynamicTanstackDevTools } from "@/components/devtools/DynamicTanstackDevTools";
+import ThemeProvider from '@repo/ui/components/theme-provider';
 
 const PontanoSansFont = localFont({
   src: "../public/fonts/Pontano_Sans/PontanoSans-VariableFont_wght.ttf",
@@ -100,12 +101,19 @@ export default async function RootLayout({
       <body
         className={`${PontanoSansFont.variable} ${PinyonScriptFont.variable} antialiased`}
       >
-        <ReactQueryProviders>
-          {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <ReactQueryProviders>
+            {children}
 
-          <DynamicTanstackDevTools />
-        </ReactQueryProviders>
-        <Toaster richColors position="top-center" />
+            <DynamicTanstackDevTools />
+          </ReactQueryProviders>
+          <Toaster theme="light" richColors position="top-center" />
+        </ThemeProvider>
       </body>
     </html>
   );

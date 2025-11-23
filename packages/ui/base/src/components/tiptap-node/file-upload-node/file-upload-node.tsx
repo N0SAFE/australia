@@ -67,7 +67,18 @@ function useFileUpload(options: UploadOptions) {
         abortController.signal
       )
 
-      if (!result?.meta?.fileId) throw new Error("Upload failed: No fileId returned in meta")
+      // For blob URL strategy (local editing), meta.contentMediaId is returned
+      // For API strategy (immediate upload), meta.fileId is returned
+      if (!result.meta) {
+        throw new Error("Upload failed: No meta object returned")
+      }
+      
+      const meta = result.meta as Record<string, unknown>
+      const hasValidId = Boolean(meta.fileId ?? meta.contentMediaId)
+      
+      if (!hasValidId) {
+        throw new Error("Upload failed: No fileId or contentMediaId returned in meta")
+      }
 
       if (!abortController.signal.aborted) {
         setFileItems((prev) =>
@@ -77,7 +88,9 @@ function useFileUpload(options: UploadOptions) {
               : item
           )
         )
-        options.onSuccess?.(result.meta.fileId)
+        // Pass fileId if available (API strategy), otherwise contentMediaId (local strategy)
+        const identifier = (meta.fileId ?? meta.contentMediaId) as string
+        options.onSuccess?.(identifier)
         return result.meta
       }
 
@@ -337,13 +350,22 @@ export const FileUploadNode: React.FC<NodeViewProps> = (props) => {
       if (isValidPosition(pos)) {
         const fileNodes = results.map((result, index) => {
           const file = preparedFiles[index]
+          
+          // Extract strategy from meta to determine if we need fileRef
+          const meta = (result.meta as Record<string, unknown>) || {}
+          const isLocalStrategy = meta.strategy === 'local'
+          
           return {
             type: extension.options.type,
             attrs: {
               meta: {
                 srcResolveStrategy: 'file',
-                ...(result.meta as object || {}),
+                ...meta,
+                // Store blob URL in meta for local strategy
+                ...(isLocalStrategy ? { blobUrl: result.url } : {}),
               },
+              // For local strategy, store File object for later upload
+              ...(isLocalStrategy && file ? { fileRef: file } : {}),
               name: file.name,
               size: file.size,
               type: file.type,

@@ -8,7 +8,7 @@ export const capsuleDeleteInput = z.object({
 
 // Define the output
 export const capsuleDeleteOutput = z.object({
-  success: z.boolean(),
+  success: z.coerce.boolean(),
 });
 
 // Define the contract

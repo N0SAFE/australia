@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Mic, Smartphone, Code, Clock, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useUnlockCapsule } from '@/hooks/useCapsules';
+import { useUnlockCapsule } from '@/hooks/capsules/hooks';
 
 interface CapsuleLockModalProps {
   capsule: Capsule;

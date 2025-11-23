@@ -90,7 +90,7 @@ export interface UploadOptions {
 function useFileUpload(options: UploadOptions) {
   const [fileItems, setFileItems] = useState<FileItem[]>([])
 
-  const uploadFile = async (file: File): Promise<string | null> => {
+  const uploadFile = async (file: File): Promise<{ url: string; meta?: unknown } | null> => {
     const abortController = new AbortController()
     const fileId = crypto.randomUUID()
 
@@ -121,18 +121,31 @@ function useFileUpload(options: UploadOptions) {
         abortController.signal
       )
 
-      if (!result?.meta?.fileId) throw new Error("Upload failed: No fileId returned in meta")
+      // For blob URL strategy (local editing), meta.contentMediaId is returned
+      // For API strategy (immediate upload), meta.fileId is returned
+      if (!result.meta) {
+        throw new Error("Upload failed: No meta object returned")
+      }
+      
+      const meta = result.meta as Record<string, unknown>
+      const hasValidId = Boolean(meta.fileId ?? meta.contentMediaId)
+      
+      if (!hasValidId) {
+        throw new Error("Upload failed: No fileId or contentMediaId returned in meta")
+      }
 
       if (!abortController.signal.aborted) {
         setFileItems((prev) =>
           prev.map((item) =>
             item.id === fileId
-              ? { ...item, status: "success", meta: result.meta, progress: 100 }
+              ? { ...item, status: "success", meta: result.meta, url: result.url, progress: 100 }
               : item
           )
         )
-        options.onSuccess?.(result.meta.fileId)
-        return result.meta
+        // Pass fileId if available (API strategy), otherwise contentMediaId (local strategy)
+        const identifier = (meta.fileId ?? meta.contentMediaId) as string
+        options.onSuccess?.(identifier)
+        return result
       }
 
       return null
@@ -172,17 +185,10 @@ function useFileUpload(options: UploadOptions) {
     const uploadPromises = files.map((file) => uploadFile(file))
     const results = await Promise.all(uploadPromises)
 
-    // Filter out null results (failed uploads) and map to result objects
-    const successfulUploads = results
-      .map((url, index) => {
-        if (!url) return null
-        const fileItem = fileItems.find(item => item.url === url)
-        return {
-          url,
-          meta: fileItem?.meta ?? undefined
-        }
-      })
-      .filter((result): result is { url: string; meta?: unknown } => result !== null)
+    // Filter out null results (failed uploads)
+    const successfulUploads = results.filter(
+      (result): result is { url: string; meta?: unknown } => result !== null
+    )
     
     return successfulUploads
   }
@@ -473,14 +479,25 @@ export const AudioUploadNode: React.FC<NodeViewProps> = (props) => {
         const audioNodes = results.map((result, index) => {
           const filename =
             preparedFiles[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
+          
+          // Extract strategy from meta to determine if we need fileRef
+          const meta = (result.meta as Record<string, unknown>) || {}
+          const isLocalStrategy = meta.strategy === 'local'
+          
+          // Build meta object carefully - explicitly set each property
+          const nodeMeta = {
+            srcResolveStrategy: 'audio',
+            strategy: meta.strategy,
+            contentMediaId: meta.contentMediaId,
+            blobUrl: result.url,
+          };
+          
           return {
             type: extension.options.type,
             attrs: {
-              ...extension.options,
-              meta: {
-                srcResolveStrategy: 'audio',
-                ...(result.meta as object || {}),
-              },
+              meta: nodeMeta,
+              // For local strategy, store File object for later upload
+              ...(isLocalStrategy && preparedFiles[index] ? { fileRef: preparedFiles[index] } : {}),
               alt: filename,
               title: filename,
             },

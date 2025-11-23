@@ -12,9 +12,9 @@ import {
   ColumnFiltersState,
 } from "@tanstack/react-table";
 import { flexRender, useReactTable } from "@tanstack/react-table";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { useCapsules, useDeleteCapsule } from "@/hooks/useCapsules";
+import { useCapsules, useDeleteCapsule, useCapsuleVideoProcessing } from "@/hooks/capsules/hooks";
 import { Capsule } from "@/types/capsule";
 import { toast } from "sonner";
 import {
@@ -55,6 +55,7 @@ import {
   Unlock,
   Sparkles,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import {
   Sheet,
@@ -80,7 +81,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Plus, CalendarIcon } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { useCreateCapsule } from "@/hooks/useCapsules";
+import { useCreateCapsule } from "@/hooks/capsules/hooks";
 import type { Value } from "platejs";
 import { Separator } from "@/components/ui/separator";
 import { Toggle } from "@/components/ui/toggle";
@@ -94,29 +95,9 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { SimpleEditor } from "@/components/tiptap/editor/index";
 import { JSONContent } from "@repo/ui/tiptap-exports/react";
-import { useStorage } from "@/hooks/useStorage";
-
-/**
- * Sanitize filename to ASCII-safe characters for HTTP headers
- * Replaces accented characters and special chars with ASCII equivalents
- */
-function sanitizeFilename(filename: string): string {
-  // Get extension
-  const lastDotIndex = filename.lastIndexOf(".");
-  const name =
-    lastDotIndex >= 0 ? filename.substring(0, lastDotIndex) : filename;
-  const ext = lastDotIndex >= 0 ? filename.substring(lastDotIndex) : "";
-
-  // Normalize to NFD (decomposed form) and remove diacritics
-  const normalized = name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
-    .replace(/[^a-zA-Z0-9_-]/g, "_") // Replace non-ASCII with underscore
-    .replace(/_+/g, "_") // Collapse multiple underscores
-    .replace(/^_|_$/g, ""); // Remove leading/trailing underscores
-
-  return normalized + ext;
-}
+import { orpc } from "@/lib/orpc";
+import { withFileUploads } from "@/lib/orpc/withFileUploads";
+import { useCapsuleMedia } from "@/hooks/capsules/media";
 
 // Create Capsule Dialog Component
 function CreateCapsuleDialog() {
@@ -129,29 +110,58 @@ function CreateCapsuleDialog() {
     openingMessage: "",
     isLocked: true,
   });
-  const storage = useStorage();
+  
+  // Track blob URLs for cleanup
+  const blobUrlsRef = useRef<Set<string>>(new Set());
+  
+  // Use media tracking hook
+  const { processContentForSubmit } = useCapsuleMedia();
+  
+  // Cleanup blob URLs on unmount or when closing the dialog
+  useEffect(() => {
+    if (!open) {
+      // Revoke all blob URLs when dialog closes
+      blobUrlsRef.current.forEach(url => {
+        URL.revokeObjectURL(url);
+      });
+      blobUrlsRef.current.clear();
+    }
+  }, [open]);
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach(url => {
+        URL.revokeObjectURL(url);
+      });
+      blobUrlsRef.current.clear();
+    };
+  }, []);
 
-  // Media URL resolution strategies
+  // Media URL resolution strategies using contentMediaId
+  // For new capsules, we don't have attachedMedia yet, so these will return empty
+  // The actual URLs are handled by local blob URLs during editing
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
   
   const imageStrategy = async (meta: any) => {
-    if (!meta?.fileId) return "";
-    return `${API_URL}/storage/image/${meta.fileId}`;
+    // During creation, return empty - blob URLs are used
+    if (!meta?.contentMediaId) return "";
+    return ""; // New capsule has no attached media yet
   };
   
   const videoStrategy = async (meta: any) => {
-    if (!meta?.fileId) return "";
-    return `${API_URL}/storage/video/${meta.fileId}`;
+    if (!meta?.contentMediaId) return "";
+    return "";
   };
   
   const audioStrategy = async (meta: any) => {
-    if (!meta?.fileId) return "";
-    return `${API_URL}/storage/audio/${meta.fileId}`;
+    if (!meta?.contentMediaId) return "";
+    return "";
   };
   
   const fileStrategy = async (meta: any) => {
-    if (!meta?.fileId) return "";
-    return `${API_URL}/storage/file/${meta.fileId}`;
+    if (!meta?.contentMediaId) return "";
+    return "";
   };
 
   const { mutate: createCapsule, isPending } = useCreateCapsule();
@@ -170,15 +180,19 @@ function CreateCapsuleDialog() {
       return;
     }
 
-    // Create capsule with editor content as JSON string
-    // Note: openingMessage is optional and can be empty
+    // Process content: extract local nodes, convert to uniqueId strategy, collect files
+    const { processedContent, media } = processContentForSubmit(
+      Array.isArray(editorValue) ? editorValue : [editorValue]
+    );
+
+    // Create capsule with processed content + media
     createCapsule(
       {
-        ...formData,
         openingDate: date.toISOString(),
-        content: JSON.stringify(editorValue),
-        // Only include openingMessage if it's not empty
+        content: JSON.stringify(processedContent),
         openingMessage: formData.openingMessage || undefined,
+        isLocked: formData.isLocked,
+        media,
       },
       {
         onSuccess: () => {
@@ -265,64 +279,33 @@ function CreateCapsuleDialog() {
                     }}
                     editable={true}
                     placeholder="Écrivez le contenu de votre capsule temporelle..."
-                    // Media URL resolution strategies
                     imageStrategy={imageStrategy}
                     videoStrategy={videoStrategy}
                     audioStrategy={audioStrategy}
                     fileStrategy={fileStrategy}
                     uploadFunctions={{
-                      image: async (file, onProgress, signal) => {
-                        // Sanitize filename to ASCII-safe characters for HTTP headers
-                        const sanitizedFile = new File(
-                          [file],
-                          sanitizeFilename(file.name),
-                          { type: file.type },
-                        );
-                        const result = await storage.uploadImageAsync(
-                          sanitizedFile,
-                          onProgress,
-                        );
+                      image: async (file) => {
+                        const url = URL.createObjectURL(file);
+                        blobUrlsRef.current.add(url);
                         return {
-                          meta: {
-                            srcResolveStrategy: 'image',
-                            fileId: result.fileId!,
-                          },
+                          url,
+                          meta: { strategy: 'local', contentMediaId: crypto.randomUUID() }
                         };
                       },
-                      video: async (file, onProgress, signal) => {
-                        // Sanitize filename to ASCII-safe characters for HTTP headers
-                        const sanitizedFile = new File(
-                          [file],
-                          sanitizeFilename(file.name),
-                          { type: file.type },
-                        );
-                        const result = await storage.uploadVideoAsync(
-                          sanitizedFile,
-                          onProgress,
-                        );
+                      video: async (file) => {
+                        const url = URL.createObjectURL(file);
+                        blobUrlsRef.current.add(url);
                         return {
-                          meta: {
-                            srcResolveStrategy: 'video',
-                            fileId: result.fileId!,
-                          },
+                          url,
+                          meta: { strategy: 'local', contentMediaId: crypto.randomUUID() }
                         };
                       },
-                      audio: async (file, onProgress, signal) => {
-                        // Sanitize filename to ASCII-safe characters for HTTP headers
-                        const sanitizedFile = new File(
-                          [file],
-                          sanitizeFilename(file.name),
-                          { type: file.type },
-                        );
-                        const result = await storage.uploadAudioAsync(
-                          sanitizedFile,
-                          onProgress,
-                        );
+                      audio: async (file) => {
+                        const url = URL.createObjectURL(file);
+                        blobUrlsRef.current.add(url);
                         return {
-                          meta: {
-                            srcResolveStrategy: 'audio',
-                            fileId: result.fileId!,
-                          },
+                          url,
+                          meta: { strategy: 'local', contentMediaId: crypto.randomUUID() }
                         };
                       },
                     }}
@@ -585,6 +568,56 @@ const columns = [
     },
     enableSorting: true,
   }),
+  columnHelper.display({
+    id: "hasProcessingVideos",
+    header: "Processing",
+    cell: (info) => {
+      const capsule = info.row.original as Capsule & { 
+        hasProcessingVideos?: boolean;
+        processingProgress?: number; 
+        processingVideoCount?: number;
+      };
+      
+      // Check if capsule has videos
+      const hasVideos = capsule.attachedMedia?.some(media => media.type === 'video') ?? false;
+      
+      // If no videos at all, show "No videos"
+      if (!hasVideos) {
+        return (
+          <span className="text-muted-foreground text-xs italic">
+            No videos
+          </span>
+        );
+      }
+      
+      // If has videos but not processing, show success badge
+      if (!capsule.hasProcessingVideos) {
+        return (
+          <span
+            className="py-1 px-2.5 text-xs rounded-md font-semibold inline-flex items-center gap-1.5 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
+            title="All videos processed"
+          >
+            <span>✓</span>
+            <span>Processed</span>
+          </span>
+        );
+      }
+      
+      const progress = capsule.processingProgress ?? 0;
+      const videoCount = capsule.processingVideoCount ?? 0;
+      
+      return (
+        <span
+          className="py-1 px-2.5 text-xs rounded-md font-semibold inline-flex items-center gap-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+          title={`Processing ${videoCount} video${videoCount !== 1 ? 's' : ''}`}
+        >
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>{progress}%</span>
+        </span>
+      );
+    },
+    enableSorting: false,
+  }),
   columnHelper.accessor("createdAt", {
     header: "Created At",
     cell: (info) => {
@@ -697,6 +730,51 @@ const RowActions = ({ row }: { row: Row<Capsule> }) => {
     </div>
   );
 };
+
+/**
+ * Wrapper component that subscribes to video processing events for a capsule
+ */
+function CapsuleRowWithProcessing({ row }: { row: Row<Capsule> }) {
+  const capsule = row.original as Capsule & { hasProcessingVideos?: boolean };
+  
+  // Extract video file IDs from attached media
+  const videoFileIds = useMemo(() => {
+    return capsule.attachedMedia
+      ?.filter(media => media.type === 'video')
+      ?.map(media => media.fileId) || [];
+  }, [capsule.attachedMedia]);
+  
+  // Always subscribe if capsule has videos (not just when hasProcessingVideos is true)
+  // This allows us to catch processing that starts after initial load
+  const { isProcessing, overallProgress, processingCount } = useCapsuleVideoProcessing(
+    capsule.id,
+    videoFileIds,
+    {
+      enabled: videoFileIds.length > 0,
+    }
+  );
+  
+  // Show processing indicator with progress if processing
+  const displayCapsule = {
+    ...capsule,
+    // Override hasProcessingVideos with real-time status
+    hasProcessingVideos: isProcessing,
+    // Add progress info for display
+    processingProgress: overallProgress,
+    processingVideoCount: processingCount,
+  };
+  
+  return (
+    <TableRow key={row.id}>
+      {row.getVisibleCells().map((cell) => (
+        <TableCell key={cell.id}>
+          {flexRender(cell.column.columnDef.cell, { ...cell.getContext(), row: { ...row, original: displayCapsule } })}
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+}
+
 export function AdminCapsulesPageClient() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -723,6 +801,9 @@ export function AdminCapsulesPageClient() {
           direction: sorting[0].desc ? "desc" : "asc",
         }
       : undefined,
+    // No polling needed - using SSE subscriptions for real-time updates
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const rawData = response?.capsules || [];
@@ -900,17 +981,9 @@ export function AdminCapsulesPageClient() {
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.map((row) => {
-            return (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            );
-          })}
+          {table.getRowModel().rows.map((row) => (
+            <CapsuleRowWithProcessing key={row.id} row={row} />
+          ))}
         </TableBody>
         <TableFooter>
           {table.getFooterGroups().map((footerGroup) => {

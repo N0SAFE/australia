@@ -2,7 +2,7 @@ import { connection } from 'next/server'
 import { notFound } from 'next/navigation'
 import { QueryClient, HydrationBoundary, dehydrate } from '@tanstack/react-query'
 import { orpc } from '@/lib/orpc'
-import { AdminCapsuleDetailsPageClient } from '../admin-capsule-details-page-client'
+import { CapsulesEditClient } from './CapsulesEditClient'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -33,7 +33,7 @@ export default async function CapsuleEditPage({ params }: PageProps) {
     
     return (
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <AdminCapsuleDetailsPageClient capsuleId={id} update={true} />
+        <CapsulesEditClient capsuleId={id} />
       </HydrationBoundary>
     )
   } catch (error) {

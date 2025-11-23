@@ -12,11 +12,10 @@ import {
   ColumnFiltersState,
 } from "@tanstack/react-table";
 import { flexRender, useReactTable } from "@tanstack/react-table";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { useCapsules, useDeleteCapsule, useCapsuleVideoProcessing } from "@/hooks/capsules/hooks";
 import { Capsule } from "@/types/capsule";
-import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -50,9 +49,6 @@ import {
   Pencil,
   Search,
   Filter,
-  MessageSquare,
-  Lock,
-  Unlock,
   Sparkles,
   Trash2,
   Loader2,
@@ -61,7 +57,6 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -78,94 +73,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@repo/ui/components/shadcn/alert-dialog";
-import { Label } from "@/components/ui/label";
-import { Plus, CalendarIcon } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
-import { useCreateCapsule } from "@/hooks/capsules/hooks";
-import type { Value } from "platejs";
+import { Plus } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Toggle } from "@/components/ui/toggle";
-import { CapsuleContent } from "@/components/pages/capsule-details";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import { TipTapContentRenderer } from "@/components/tiptap/common";
-import { JSONContent } from "@repo/ui/tiptap-exports/react";
-import { orpc } from "@/lib/orpc";
-import { withFileUploads } from "@/lib/orpc/withFileUploads";
-import { useCapsuleMedia } from "@/hooks/capsules/media";
+import { CapsuleForm } from "@/components/capsule/form";
+import { CapsuleContent } from "@/components/capsule/view";
 
 // Create Capsule Dialog Component
 function CreateCapsuleDialog() {
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState<Date>();
-  const [formData, setFormData] = useState({
-    openingMessage: "",
-    isLocked: false,
-  });
-  
-  // Default empty Tiptap value (proper doc structure)
-  const getEmptyValue = () => ({
-    type: "doc",
-    content: [{ type: "paragraph" }],
-  });
-
-  const [editorValue, setEditorValue] = useState<any>(getEmptyValue());
-  const [isEditorReady, setIsEditorReady] = useState(false);
-  
-  // Use media tracking hook
-  const { processContentForSubmit } = useCapsuleMedia();
-
-  const { mutate: createCapsule, isPending } = useCreateCapsule();
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate content
-    if (!editorValue || editorValue.length === 0) {
-      toast.error("Content is required");
-      return;
-    }
-
-    if (!date) {
-      toast.error("Opening date is required");
-      return;
-    }
-
-    // Process content: extract local nodes, convert to uniqueId strategy, collect files
-    const contentArray = Array.isArray(editorValue) ? editorValue : [editorValue];
-    const { processedContent, media } = processContentForSubmit(contentArray);
-
-    // Create capsule with processed content + media
-    // Note: Explicitly convert boolean to ensure proper multipart/form-data handling
-    createCapsule(
-      {
-        openingDate: date.toISOString(),
-        content: JSON.stringify(processedContent),
-        openingMessage: formData.openingMessage || undefined,
-        isLocked: Boolean(formData.isLocked), // Explicit boolean conversion
-        media,
-      },
-      {
-        onSuccess: () => {
-          // Toast notification is handled by the hook
-          setOpen(false);
-          // Reset form
-          setEditorValue(getEmptyValue());
-          setDate(undefined);
-          setFormData({
-            openingMessage: "",
-            isLocked: false,
-          });
-        },
-        // Error notification is handled by the hook
-      },
-    );
-  };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -183,7 +98,7 @@ function CreateCapsuleDialog() {
         side="right"
         className="w-full sm:w-[90vw] sm:max-w-4xl p-0 gap-0 overflow-y-auto"
       >
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+        <div className="flex flex-col h-full">
           <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 space-y-2 sm:space-y-3">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -204,236 +119,12 @@ function CreateCapsuleDialog() {
           <Separator />
 
           <div className="flex-1 overflow-auto px-4 py-4 sm:px-6 sm:py-6">
-            <div className="space-y-4 sm:space-y-6 max-w-full">
-              {/* Content Editor Section */}
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-muted">
-                    <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <Label
-                      htmlFor="content"
-                      className="text-sm sm:text-base font-semibold"
-                    >
-                      Capsule Content
-                    </Label>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      Add text, images, videos, audio, and more
-                    </p>
-                  </div>
-                </div>
-                <div 
-                  className="border rounded-lg overflow-hidden"
-                  role="region"
-                  aria-label="Contenu de la capsule"
-                  tabIndex={0}
-                >
-                  {!isEditorReady && (
-                    <div className="p-4 space-y-3 animate-pulse">
-                      <div className="h-4 bg-muted rounded w-3/4"></div>
-                      <div className="h-4 bg-muted rounded w-full"></div>
-                      <div className="h-4 bg-muted rounded w-5/6"></div>
-                    </div>
-                  )}
-                  <div className={!isEditorReady ? 'hidden' : ''}>
-                    <TipTapContentRenderer
-                      mode="editor"
-                      value={editorValue}
-                      onChange={(newValue) => {
-                        console.log(
-                          "📝 [TipTap] Content changed:",
-                          JSON.stringify(newValue, null, 2),
-                        );
-                        setEditorValue(newValue);
-                      }}
-                      capsule={undefined}
-                      placeholder="Écrivez le contenu de votre capsule temporelle..."
-                      onEditorReady={() => {
-                        console.log("✅ [TipTap] Editor is ready");
-                        setIsEditorReady(true);
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Opening Date Section */}
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <Label
-                      htmlFor="openingDate"
-                      className="text-sm sm:text-base font-semibold"
-                    >
-                      Opening Date
-                    </Label>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      When should this capsule be revealed?
-                    </p>
-                  </div>
-                </div>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      data-empty={!date}
-                      className="data-[empty=true]:text-muted-foreground w-[280px] justify-start text-left font-normal"
-                    >
-                      <CalendarIcon />
-                      {date ? format(date, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-auto overflow-hidden p-0"
-                    align="start"
-                  >
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      captionLayout="dropdown"
-                      onSelect={setDate}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <Separator />
-
-              {/* Opening Message Section */}
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-muted">
-                    <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <Label
-                      htmlFor="openingMessage"
-                      className="text-sm sm:text-base font-semibold"
-                    >
-                      Opening Message
-                      <span className="text-[10px] sm:text-xs text-muted-foreground font-normal ml-2">
-                        (Optional)
-                      </span>
-                    </Label>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      A special greeting when the capsule opens
-                    </p>
-                  </div>
-                </div>
-                <Textarea
-                  id="openingMessage"
-                  placeholder="Welcome to this moment from the past..."
-                  value={formData.openingMessage}
-                  onChange={(e) =>
-                    setFormData({ ...formData, openingMessage: e.target.value })
-                  }
-                  className="min-h-16 sm:min-h-20 resize-none shadow-sm text-sm"
-                />
-              </div>
-
-              <Separator />
-
-              {/* Lock Status Section */}
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-muted">
-                    {formData.isLocked ? (
-                      <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                    ) : (
-                      <Unlock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <Label className="text-sm sm:text-base font-semibold">
-                      Security Settings
-                    </Label>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      Control when this capsule can be accessed
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between rounded-lg border p-3 sm:p-4 shadow-sm bg-muted/30 gap-2">
-                  <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
-                    <div
-                      className={cn(
-                        "flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full shrink-0",
-                        formData.isLocked ? "bg-primary/10" : "bg-muted",
-                      )}
-                    >
-                      {formData.isLocked ? (
-                        <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                      ) : (
-                        <Unlock className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 space-y-0.5 sm:space-y-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium leading-none">
-                        {formData.isLocked
-                          ? "Locked until opening date"
-                          : "Accessible anytime"}
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2">
-                        {formData.isLocked
-                          ? "Capsule will remain sealed until the scheduled opening date"
-                          : "Capsule can be viewed immediately after creation"}
-                      </p>
-                    </div>
-                  </div>
-                  <Toggle
-                    pressed={formData.isLocked}
-                    onPressedChange={(pressed) =>
-                      setFormData({ ...formData, isLocked: pressed })
-                    }
-                    aria-label="Toggle lock status"
-                    className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground shrink-0 h-8 w-8 sm:h-9 sm:w-9"
-                  >
-                    {formData.isLocked ? (
-                      <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    ) : (
-                      <Unlock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    )}
-                  </Toggle>
-                </div>
-              </div>
-            </div>
+            <CapsuleForm
+              mode="create"
+              onSuccess={() => setOpen(false)}
+            />
           </div>
-
-          <Separator />
-
-          <SheetFooter className="px-4 py-3 sm:px-6 sm:py-4 bg-muted/30">
-            <div className="flex w-full gap-2 sm:gap-3 sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={isPending}
-                className="flex-1 sm:flex-none h-9 sm:h-10 text-sm"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isPending}
-                className="flex-1 sm:flex-none gap-2 shadow-sm h-9 sm:h-10 text-sm"
-              >
-                {isPending ? (
-                  <>
-                    <span className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Create Capsule
-                  </>
-                )}
-              </Button>
-            </div>
-          </SheetFooter>
-        </form>
+        </div>
       </SheetContent>
     </Sheet>
   );
@@ -625,13 +316,6 @@ const RowActions = ({ row }: { row: Row<Capsule> }) => {
           <CapsuleContent data={row.original} />
         </SheetContent>
       </Sheet>
-      <Link
-        href={`/admin/capsules/${capsuleId}`}
-        className="p-2 hover:bg-accent rounded-md transition-colors"
-        title="View details"
-      >
-        <Eye className="h-4 w-4" />
-      </Link>
       <Link
         href={`/admin/capsules/${capsuleId}/edit`}
         className="p-2 hover:bg-accent rounded-md transition-colors"

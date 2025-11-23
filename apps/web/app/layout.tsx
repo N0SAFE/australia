@@ -97,7 +97,7 @@ export default async function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="fr" className="overflow-hidden">
+    <html lang="fr">
       <body
         className={`${PontanoSansFont.variable} ${PinyonScriptFont.variable} antialiased`}
       >

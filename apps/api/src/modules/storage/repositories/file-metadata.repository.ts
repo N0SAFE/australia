@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '@/core/modules/database/services/database.service';
-import { file, imageFile, videoFile, audioFile, textFile } from '@/config/drizzle/schema';
+import { file, imageFile, videoFile, audioFile, rawFile } from '@/config/drizzle/schema';
 import { eq } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
 
@@ -182,30 +182,22 @@ export class FileMetadataRepository {
   /**
    * Create a text file entry in the database
    */
-  async createTextFile(data: {
+  async createRawFile(data: {
     filePath: string;
+    absoluteFilePath: string;
     filename: string;
     storedFilename: string;
     mimeType: string;
     size: number;
     uploadedBy?: string;
-    textMetadata?: {
-      encoding?: string;
-      lineCount?: number;
-      wordCount?: number;
-      characterCount?: number;
-    };
   }) {
     const db = this.databaseService.db;
 
-    // 1. Create text metadata entry
-    const [textMetadata] = await db
-      .insert(textFile)
+    // 1. Create raw file metadata entry
+    const [rawMetadata] = await db
+      .insert(rawFile)
       .values({
-        encoding: data.textMetadata?.encoding ?? 'utf-8',
-        lineCount: data.textMetadata?.lineCount,
-        wordCount: data.textMetadata?.wordCount,
-        characterCount: data.textMetadata?.characterCount,
+        encoding: 'binary', // Default for raw files
         isProcessed: false,
       })
       .returning();
@@ -214,8 +206,8 @@ export class FileMetadataRepository {
     const [fileEntry] = await db
       .insert(file)
       .values({
-        type: 'text',
-        contentId: textMetadata.id,
+        type: 'raw',
+        contentId: rawMetadata.id,
         filePath: data.filePath,
         filename: data.filename,
         storedFilename: data.storedFilename,
@@ -227,7 +219,92 @@ export class FileMetadataRepository {
       })
       .returning();
 
-    return { file: fileEntry, textMetadata };
+    return { file: fileEntry, rawMetadata };
+  }
+
+  /**
+   * Create a placeholder file entry to get an ID before saving the physical file
+   * This allows us to use the fileId as the filename on disk
+   */
+  async createPlaceholderFile(data: {
+    type: 'image' | 'video' | 'audio' | 'raw';
+    filename: string;
+    mimeType: string;
+    size: number;
+    uploadedBy?: string;
+  }) {
+    const db = this.databaseService.db;
+    
+    // Create appropriate metadata entry first
+    let contentId: string;
+    
+    if (data.type === 'image') {
+      const [metadata] = await db.insert(imageFile).values({
+        width: 0, // Will be updated later
+        height: 0,
+        isProcessed: false,
+      }).returning();
+      contentId = metadata.id;
+    } else if (data.type === 'video') {
+      const [metadata] = await db.insert(videoFile).values({
+        width: 0,
+        height: 0,
+        duration: 0,
+        hasAudio: true,
+        isProcessed: false,
+      }).returning();
+      contentId = metadata.id;
+    } else if (data.type === 'audio') {
+      const [metadata] = await db.insert(audioFile).values({
+        duration: 0,
+        sampleRate: 44100,
+        channels: 2,
+        isProcessed: false,
+      }).returning();
+      contentId = metadata.id;
+    } else {
+      const [metadata] = await db.insert(rawFile).values({
+        encoding: 'binary',
+        isProcessed: false,
+      }).returning();
+      contentId = metadata.id;
+    }
+    
+    // Create file entry with placeholder path (will be updated after save)
+    const [fileEntry] = await db
+      .insert(file)
+      .values({
+        type: data.type,
+        contentId,
+        filePath: 'pending', // Temporary - will be updated
+        filename: data.filename,
+        storedFilename: 'pending', // Temporary - will be updated
+        mimeType: data.mimeType,
+        size: data.size,
+        extension: data.filename.split('.').pop() ?? '',
+        uploadedBy: data.uploadedBy,
+        isPublic: false,
+      })
+      .returning();
+    
+    return fileEntry;
+  }
+
+  /**
+   * Update file paths after physical file has been saved
+   */
+  async updateFilePaths(fileId: string, paths: {
+    filePath: string;
+    storedFilename: string;
+  }) {
+    const db = this.databaseService.db;
+    await db
+      .update(file)
+      .set({
+        filePath: paths.filePath,
+        storedFilename: paths.storedFilename,
+      })
+      .where(eq(file.id, fileId));
   }
 
   /**
@@ -286,18 +363,52 @@ export class FileMetadataRepository {
       isProcessed: boolean;
       processingProgress?: number;
       processingError?: string;
-    }
+      processingStartedAt?: Date;
+    },
+    fileId?: string,
+    newFilePath?: string
   ) {
     const db = this.databaseService.db;
+    
+    // Update video metadata
     await db
       .update(videoFile)
       .set({
         isProcessed: status.isProcessed,
         processingProgress: status.processingProgress,
         processingError: status.processingError,
+        processingStartedAt: status.processingStartedAt,
         processingCompletedAt: status.isProcessed ? new Date() : undefined,
       })
       .where(eq(videoFile.id, videoId));
+    
+    // If newFilePath provided (video was converted), update the file path in file table
+    if (fileId && newFilePath) {
+      // Convert absolute path to relative path
+      // FFmpeg returns absolute: /app/apps/api/uploads/videos/video-123.mp4
+      // getAbsolutePath() does: join(UPLOADS_DIR, filePath) where UPLOADS_DIR = /app/apps/api/uploads
+      // So database needs ONLY the part after uploads/: videos/video-123.mp4
+      const uploadsIndex = newFilePath.indexOf('uploads/');
+      const relativePath = uploadsIndex >= 0 
+        ? newFilePath.substring(uploadsIndex + 'uploads/'.length)  // Skip 'uploads/' prefix
+        : newFilePath;
+      
+      console.log('[DEBUG updateVideoProcessingStatus] Path extraction:', {
+        fileId,
+        newFilePath,
+        uploadsIndex,
+        relativePath,
+      });
+      
+      await db
+        .update(file)
+        .set({
+          filePath: relativePath,
+          // Update stored filename to match new path
+          storedFilename: relativePath.split('/').pop() || relativePath,
+        })
+        .where(eq(file.id, fileId));
+    }
   }
 
   /**
@@ -335,5 +446,71 @@ export class FileMetadataRepository {
     }
 
     return results[0].filePath;
+  }
+
+  /**
+   * Get image file by ID
+   * Returns file record with joined image metadata
+   * Returns undefined if not found or if file is not an image
+   */
+  async getImageByFileId(fileId: string): Promise<{
+    file: InferSelectModel<typeof file>;
+    imageMetadata: InferSelectModel<typeof imageFile> | null;
+  } | undefined> {
+    const db = this.databaseService.db;
+    const [result] = await db
+      .select({
+        file: file,
+        imageMetadata: imageFile,
+      })
+      .from(file)
+      .leftJoin(imageFile, eq(file.contentId, imageFile.id))
+      .where(eq(file.id, fileId));
+
+    return result;
+  }
+
+  /**
+   * Get audio file by ID
+   * Returns file record with joined audio metadata
+   * Returns undefined if not found or if file is not an audio
+   */
+  async getAudioByFileId(fileId: string): Promise<{
+    file: InferSelectModel<typeof file>;
+    audioMetadata: InferSelectModel<typeof audioFile> | null;
+  } | undefined> {
+    const db = this.databaseService.db;
+    const [result] = await db
+      .select({
+        file: file,
+        audioMetadata: audioFile,
+      })
+      .from(file)
+      .leftJoin(audioFile, eq(file.contentId, audioFile.id))
+      .where(eq(file.id, fileId));
+
+    return result;
+  }
+
+  /**
+   * Get raw file by ID
+   * Returns file record with joined raw file metadata
+   * Returns undefined if not found or if file is not a raw file
+   */
+  async getRawFileByFileId(fileId: string): Promise<{
+    file: InferSelectModel<typeof file>;
+    rawMetadata: InferSelectModel<typeof rawFile> | null;
+  } | undefined> {
+    const db = this.databaseService.db;
+    const [result] = await db
+      .select({
+        file: file,
+        rawMetadata: rawFile,
+      })
+      .from(file)
+      .leftJoin(rawFile, eq(file.contentId, rawFile.id))
+      .where(eq(file.id, fileId));
+
+    return result;
   }
 }

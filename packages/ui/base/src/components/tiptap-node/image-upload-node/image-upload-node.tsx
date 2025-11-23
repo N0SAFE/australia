@@ -33,6 +33,11 @@ export interface FileItem {
    */
   url?: string
   /**
+   * Generic metadata object for implementation-specific data
+   * @optional
+   */
+  meta?: unknown
+  /**
    * Controller that can be used to abort the upload process
    * @optional
    */
@@ -58,13 +63,13 @@ export interface UploadOptions {
    * @param {File} file - The file to be uploaded
    * @param {Function} onProgress - Callback function to report upload progress
    * @param {AbortSignal} signal - Signal that can be used to abort the upload
-   * @returns {Promise<string>} Promise resolving to the URL of the uploaded file
+   * @returns {Promise<{url: string, meta?: unknown}>} Promise resolving to upload result with URL and optional metadata
    */
   upload: (
     file: File,
     onProgress: (event: { progress: number }) => void,
     signal: AbortSignal
-  ) => Promise<string>
+  ) => Promise<{ url: string; meta?: unknown }>
   /**
    * Callback triggered when a file is uploaded successfully
    * @param {string} url - URL of the successfully uploaded file
@@ -85,7 +90,7 @@ export interface UploadOptions {
 function useFileUpload(options: UploadOptions) {
   const [fileItems, setFileItems] = useState<FileItem[]>([])
 
-  const uploadFile = async (file: File): Promise<string | null> => {
+  const uploadFile = async (file: File): Promise<{ url: string; meta?: unknown } | null> => {
     const abortController = new AbortController()
     const fileId = crypto.randomUUID()
 
@@ -104,7 +109,7 @@ function useFileUpload(options: UploadOptions) {
         throw new Error("Upload function is not defined")
       }
 
-      const url = await options.upload(
+      const result = await options.upload(
         file,
         (event: { progress: number }) => {
           setFileItems((prev) =>
@@ -116,18 +121,31 @@ function useFileUpload(options: UploadOptions) {
         abortController.signal
       )
 
-      if (!url) throw new Error("Upload failed: No URL returned")
+      // For blob URL strategy (local editing), meta.contentMediaId is returned
+      // For API strategy (immediate upload), meta.fileId is returned
+      if (!result.meta) {
+        throw new Error("Upload failed: No meta object returned")
+      }
+      
+      const meta = result.meta as Record<string, unknown>
+      const hasValidId = Boolean(meta.fileId ?? meta.contentMediaId)
+      
+      if (!hasValidId) {
+        throw new Error("Upload failed: No fileId or contentMediaId returned in meta")
+      }
 
       if (!abortController.signal.aborted) {
         setFileItems((prev) =>
           prev.map((item) =>
             item.id === fileId
-              ? { ...item, status: "success", url, progress: 100 }
+              ? { ...item, status: "success", meta: result.meta, url: result.url, progress: 100 }
               : item
           )
         )
-        options.onSuccess?.(url)
-        return url
+        // Pass fileId if available (API strategy), otherwise contentMediaId (local strategy)
+        const identifier = (meta.fileId ?? meta.contentMediaId) as string
+        options.onSuccess?.(identifier)
+        return result
       }
 
       return null
@@ -148,7 +166,7 @@ function useFileUpload(options: UploadOptions) {
     }
   }
 
-  const uploadFiles = async (files: File[]): Promise<string[]> => {
+  const uploadFiles = async (files: File[]): Promise<{ url: string; meta?: unknown }[]> => {
     if (!files || files.length === 0) {
       options.onError?.(new Error("No files to upload"))
       return []
@@ -168,7 +186,11 @@ function useFileUpload(options: UploadOptions) {
     const results = await Promise.all(uploadPromises)
 
     // Filter out null results (failed uploads)
-    return results.filter((url): url is string => url !== null)
+    const successfulUploads = results.filter(
+      (result): result is { url: string; meta?: unknown } => result !== null
+    )
+    
+    return successfulUploads
   }
 
   const removeFileItem = (fileId: string) => {
@@ -448,37 +470,49 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
       ? files.map(file => extension.options.prepareForUpload!(file))
       : files
     
-    // Don't upload - just create local blob URLs with contentMediaId
-    const pos = props.getPos()
+    const results = await uploadFiles(preparedFiles)
 
-    if (isValidPosition(pos)) {
-      const imageNodes = preparedFiles.map((file) => {
-        const blobUrl = URL.createObjectURL(file)
-        const filename = file.name.replace(/\.[^/.]+$/, "") || "unknown"
-        const contentMediaId = crypto.randomUUID() // Generate UUID for linking
-        
-        return {
-          type: extension.options.type,
-          attrs: {
-            ...extension.options,
-            src: blobUrl,
-            contentMediaId, // UUID linking content node to capsule media
-            strategy: 'local',
-            fileRef: file, // Store File reference
-            alt: filename,
-            title: filename,
-          },
-        }
-      })
+    if (results.length > 0) {
+      const pos = props.getPos()
 
-      props.editor
-        .chain()
-        .focus()
-        .deleteRange({ from: pos, to: pos + props.node.nodeSize })
-        .insertContentAt(pos, imageNodes)
-        .run()
+      if (isValidPosition(pos)) {
+        const imageNodes = results.map((result, index) => {
+          const filename =
+            preparedFiles[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
+          
+          // Extract strategy from meta to determine if we need fileRef
+          const meta = (result.meta as Record<string, unknown>) || {}
+          const isLocalStrategy = meta.strategy === 'local'
+          
+          // Build meta object carefully - explicitly set each property
+          const nodeMeta = {
+            srcResolveStrategy: 'image',
+            strategy: meta.strategy,
+            contentMediaId: meta.contentMediaId,
+            blobUrl: result.url,
+          };
+          
+          return {
+            type: extension.options.type,
+            attrs: {
+              meta: nodeMeta,
+              // For local strategy, store File object for later upload
+              ...(isLocalStrategy && preparedFiles[index] ? { fileRef: preparedFiles[index] } : {}),
+              alt: filename,
+              title: filename,
+            },
+          }
+        })
 
-      focusNextNode(props.editor)
+        props.editor
+          .chain()
+          .focus()
+          .deleteRange({ from: pos, to: pos + props.node.nodeSize })
+          .insertContentAt(pos, imageNodes)
+          .run()
+
+        focusNextNode(props.editor)
+      }
     }
   }
 

@@ -21,7 +21,7 @@ import {
   ImagePlugin,
   VideoPlugin,
 } from '@platejs/media/react';
-import { useUploadVideoWithProgress } from '@/hooks/useStorage';
+import { useUploadVideoWithProgress } from '@/hooks/storage/hooks';
 import { toast } from 'sonner';
 import { useMutation } from '@tanstack/react-query';
 import { orpc } from '@/lib/orpc';

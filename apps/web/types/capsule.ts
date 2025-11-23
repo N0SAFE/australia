@@ -55,9 +55,9 @@ export type AttachedMedia = {
   filename: string;
   mimeType: string;
   size: number;
-  width?: number;
-  height?: number;
-  duration?: number;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
   thumbnailPath?: string | null;
   createdAt: string;
 };
@@ -81,6 +81,9 @@ export type Capsule = {
   
   // Attached media linked via contentMediaId in TipTap JSON
   attachedMedia?: AttachedMedia[];
+  
+  // Video processing status (from backend query)
+  hasProcessingVideos?: boolean;
   
   createdAt: string;
   updatedAt: string;

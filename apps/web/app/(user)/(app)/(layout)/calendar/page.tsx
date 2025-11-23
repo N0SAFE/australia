@@ -1,4 +1,4 @@
-import { getCapsules } from '@/hooks/useCapsules';
+import { getCapsules } from '@/hooks/capsules/queries';
 import { CalendarPage } from '@/components/pages/calendar';
 import { Capsule } from '@/types/capsule';
 

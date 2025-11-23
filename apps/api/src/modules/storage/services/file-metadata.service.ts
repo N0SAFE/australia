@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { FileMetadataRepository } from '../repositories/file-metadata.repository';
+import { StorageService } from './storage.service';
 
 /**
  * Service for file metadata management
@@ -8,7 +9,10 @@ import { FileMetadataRepository } from '../repositories/file-metadata.repository
  */
 @Injectable()
 export class FileMetadataService {
-  constructor(private readonly fileMetadataRepository: FileMetadataRepository) {}
+  constructor(
+    private readonly fileMetadataRepository: FileMetadataRepository,
+    private readonly storageService: StorageService,
+  ) {}
 
   /**
    * Extract video file metadata
@@ -126,12 +130,10 @@ export class FileMetadataService {
    * Create video file record with metadata extraction
    */
   async createVideoFile(data: {
+    file: File;
     filePath: string;
     absoluteFilePath: string;
-    filename: string;
     storedFilename: string;
-    mimeType: string;
-    size: number;
     uploadedBy?: string;
   }) {
     // Extract metadata from the file
@@ -139,16 +141,16 @@ export class FileMetadataService {
     
     // Calculate aspect ratio if dimensions are available
     if (videoMetadata.width && videoMetadata.height) {
-      videoMetadata.aspectRatio = `${videoMetadata.width}:${videoMetadata.height}`;
+      videoMetadata.aspectRatio = `${videoMetadata.width.toString()}:${videoMetadata.height.toString()}`;
     }
 
     // Save to database via repository
     return this.fileMetadataRepository.createVideoFile({
       filePath: data.filePath,
-      filename: data.filename,
+      filename: data.file.name,
       storedFilename: data.storedFilename,
-      mimeType: data.mimeType,
-      size: data.size,
+      mimeType: data.file.type,
+      size: data.file.size,
       uploadedBy: data.uploadedBy,
       videoMetadata,
     });
@@ -158,12 +160,10 @@ export class FileMetadataService {
    * Create image file record with metadata extraction
    */
   async createImageFile(data: {
+    file: File;
     filePath: string;
     absoluteFilePath: string;
-    filename: string;
     storedFilename: string;
-    mimeType: string;
-    size: number;
     uploadedBy?: string;
   }) {
     // Extract metadata from the file
@@ -172,10 +172,10 @@ export class FileMetadataService {
     // Save to database via repository
     return this.fileMetadataRepository.createImageFile({
       filePath: data.filePath,
-      filename: data.filename,
+      filename: data.file.name,
       storedFilename: data.storedFilename,
-      mimeType: data.mimeType,
-      size: data.size,
+      mimeType: data.file.type,
+      size: data.file.size,
       uploadedBy: data.uploadedBy,
       imageMetadata,
     });
@@ -185,12 +185,10 @@ export class FileMetadataService {
    * Create audio file record with metadata extraction
    */
   async createAudioFile(data: {
+    file: File;
     filePath: string;
     absoluteFilePath: string;
-    filename: string;
     storedFilename: string;
-    mimeType: string;
-    size: number;
     uploadedBy?: string;
   }) {
     // Extract metadata from the file
@@ -199,19 +197,19 @@ export class FileMetadataService {
     // Save to database via repository
     return this.fileMetadataRepository.createAudioFile({
       filePath: data.filePath,
-      filename: data.filename,
+      filename: data.file.name,
       storedFilename: data.storedFilename,
-      mimeType: data.mimeType,
-      size: data.size,
+      mimeType: data.file.type,
+      size: data.file.size,
       uploadedBy: data.uploadedBy,
       audioMetadata,
     });
   }
 
   /**
-   * Create text file record with metadata extraction
+   * Create raw file record (for generic/document files)
    */
-  async createTextFile(data: {
+  async createRawFile(data: {
     filePath: string;
     absoluteFilePath: string;
     filename: string;
@@ -220,18 +218,16 @@ export class FileMetadataService {
     size: number;
     uploadedBy?: string;
   }) {
-    // Extract metadata from the file
-    const textMetadata = await this.extractTextMetadata(data.absoluteFilePath);
-
-    // Save to database via repository
-    return this.fileMetadataRepository.createTextFile({
+    // For raw files, we don't extract metadata
+    // Just save to database via repository
+    return this.fileMetadataRepository.createRawFile({
       filePath: data.filePath,
+      absoluteFilePath: data.absoluteFilePath,
       filename: data.filename,
       storedFilename: data.storedFilename,
       mimeType: data.mimeType,
       size: data.size,
       uploadedBy: data.uploadedBy,
-      textMetadata,
     });
   }
 
@@ -259,6 +255,11 @@ export class FileMetadataService {
 
   /**
    * Update video processing status
+   * Called after video processing completes or fails
+   * @param videoId - Video metadata ID
+   * @param status - Processing status update
+   * @param fileId - Optional file ID to update file path
+   * @param newFilePath - Optional new file path (when video was converted)
    */
   async updateVideoProcessingStatus(
     videoId: string,
@@ -266,8 +267,193 @@ export class FileMetadataService {
       isProcessed: boolean;
       processingProgress?: number;
       processingError?: string;
-    }
+      processingStartedAt?: Date;
+    },
+    fileId?: string,
+    newFilePath?: string
   ) {
-    return this.fileMetadataRepository.updateVideoProcessingStatus(videoId, status);
+    return this.fileMetadataRepository.updateVideoProcessingStatus(videoId, status, fileId, newFilePath);
+  }
+
+  /**
+   * Get image with file metadata by file ID
+   * Returns undefined if not found or if file is not an image
+   */
+  async getImageByFileId(fileId: string) {
+    return this.fileMetadataRepository.getImageByFileId(fileId);
+  }
+
+  /**
+   * Get audio with file metadata by file ID
+   * Returns undefined if not found or if file is not an audio
+   */
+  async getAudioByFileId(fileId: string) {
+    return this.fileMetadataRepository.getAudioByFileId(fileId);
+  }
+
+  /**
+   * Get raw file with file metadata by file ID
+   * Returns undefined if not found or if file is not a raw file
+   */
+  async getRawFileByFileId(fileId: string) {
+    return this.fileMetadataRepository.getRawFileByFileId(fileId);
+  }
+
+  /**
+   * Upload an image file with proper feature-based storage
+   * Creates DB record first to get fileId, then saves file with that ID as filename
+   */
+  async uploadImage(
+    file: File,
+    feature: string,
+    uploadedBy?: string,
+  ): Promise<{
+    fileId: string;
+    filename: string;
+    size: number;
+    mimeType: string;
+    filePath: string;
+  }> {
+    // Step 1: Create placeholder database record to get fileId
+    const fileRecord = await this.fileMetadataRepository.createPlaceholderFile({
+      type: 'image',
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+      uploadedBy,
+    });
+
+    // Step 2: Save file using the generated fileId as the filename
+    const ext = file.name.split('.').pop() ?? 'bin';
+    const absolutePath = await this.storageService.saveFile(
+      file,
+      fileRecord.id,
+      feature,
+      ext,
+    );
+
+    // Step 3: Build the paths for database
+    const storedFilename = `${fileRecord.id}.${ext}`;
+    const filePath = `${feature}/${storedFilename}`;
+
+    // Step 4: Update the database record with actual paths
+    await this.fileMetadataRepository.updateFilePaths(fileRecord.id, {
+      filePath,
+      storedFilename,
+    });
+
+    return {
+      fileId: fileRecord.id,
+      filename: file.name,
+      size: file.size,
+      mimeType: file.type,
+      filePath,
+    };
+  }
+
+  /**
+   * Upload a video file with proper feature-based storage
+   * Creates DB record first to get fileId, then saves file with that ID as filename
+   */
+  async uploadVideo(
+    file: File,
+    feature: string,
+    uploadedBy?: string,
+  ): Promise<{
+    fileId: string;
+    filename: string;
+    size: number;
+    mimeType: string;
+    filePath: string;
+    absolutePath: string;
+  }> {
+    // Step 1: Create placeholder database record to get fileId
+    const fileRecord = await this.fileMetadataRepository.createPlaceholderFile({
+      type: 'video',
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+      uploadedBy,
+    });
+
+    // Step 2: Save file using the generated fileId as the filename
+    const ext = file.name.split('.').pop() ?? 'bin';
+    const absolutePath = await this.storageService.saveFile(
+      file,
+      fileRecord.id,
+      feature,
+      ext,
+    );
+
+    // Step 3: Build the paths for database
+    const storedFilename = `${fileRecord.id}.${ext}`;
+    const filePath = `${feature}/${storedFilename}`;
+
+    // Step 4: Update the database record with actual paths
+    await this.fileMetadataRepository.updateFilePaths(fileRecord.id, {
+      filePath,
+      storedFilename,
+    });
+
+    return {
+      fileId: fileRecord.id,
+      filename: file.name,
+      size: file.size,
+      mimeType: file.type,
+      filePath,
+      absolutePath,
+    };
+  }
+
+  /**
+   * Upload an audio file with proper feature-based storage
+   * Creates DB record first to get fileId, then saves file with that ID as filename
+   */
+  async uploadAudio(
+    file: File,
+    feature: string,
+    uploadedBy?: string,
+  ): Promise<{
+    fileId: string;
+    filename: string;
+    size: number;
+    mimeType: string;
+    filePath: string;
+  }> {
+    // Step 1: Create placeholder database record to get fileId
+    const fileRecord = await this.fileMetadataRepository.createPlaceholderFile({
+      type: 'audio',
+      filename: file.name,
+      mimeType: file.type,
+      size: file.size,
+      uploadedBy,
+    });
+
+    // Step 2: Save file using the generated fileId as the filename
+    const ext = file.name.split('.').pop() ?? 'bin';
+    const absolutePath = await this.storageService.saveFile(
+      file,
+      fileRecord.id,
+      feature,
+      ext,
+    );
+
+    // Step 3: Build the paths for database
+    const storedFilename = `${fileRecord.id}.${ext}`;
+    const filePath = `${feature}/${storedFilename}`;
+
+    // Step 4: Update the database record with actual paths
+    await this.fileMetadataRepository.updateFilePaths(fileRecord.id, {
+      filePath,
+      storedFilename,
+    });
+
+    return {
+      fileId: fileRecord.id,
+      filename: file.name,
+      size: file.size,
+      mimeType: file.type,
+      filePath,
+    };
   }
 }

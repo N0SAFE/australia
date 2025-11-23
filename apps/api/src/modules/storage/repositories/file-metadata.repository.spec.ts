@@ -126,7 +126,7 @@ describe('FileMetadataRepository', () => {
     });
   });
 
-  describe('createTextFile', () => {
+  describe('createRawFile', () => {
     it('should create a text file entry in database', async () => {
       const mockTextMetadata = { id: 'text-uuid-123' };
       const mockFileEntry = { id: 'file-uuid-456' };
@@ -135,7 +135,7 @@ describe('FileMetadataRepository', () => {
         .mockResolvedValueOnce([mockTextMetadata])
         .mockResolvedValueOnce([mockFileEntry]);
 
-      const result = await repository.createTextFile({
+      const result = await repository.createRawFile({
         filePath: 'files/test.txt',
         filename: 'test.txt',
         storedFilename: 'uuid-test.txt',

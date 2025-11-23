@@ -1,4 +1,4 @@
-import { z } from "zod";
+import z from "zod/v4";
 import { oc } from "@orpc/contract";
 
 export const invitationValidateInput = z.object({

@@ -9,7 +9,7 @@ export const capsuleMarkAsOpenedInput = z.object({
 
 // Define the output
 export const capsuleMarkAsOpenedOutput = z.object({
-  success: z.boolean(),
+  success: z.coerce.boolean(),
   message: z.string().optional(),
   capsule: capsuleSchema.optional(), // Return updated capsule if successful
 });

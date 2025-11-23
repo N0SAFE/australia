@@ -1,6 +1,16 @@
 import { validateEnvPath } from '#/env'
 import { toast } from 'sonner'
-import type { $ZodType as ZodType } from 'zod/v4/core'
+import type { $ZodType as ZodType, SomeType } from 'zod/v4/core'
+import type {
+  ZodFile,
+  ZodObject,
+  ZodArray,
+  ZodOptional,
+  ZodNullable,
+  ZodTransform,
+  ZodUnion,
+  ZodIntersection,
+} from 'zod/v4'
 
 /**
  * Progress event for file uploads
@@ -13,9 +23,17 @@ export type FileUploadProgressEvent = {
 }
 
 /**
- * Options for file upload routes
+ * Context extension for file upload routes
+ * This is merged with the existing ORPC context type
  */
-export type FileUploadOptions<TResult = unknown> = {
+export type FileUploadContext = {
+  onProgress?: (event: FileUploadProgressEvent) => void
+}
+
+/**
+ * Options for file upload routes (internal use)
+ */
+type FileUploadOptions<TResult = unknown> = {
   onProgress?: (event: FileUploadProgressEvent) => void
   onSuccess?: (data: TResult) => void
   onError?: (error: Error) => void
@@ -178,6 +196,14 @@ async function uploadWithWorker<TResult = unknown>(
   options?: FileUploadOptions<TResult>
 ): Promise<TResult> {
   return new Promise((resolve, reject) => {
+    console.log('[uploadWithWorker] Starting upload with options:', {
+      endpoint,
+      hasOptions: !!options,
+      hasOnProgress: !!options?.onProgress,
+      onProgressType: typeof options?.onProgress,
+      optionsKeys: options ? Object.keys(options) : [],
+    })
+    
     const worker = getOrCreateWorker()
     const uploadId = generateUploadId()
 
@@ -212,6 +238,14 @@ async function uploadWithWorker<TResult = unknown>(
 
       switch (response.type) {
         case 'progress':
+          console.log('[uploadWithWorker] Progress event received:', {
+            uploadId,
+            loaded: response.loaded,
+            total: response.total,
+            percentage: response.percentage,
+            hasOnProgressCallback: !!options?.onProgress,
+          })
+          
           options?.onProgress?.({
             loaded: response.loaded,
             total: response.total,
@@ -305,17 +339,25 @@ function containsFile(value: unknown): boolean {
 function schemaAcceptsFiles(schema: ZodType): boolean {
   try {
     if (!schema || typeof schema !== 'object') {
+      console.log('[schemaAcceptsFiles] Schema is not an object')
       return false
     }
 
     const def = schema._zod?.def
 
     if (!def) {
+      console.log('[schemaAcceptsFiles] Schema has no _zod.def')
       return false
     }
 
+    console.log('[schemaAcceptsFiles] Checking schema type:', {
+      type: def.type,
+      defKeys: Object.keys(def),
+    })
+
     // Direct ZodFile check
     if (def.type === 'file') {
+      console.log('[schemaAcceptsFiles] ✅ Found file type!')
       return true
     }
 
@@ -429,36 +471,96 @@ function getSuccessMessage(contract: ORPCContract): string {
   return 'File uploaded successfully'
 }
 
+// Import ORPC client types
+import type { Client, ClientContext, NestedClient } from '@orpc/client'
+
 /**
- * ORPC Procedure type (has call methods and utilities)
+ * Type-level detection of File in TypeScript types
+ * Returns true if the type contains File at any level
+ * Note: This checks the INFERRED TypeScript type, not the Zod schema
  */
-type ORPCProcedure = {
-  (input: unknown, options?: unknown): Promise<unknown>
-  [key: string]: unknown
-}
+type HasFileInType<T> = 
+  T extends File ? true :
+  T extends Array<infer Element> ? HasFileInType<Element> :
+  T extends object ? 
+    (keyof T extends never 
+      ? false  // Empty object has no keys, no File
+      : { [K in keyof T]: HasFileInType<T[K]> }[keyof T] extends never
+        ? false  // All properties returned never (impossible case), treat as false
+        : { [K in keyof T]: HasFileInType<T[K]> }[keyof T] extends true 
+          ? true 
+          : false
+    ) :
+  false
+
+/**
+ * Transform a client type to extend context with FileUploadContext ONLY for routes with files
+ * Routes without files will NOT have FileUploadContext in their type
+ */
+type WithFileUploadsClient<T extends NestedClient<any>> = 
+  T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
+    ? HasFileInType<UInput> extends true
+      ? Client<UContext & FileUploadContext, UInput, UOutput, UError>
+      : Client<UContext, UInput, UOutput, UError>
+    : {
+        [K in keyof T]: T[K] extends NestedClient<any> 
+          ? WithFileUploadsClient<T[K]>
+          : T[K]
+      }
 
 /**
  * Wrap a route function to handle file uploads with Web Worker
+ * Returns a client with extended context type that includes FileUploadContext
  */
-function wrapRouteWithFileUpload<TProcedure extends ORPCProcedure>(
-  procedure: TProcedure,
+function wrapRouteWithFileUpload<
+  TClientContext extends ClientContext,
+  TInput,
+  TOutput,
+  TError
+>(
+  procedure: Client<TClientContext, TInput, TOutput, TError>,
   contract: ORPCContract
-): TProcedure {
+): Client<TClientContext & FileUploadContext, TInput, TOutput, TError> {
   const endpoint = getEndpointFromContract(contract)
   const successMessage = getSuccessMessage(contract)
 
-  // Create a wrapper function that handles file uploads
-  const wrappedFunction = async (input: unknown, options?: unknown): Promise<unknown> => {
-    // Check if this is a FileUploadOptions (has onProgress callback)
-    const isFileUploadOptions = options && typeof options === 'object' && 'onProgress' in options
-    const fileUploadOptions = isFileUploadOptions ? options as FileUploadOptions : undefined
+  // Create a wrapper function that matches ORPC's Client signature
+  // Client accepts (...rest: ClientRest<TClientContext, TInput>) which is a conditional tuple
+  const wrappedFunction = (async (...rest: any[]) => {
+    // Extract input and options from the ClientRest tuple
+    // rest can be [input], [input, options], or []
+    const [input, options] = rest as [unknown, { context?: FileUploadContext } | undefined]
+    
+    console.log('[withFileUploads] Wrapper called with:', {
+      restLength: rest.length,
+      hasOptions: !!options,
+      hasContext: !!options?.context,
+      hasOnProgress: !!options?.context?.onProgress,
+      optionsKeys: options ? Object.keys(options) : [],
+      contextKeys: options?.context ? Object.keys(options.context) : [],
+      options: options,
+    })
+    
+    // Extract onProgress from options.context if it exists
+    const onProgress = options?.context?.onProgress
+
+    // Build FileUploadOptions from context
+    const fileUploadOptions: FileUploadOptions | undefined = onProgress 
+      ? { onProgress }
+      : undefined
+    
+    console.log('[withFileUploads] onProgress callback:', {
+      exists: !!onProgress,
+      type: typeof onProgress,
+      fileUploadOptions: fileUploadOptions ? 'created' : 'undefined',
+    })
 
     try {
       // Check if input actually contains files at runtime
       if (!containsFile(input)) {
         // No files found, use regular ORPC call
         console.log('[withFileUploads] No files detected, using standard ORPC call')
-        return await procedure(input, options)
+        return await procedure(...rest as any)
       }
 
       const result = await uploadWithWorker(input, endpoint, fileUploadOptions)
@@ -473,27 +575,38 @@ function wrapRouteWithFileUpload<TProcedure extends ORPCProcedure>(
       }
       throw error
     }
-  }
+  }) as Client<TClientContext & FileUploadContext, TInput, TOutput, TError>
 
-  // Copy all properties and methods from the original procedure
-  // This preserves ORPC utilities like useQuery, useMutation, etc.
-  return Object.assign(wrappedFunction, procedure) as TProcedure
+  // Return the wrapped function directly
+  // ORPC clients are just functions, not objects with methods
+  return wrappedFunction
 }
 
 /**
  * Recursively wrap an ORPC client to enhance routes with file uploads
+ * Routes with z.file() will have their context extended with FileUploadContext
  */
-function wrapClientWithFileUploads<T>(
+function wrapClientWithFileUploads<T extends NestedClient<any>>(
   client: T,
   parentPath: string[] = []
-): T {
+): WithFileUploadsClient<T> {
+  console.log(`[wrapClientWithFileUploads] Wrapping client at path: ${parentPath.join('.') || 'root'}`, {
+    clientType: typeof client,
+    isObject: typeof client === 'object',
+    isNull: client === null,
+  })
+  
+  console.log(client)
+  
   if (!client || typeof client !== 'object') {
-    return client
+    console.log(`[wrapClientWithFileUploads] Client is not an object, returning as-is`)
+    return client as WithFileUploadsClient<T>
   }
 
   // Create a proxy to intercept property access
   return new Proxy(client as object, {
     get(target, prop) {
+      console.log(`[wrapClientWithFileUploads] Accessing property: ${String(prop)} on path: ${parentPath.join('.') || 'root'}`)
       if (typeof prop === 'symbol' || prop === 'then') {
         return Reflect.get(target, prop)
       }
@@ -501,50 +614,72 @@ function wrapClientWithFileUploads<T>(
       const value = Reflect.get(target, prop)
       const currentPath = [...parentPath, prop as string]
 
-      // Check if this is a route with file input
-      if (value && typeof value === 'object' && '~orpc' in value) {
-        if (hasFileInput(value as ORPCContract)) {
+      console.log(`[wrapClientWithFileUploads] Accessing property: ${currentPath.join('.')}`, {
+        valueType: typeof value,
+        isFunction: typeof value === 'function',
+        hasOrpcMetadata: typeof value === 'function' && '~orpc' in value,
+      })
+
+      // Check if this is a procedure (function) with ORPC contract metadata
+      if (typeof value === 'function' && '~orpc' in value) {
+        const contract = value as ORPCContract
+        const hasFiles = hasFileInput(contract)
+        
+        console.log(`[wrapClientWithFileUploads] Found ORPC procedure: ${currentPath.join('.')}`, {
+          hasFiles,
+          contractMetadata: contract?.['~orpc'],
+        })
+        
+        if (hasFiles) {
           // This is a file upload route - wrap it
-          console.log(`[withFileUploads] Wrapping route: ${currentPath.join('.')}`)
-          return wrapRouteWithFileUpload(value as ORPCProcedure, value as ORPCContract)
+          console.log(`[withFileUploads] ✅ Wrapping file upload route: ${currentPath.join('.')}`)
+          return wrapRouteWithFileUpload(value as any, contract)
         }
+        
+        // It's a procedure but doesn't have file input, return as-is
+        console.log(`[withFileUploads] ❌ Route has no file input, returning as-is: ${currentPath.join('.')}`)
+        return value
       }
 
       // If it's an object (router), recursively wrap it
       if (value && typeof value === 'object' && !Array.isArray(value)) {
+        console.log(`[wrapClientWithFileUploads] Recursively wrapping nested object: ${currentPath.join('.')}`)
         return wrapClientWithFileUploads(value, currentPath)
       }
 
+      console.log(`[wrapClientWithFileUploads] Returning value as-is for: ${currentPath.join('.')}`)
       return value
     },
-  }) as T
+  }) as WithFileUploadsClient<T>
 }
 
 /**
  * Wrap an ORPC client instance to automatically handle file uploads using Web Workers
  * 
- * This function enhances ORPC client methods that have file inputs to automatically
- * use XMLHttpRequest with Web Workers for non-blocking uploads with progress tracking.
+ * Routes with z.file() in their schemas will have their context extended with FileUploadContext.
+ * This enables type-safe onProgress callbacks without requiring 'as any' casts.
  * 
  * @param orpcClient - The ORPC client instance to wrap
- * @returns Enhanced ORPC client with automatic file upload handling
+ * @returns Enhanced ORPC client with FileUploadContext in file upload routes
  * 
  * @example
  * ```typescript
- * import { orpc } from '@/lib/orpc'
  * import { withFileUploads } from '@/lib/orpc/withFileUploads'
  * 
- * const orpcWithUploads = withFileUploads(orpc)
+ * const orpc = createTanstackQueryUtils(
+ *   withFileUploads(createORPCClientWithCookies())
+ * )
  * 
- * // Now you can call file upload routes directly with progress tracking
- * const result = await orpcWithUploads.storage.uploadImage(file, {
- *   onProgress: (e) => console.log(`Progress: ${e.percentage}%`),
- *   onSuccess: (data) => console.log('Uploaded:', data),
- *   onError: (error) => console.error('Error:', error)
- * })
+ * // TypeScript will now recognize onProgress in context for file upload routes
+ * const result = await orpc.presentation.upload.call(
+ *   { file },
+ *   { onProgress: (e) => console.log(`Progress: ${e.percentage}%`) }
+ * )
  * ```
  */
-export function withFileUploads<T>(orpcClient: T): T {
+export function withFileUploads<T extends NestedClient<any>>(
+  orpcClient: T
+): WithFileUploadsClient<T> {
   return wrapClientWithFileUploads(orpcClient)
 }
 
@@ -567,7 +702,9 @@ export function withFileUploads<T>(orpcClient: T): T {
  * }
  * ```
  */
-export function useFileUploadRoutes<T>(orpcClient: T): T {
+export function useFileUploadRoutes<T extends NestedClient<any>>(
+  orpcClient: T
+): WithFileUploadsClient<T> {
   // In React, we can memoize the wrapped client
   // For now, we'll just return the wrapped client
   // In a real implementation, we'd use useMemo

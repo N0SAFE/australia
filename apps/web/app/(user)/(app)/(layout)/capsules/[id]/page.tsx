@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import { Capsule } from '@/types/capsule';
 import { redirect } from 'next/navigation';
 import { CapsuleDetails } from '@/components/pages/capsule-details';
-import { getCapsule } from '@/hooks/useCapsules';
+import { getCapsule } from '@/hooks/capsules/queries';
 
 export default async function CapsulePage({
   params,

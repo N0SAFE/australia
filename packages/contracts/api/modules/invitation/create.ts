@@ -1,18 +1,18 @@
-import { z } from "zod";
+import z from "zod/v4";
 import { oc } from "@orpc/contract";
 
 // Define valid roles - must match backend permission config
 const roleSchema = z.enum(["admin", "sarah", "manager", "editor", "viewer", "user", "superAdmin"]);
 
 export const invitationCreateInput = z.object({
-  email: z.string().email(),
+  email: z.email(),
   role: roleSchema.optional().default("user"),
 });
 
 export const invitationCreateOutput = z.object({
-  success: z.boolean(),
+  success: z.coerce.boolean(),
   token: z.string(),
-  expiresAt: z.string().datetime(),
+  expiresAt: z.iso.datetime(),
 });
 
 export const invitationCreateContract = oc

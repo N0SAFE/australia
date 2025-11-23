@@ -1,29 +1,23 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod/v4';
+import { videoSchema } from '../../common/utils/file';
 
-export const presentationUploadInput = z.file()
-  .refine(file => file.size <= 500 * 1024 * 1024, {
-    message: 'File size must not exceed 500MB',
-  })
-  .refine(
-    file => file.type.startsWith('video/'),
-    {
-      message: 'Only video files are allowed',
-    }
-  );
+export const presentationUploadInput = z.object({
+  file: videoSchema,
+});
 
 export const presentationUploadOutput = z.object({
   id: z.string(),
   filename: z.string(),
   filePath: z.string(),
   mimeType: z.string(),
-  size: z.number(),
-  duration: z.number().nullable(),
-  width: z.number().nullable(),
-  height: z.number().nullable(),
+  size: z.coerce.number(),
+  duration: z.coerce.number().nullable(),
+  width: z.coerce.number().nullable(),
+  height: z.coerce.number().nullable(),
   thumbnailPath: z.string().nullable(),
-  uploadedAt: z.date(),
-  updatedAt: z.date(),
+  uploadedAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
   url: z.string(),
 });
 

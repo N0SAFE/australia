@@ -10,7 +10,7 @@ import { z } from 'zod';
 export const storageEventContracts = {
   videoProcessing: contractBuilder()
     .input(z.object({
-      videoId: z.uuid(),
+      fileId: z.uuid(),
     }))
     .output(z.object({
       progress: z.number().min(0).max(100),
@@ -25,17 +25,17 @@ export const storageEventContracts = {
     }))
     .strategy(ProcessingStrategy.ABORT, {
       onAbort: (input, { signal: _signal }) => {
-        console.log(`⚠️  Aborting video processing for ${input.videoId}`);
+        console.log(`⚠️  Aborting video processing for ${input.fileId}`);
       },
     })
     .build(),
   
   imageProcessing: contractBuilder()
     .input(z.object({
-      imageId: z.uuid(),
+      fileId: z.uuid(),
     }))
     .output(z.object({
-      imageId: z.uuid(),
+      fileId: z.uuid(),
       progress: z.number().min(0).max(100),
       status: z.enum(['queued', 'processing', 'completed', 'failed']),
       currentStep: z.string().optional(),
@@ -43,7 +43,7 @@ export const storageEventContracts = {
     }))
     .strategy(ProcessingStrategy.QUEUE, {
       onQueue: (input, position) => {
-        console.log(`📋 Image ${input.imageId} queued at position ${String(position)}`);
+        console.log(`📋 Image ${input.fileId} queued at position ${String(position)}`);
       },
     })
     .build(),
@@ -68,10 +68,10 @@ export const storageEventContracts = {
   
   fileUpload: contractBuilder()
     .input(z.object({
-      uploadId: z.uuid(),
+      fileId: z.uuid(),
     }))
     .output(z.object({
-      uploadId: z.uuid(),
+      fileId: z.uuid(),
       progress: z.number().min(0).max(100),
       status: z.enum(['uploading', 'completed', 'failed']),
       bytesUploaded: z.number(),

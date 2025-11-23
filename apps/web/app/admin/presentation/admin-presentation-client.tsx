@@ -9,7 +9,7 @@ import { orpc } from '@/lib/orpc';
 import { useQuery } from '@tanstack/react-query';
 import { getApiUrl } from '@/lib/api-url';
 import { Progress } from '@repo/ui/components/shadcn/progress';
-import { useUploadPresentation, useSubscribeProcessingProgress } from '@/hooks/usePresentation';
+import { useUploadPresentation, useSubscribeProcessingProgress } from '@/hooks/presentation/hooks';
 
 export function AdminPresentationClient() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

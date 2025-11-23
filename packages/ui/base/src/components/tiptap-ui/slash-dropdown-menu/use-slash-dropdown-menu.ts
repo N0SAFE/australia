@@ -202,7 +202,7 @@ const texts = {
     group: "Upload",
   },
   add_file: {
-    title: "+ Add File",
+    title: "Add File",
     subtext: "Upload media or files",
     keywords: ["add", "upload", "file", "media", "image", "video", "audio"],
     badge: PlusIcon,

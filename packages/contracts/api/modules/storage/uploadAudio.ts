@@ -1,19 +1,16 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod/v4';
+import { audioSchema } from '../../common/utils/file';
 
-export const uploadAudioInput = z.file()
-  .refine(
-    file => file.type.startsWith('audio/'),
-    {
-      message: 'Only audio files are allowed',
-    }
-  );
+export const uploadAudioInput = z.object({
+  file: audioSchema,
+});
 
 export const uploadAudioOutput = z.object({
   filename: z.string(),
-  path: z.string(),
-  size: z.number(),
+  size: z.coerce.number(),
   mimeType: z.string(),
+  fileId: z.string(),
 });
 
 export const uploadAudioContract = oc

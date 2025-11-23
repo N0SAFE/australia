@@ -2,19 +2,25 @@ import { Controller } from '@nestjs/common';
 import { Implement, implement } from '@orpc/nest';
 import { capsuleContract } from '@repo/api-contracts';
 import { CapsuleService } from '../services/capsule.service';
+import { CapsuleEventService } from '../events/capsule.event';
+import { StorageEventService } from '../../storage/events/storage.event';
 import { AllowAnonymous, Session as SessionDecorator } from '../../../core/modules/auth/decorators/decorators';
+import { combineAsyncIterators } from '../../../core/utils/async-iterators';
 import type { Session } from '@repo/auth';
 
 @Controller()
 export class CapsuleController {
-  constructor(private readonly capsuleService: CapsuleService) {}
+  constructor(
+    private readonly capsuleService: CapsuleService,
+    private readonly capsuleEventService: CapsuleEventService,
+    private readonly storageEventService: StorageEventService,
+  ) {}
 
   @AllowAnonymous()
   @Implement(capsuleContract.list)
   list() {
     return implement(capsuleContract.list).handler(async ({ input }) => {
       const result = await this.capsuleService.getCapsules(input);
-      console.log(result)
       return result;
     });
   }
@@ -90,9 +96,6 @@ export class CapsuleController {
   create() {
     return implement(capsuleContract.create).handler(async ({ input }) => {
       const capsule = await this.capsuleService.createCapsule(input);
-      if (!capsule) {
-        throw new Error('Failed to create capsule');
-      }
       return capsule;
     });
   }
@@ -106,6 +109,18 @@ export class CapsuleController {
         throw new Error('Capsule not found');
       }
       return capsule;
+    });
+  }
+
+  @AllowAnonymous()
+  @Implement(capsuleContract.subscribeUploadProgress)
+  subscribeUploadProgress() {
+    const capsuleEventService = this.capsuleEventService;
+    return implement(capsuleContract.subscribeUploadProgress).handler(async function* ({ input }) {
+      const { operationId } = input;
+      
+      // Subscribe to upload progress events for this operation
+      yield* capsuleEventService.subscribe('uploadProgress', { operationId });
     });
   }
 
@@ -163,6 +178,136 @@ export class CapsuleController {
         message: result.message,
         capsule: result.capsule === null ? undefined : result.capsule,
       };
+    });
+  }
+
+  /**
+   * Subscribe to video processing progress for all videos in a capsule
+   * 
+   * Aggregates progress from multiple videos and emits overall capsule progress
+   * Automatically subscribes to all video processing events and calculates average progress
+   */
+  @AllowAnonymous()
+  @Implement(capsuleContract.subscribeCapsuleVideoProcessing)
+  subscribeCapsuleVideoProcessing() {
+    const capsuleService = this.capsuleService;
+    const storageEventService = this.storageEventService;
+
+    return implement(capsuleContract.subscribeCapsuleVideoProcessing).handler(async function* ({ input }) {
+      const { capsuleId } = input;
+
+      // Get capsule and its videos
+      const capsule = await capsuleService.getCapsuleById(capsuleId);
+
+      // Get all video fileIds from capsule
+      const videoFileIds = capsule.attachedMedia
+        .filter((media) => media.type === 'video')
+        .map((media) => media.fileId);
+
+      if (videoFileIds.length === 0) {
+        // No videos to process
+        yield {
+          overallProgress: 100,
+          processingCount: 0,
+          totalCount: 0,
+          videoProgress: {},
+          message: 'No videos in capsule',
+          timestamp: new Date().toISOString(),
+        };
+        return;
+      }
+
+      // Track progress for each video
+      const progressMap = new Map<string, number>();
+      
+      // Only initialize videos that are ACTUALLY processing right now
+      // Don't include completed or not-yet-started videos
+      const processingVideoIds: string[] = [];
+      videoFileIds.forEach(fileId => {
+        const isActuallyProcessing = storageEventService.isProcessing('videoProcessing', { fileId });
+        if (isActuallyProcessing) {
+          console.log(`✅ [subscribeCapsuleVideoProcessing] Video ${fileId} IS actively processing`);
+          progressMap.set(fileId, 0);
+          processingVideoIds.push(fileId);
+        } else {
+          console.log(`⏸️  [subscribeCapsuleVideoProcessing] Video ${fileId} is NOT processing (completed or not started)`);
+        }
+      });
+
+      // If no videos are actively processing, complete immediately
+      if (processingVideoIds.length === 0) {
+        console.log(`✅ [subscribeCapsuleVideoProcessing] No videos actively processing for capsule ${capsuleId}`);
+        yield {
+          overallProgress: 100,
+          processingCount: 0,
+          totalCount: videoFileIds.length,
+          videoProgress: {},
+          message: 'All videos processed',
+          timestamp: new Date().toISOString(),
+        };
+        return;
+      }
+
+      // Yield initial state (only for videos that are actively processing)
+      const initialState = {
+        overallProgress: 0,
+        processingCount: processingVideoIds.length,
+        totalCount: videoFileIds.length,
+        videoProgress: Object.fromEntries(progressMap),
+        message: `Processing ${String(processingVideoIds.length)} of ${String(videoFileIds.length)} video(s)...`,
+        timestamp: new Date().toISOString(),
+      };
+      console.log(`🚀 [subscribeCapsuleVideoProcessing] Yielding initial state for capsule ${capsuleId}:`, initialState);
+      yield initialState;
+
+      // Create async iterators for each video, wrapping events with fileId
+      interface VideoEvent {
+        fileId: string;
+        progress: number;
+        message?: string;
+        metadata?: any;
+      }
+
+      // Only create iterators for videos that are actively processing
+      const videoIterators = processingVideoIds.map((fileId) => {
+        const subscription = storageEventService.subscribe('videoProcessing', { fileId });
+        // Wrap each subscription to include fileId with each event
+        return (async function* () {
+          for await (const event of subscription) {
+            yield { fileId, ...event } as VideoEvent;
+          }
+        })();
+      });
+
+      // Process combined events from all video subscriptions
+      for await (const event of combineAsyncIterators(videoIterators)) {
+        console.log(`📥 [subscribeCapsuleVideoProcessing] Received video event:`, event);
+        
+        // Update progress for this video
+        progressMap.set(event.fileId, event.progress);
+        
+        // Calculate overall progress (average of all videos)
+        const progressValues = Array.from(progressMap.values());
+        const totalProgress = progressValues.reduce((sum, p) => sum + p, 0);
+        const overallProgress = Math.round(totalProgress / progressMap.size);
+        
+        // Count how many videos are still processing (< 100%)
+        const processingCount = progressValues.filter(p => p < 100).length;
+        
+        // Yield aggregated progress update
+        const progressUpdate = {
+          overallProgress,
+          processingCount,
+          totalCount: videoFileIds.length,
+          videoProgress: Object.fromEntries(progressMap),
+          message: processingCount > 0 
+            ? `Processing ${String(processingCount)}/${String(videoFileIds.length)} video(s)...`
+            : 'All videos processed',
+          timestamp: new Date().toISOString(),
+        };
+        console.log(`📤 [subscribeCapsuleVideoProcessing] Yielding progress update:`, progressUpdate);
+        yield progressUpdate;
+      }
     });
   }
 }

@@ -1,46 +1,77 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useWorkerUploadFile } from '@/hooks/useWorkerFileUpload'
-import { orpc } from '@/lib/orpc'
-import { Button } from '@repo/ui/button'
-import { Progress } from '@repo/ui/progress'
-import { Card, CardContent, CardHeader, CardTitle } from '@repo/ui/card'
+import { useState } from "react";
+import { orpc } from "@/lib/orpc";
+import { Button } from "@repo/ui/components/shadcn/button";
+import { Progress } from "@repo/ui/components/shadcn/progress";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@repo/ui/components/shadcn/card";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { getApiUrl } from "@/lib/api-url";
 
 /**
- * Demo component showing Web Worker-based file upload
+ * Demo component showing Web Worker-based file upload via ORPC
  * This component demonstrates:
  * - File selection
- * - Upload progress tracking
- * - Cancellation support
- * - Result display
+ * - Upload progress tracking (built-in worker)
+ * - Result display with image preview
+ * - Separation of upload and data retrieval
+ *
+ * All file uploads now use background workers automatically via ORPC's
+ * withFileUploads wrapper - no need for separate useWorkerUploadFile hook
  */
 export function WorkerUploadDemo() {
-  const upload = useWorkerUploadFile(orpc.storage.uploadImage)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const upload = useMutation(
+    orpc.storage.uploadImage.mutationOptions({
+      context: {
+        onProgress: (event) => {
+          setUploadProgress(event.percentage);
+        },
+      },
+    }),
+  );
+  
+  // Fetch image data after successful upload
+  const imageData = useQuery(
+    orpc.storage.getImageData.queryOptions({
+      input: {
+        fileId: upload.data?.fileId ?? "",
+      },
+      enabled: !!upload.data?.fileId,
+    }),
+  );
+  
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Construct image URL from fileId
+  const imageUrl = upload.data?.fileId 
+    ? `${getApiUrl()}/storage/image/${upload.data.fileId}`
+    : null;
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+    const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file)
+      setSelectedFile(file);
     }
-  }
+  };
 
   const handleUpload = () => {
     if (selectedFile) {
-      upload.mutate(selectedFile)
+      setUploadProgress(0);
+      upload.mutate({ file: selectedFile });
     }
-  }
-
-  const handleCancel = () => {
-    upload.cancel()
-    setSelectedFile(null)
-  }
+  };
 
   const handleReset = () => {
-    upload.reset()
-    setSelectedFile(null)
-  }
+    upload.reset();
+    setSelectedFile(null);
+    setUploadProgress(0);
+  };
 
   return (
     <Card className="w-full max-w-2xl">
@@ -72,7 +103,8 @@ export function WorkerUploadDemo() {
           />
           {selectedFile && (
             <p className="text-sm text-gray-600">
-              Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+              Selected: {selectedFile.name} (
+              {(selectedFile.size / 1024).toFixed(2)} KB)
             </p>
           )}
         </div>
@@ -83,13 +115,8 @@ export function WorkerUploadDemo() {
             onClick={handleUpload}
             disabled={!selectedFile || upload.isPending}
           >
-            {upload.isPending ? 'Uploading...' : 'Upload'}
+            {upload.isPending ? "Uploading..." : "Upload"}
           </Button>
-          {upload.isPending && (
-            <Button onClick={handleCancel} variant="destructive">
-              Cancel Upload
-            </Button>
-          )}
           {(upload.data || upload.error) && (
             <Button onClick={handleReset} variant="outline">
               Reset
@@ -102,9 +129,9 @@ export function WorkerUploadDemo() {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Uploading...</span>
-              <span>{upload.uploadProgress.toFixed(1)}%</span>
+              <span>{uploadProgress.toFixed(1)}%</span>
             </div>
-            <Progress value={upload.uploadProgress} className="w-full" />
+            <Progress value={uploadProgress} className="w-full" />
           </div>
         )}
 
@@ -114,8 +141,12 @@ export function WorkerUploadDemo() {
             <h3 className="font-medium text-green-900">Upload Successful!</h3>
             <dl className="text-sm space-y-1">
               <div>
-                <dt className="inline font-medium text-green-800">Filename: </dt>
-                <dd className="inline text-green-700">{upload.data.filename}</dd>
+                <dt className="inline font-medium text-green-800">
+                  Filename:{" "}
+                </dt>
+                <dd className="inline text-green-700">
+                  {upload.data.filename}
+                </dd>
               </div>
               <div>
                 <dt className="inline font-medium text-green-800">Size: </dt>
@@ -125,16 +156,35 @@ export function WorkerUploadDemo() {
               </div>
               <div>
                 <dt className="inline font-medium text-green-800">Type: </dt>
-                <dd className="inline text-green-700">{upload.data.mimeType}</dd>
+                <dd className="inline text-green-700">
+                  {upload.data.mimeType}
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-green-800">File ID: </dt>
+                <dd className="inline text-green-700 font-mono text-xs">
+                  {upload.data.fileId}
+                </dd>
               </div>
             </dl>
-            {upload.data.url && (
-              <div className="mt-4">
-                <img
-                  src={upload.data.url}
-                  alt={upload.data.filename}
-                  className="max-w-full h-auto rounded-md"
-                />
+            {imageUrl && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium text-green-800">Preview:</p>
+                {imageData.isLoading && (
+                  <p className="text-sm text-green-700">Loading image...</p>
+                )}
+                {imageData.isError && (
+                  <p className="text-sm text-red-600">
+                    Failed to load image preview: {imageData.error.message}
+                  </p>
+                )}
+                {!imageData.isLoading && !imageData.isError && (
+                  <img
+                    src={imageUrl}
+                    alt={upload.data.filename}
+                    className="max-w-full h-auto rounded-md border border-green-300"
+                  />
+                )}
               </div>
             )}
           </div>
@@ -160,5 +210,5 @@ export function WorkerUploadDemo() {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

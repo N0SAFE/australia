@@ -1,11 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DatabaseService } from "../../../core/modules/database/services/database.service";
+import { StorageEventService } from "@/modules/storage/events/storage.event";
 import { capsule } from "@/config/drizzle/schema/capsule";
 import { capsuleMedia } from "@/config/drizzle/schema/capsule-media";
 import { file } from "@/config/drizzle/schema/file";
 import { imageFile } from "@/config/drizzle/schema/file";
 import { videoFile } from "@/config/drizzle/schema/file";
-import { audioFile } from "@/config/drizzle/schema/file";import { eq } from 'drizzle-orm';import { eq, desc, asc, count, and, SQL, gte, lt, lte } from "drizzle-orm";
+import { audioFile } from "@/config/drizzle/schema/file";
+import { eq, desc, asc, count, and, SQL, gte, lt, lte, inArray, isNull, not } from "drizzle-orm";
 import { capsuleCreateInput, capsuleUpdateInput, capsuleListInput, capsuleFindByIdOutput } from "@repo/api-contracts";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -20,7 +22,10 @@ export type GetCapsuleOutput = z.infer<typeof capsuleFindByIdOutput>;
 export class CapsuleRepository {
     private readonly logger = new Logger(CapsuleRepository.name);
 
-    constructor(private readonly databaseService: DatabaseService) {}
+    constructor(
+        private readonly databaseService: DatabaseService,
+        private readonly storageEventService: StorageEventService,
+    ) {}
 
     /**
      * Fetch attached media for a capsule by joining capsuleMedia → file → type-specific tables
@@ -53,7 +58,7 @@ export class CapsuleRepository {
                 // Base media object
                 const baseMedia = {
                     contentMediaId: mediaRecord.contentMediaId,
-                    type: mediaRecord.type as 'image' | 'video' | 'audio',
+                    type: mediaRecord.type,
                     fileId: f.id,
                     filePath: f.filePath,
                     filename: f.filename,
@@ -76,7 +81,7 @@ export class CapsuleRepository {
                             ...baseMedia,
                             width: img.width,
                             height: img.height,
-                            thumbnailPath: img.thumbnailPath || null,
+                            thumbnailPath: img.thumbnailPath,
                         };
                     }
                 } else if (mediaRecord.type === 'video') {
@@ -93,10 +98,10 @@ export class CapsuleRepository {
                             width: vid.width,
                             height: vid.height,
                             duration: vid.duration,
-                            thumbnailPath: vid.thumbnailPath || null,
+                            thumbnailPath: vid.thumbnailPath,
                         };
                     }
-                } else if (mediaRecord.type === 'audio') {
+                } else {
                     const audioRecord = await this.databaseService.db
                         .select()
                         .from(audioFile)
@@ -119,6 +124,87 @@ export class CapsuleRepository {
 
         // Filter out nulls and return
         return attachedMedia.filter((media): media is NonNullable<typeof media> => media !== null);
+    }
+
+    /**
+     * Check if a capsule has any videos that are still being processed
+     */
+    private async checkHasProcessingVideos(capsuleId: string): Promise<boolean> {
+        // Join capsuleMedia → file → videoFile to check for unprocessed videos
+        const result = await this.databaseService.db
+            .select({ 
+                videoId: videoFile.id,
+                isProcessed: videoFile.isProcessed 
+            })
+            .from(capsuleMedia)
+            .innerJoin(file, eq(capsuleMedia.fileId, file.id))
+            .innerJoin(videoFile, eq(file.contentId, videoFile.id))
+            .where(and(
+                eq(capsuleMedia.capsuleId, capsuleId),
+                eq(file.type, 'video'),
+                eq(videoFile.isProcessed, false)
+            ))
+            .limit(1); // We only need to know if ANY video is unprocessed
+
+        return result.length > 0;
+    }
+
+    /**
+     * Batch check processing status for multiple capsules
+     * Returns a Map of capsuleId -> hasProcessingVideos
+     */
+    private async batchCheckProcessingStatus(capsuleIds: string[]): Promise<Map<string, boolean>> {
+        if (capsuleIds.length === 0) {
+            return new Map();
+        }
+
+        // Query all videos for these capsules that might be processing
+        // Get videos that are not yet fully processed (isProcessed = false)
+        const candidateVideos = await this.databaseService.db
+            .select({ 
+                capsuleId: capsuleMedia.capsuleId,
+                videoId: videoFile.id,
+                fileId: file.id,
+                isProcessed: videoFile.isProcessed,
+                processingStartedAt: videoFile.processingStartedAt
+            })
+            .from(capsuleMedia)
+            .innerJoin(file, eq(capsuleMedia.fileId, file.id))
+            .innerJoin(videoFile, eq(file.contentId, videoFile.id))
+            .where(and(
+                inArray(capsuleMedia.capsuleId, capsuleIds),
+                eq(file.type, 'video'),
+                eq(videoFile.isProcessed, false)
+            ));
+
+        console.log('🔍 Checking processing status for capsules:', capsuleIds);
+        console.log('📹 Candidate unprocessed videos:', candidateVideos);
+
+        // Build map of which capsules have processing videos
+        const processingMap = new Map<string, boolean>();
+        
+        // Initialize all capsules to false
+        capsuleIds.forEach(id => processingMap.set(id, false));
+        
+        // Check each candidate video to see if it's ACTUALLY processing
+        // (not just unprocessed, but actively being processed right now)
+        for (const video of candidateVideos) {
+            const isActuallyProcessing = this.storageEventService.isProcessing(
+                'videoProcessing',
+                { fileId: video.fileId }
+            );
+            
+            if (isActuallyProcessing) {
+                console.log(`✅ Video ${video.fileId} in capsule ${video.capsuleId} IS actively processing`);
+                processingMap.set(video.capsuleId, true);
+            } else {
+                console.log(`⏸️  Video ${video.fileId} in capsule ${video.capsuleId} is unprocessed but NOT actively processing`);
+            }
+        }
+
+        console.log('✅ Final processing map result:', Array.from(processingMap.entries()));
+
+        return processingMap;
     }
 
     /**
@@ -153,7 +239,7 @@ export class CapsuleRepository {
         unlockedAt: string | null;
         openedAt: string | null;
         isOpened: boolean;
-        attachedMedia: Array<{
+        attachedMedia: {
             contentMediaId: string;
             type: 'image' | 'video' | 'audio';
             fileId: string;
@@ -166,7 +252,8 @@ export class CapsuleRepository {
             duration?: number;
             thumbnailPath?: string | null;
             createdAt: string;
-        }>;
+        }[];
+        hasProcessingVideos: boolean;
         createdAt: string;
         updatedAt: string;
     } | null> {
@@ -176,6 +263,9 @@ export class CapsuleRepository {
         
         // Fetch attached media for this capsule
         const attachedMedia = await this.getAttachedMedia(capsule.id);
+        
+        // Check if any videos are still being processed
+        const hasProcessingVideos = await this.checkHasProcessingVideos(capsule.id);
         
         // Return content field directly - it's already Plate.js JSON
         const result = {
@@ -195,6 +285,7 @@ export class CapsuleRepository {
             openedAt: capsule.openedAt ? capsule.openedAt.toISOString() : null,
             isOpened: capsule.openedAt !== null, // Derived field: true if openedAt is not null
             attachedMedia, // Include attached media in response
+            hasProcessingVideos, // Include processing status
             createdAt: capsule.createdAt.toISOString(),
             updatedAt: capsule.updatedAt.toISOString(),
         };
@@ -204,6 +295,7 @@ export class CapsuleRepository {
 
     /**
      * Transform multiple capsules for API response
+     * Optimized to batch-check processing status for all capsules at once
      */
     private async transformCapsules(capsules: {
         id: string;
@@ -218,10 +310,45 @@ export class CapsuleRepository {
         createdAt: Date;
         updatedAt: Date;
     }[]) {
+        // Batch check processing status for all capsules
+        const capsuleIds = capsules.map(c => c.id);
+        const processingStatusMap = await this.batchCheckProcessingStatus(capsuleIds);
+        
+        // Transform each capsule with pre-fetched processing status
         const transformed = await Promise.all(
-            capsules.map((cap) => this.transformCapsule(cap))
+            capsules.map(async (cap) => {
+                // Fetch attached media for this capsule
+                const attachedMedia = await this.getAttachedMedia(cap.id);
+                
+                // Get processing status from batch results
+                const hasProcessingVideos = processingStatusMap.get(cap.id) ?? false;
+                
+                // Return transformed capsule
+                return {
+                    id: cap.id,
+                    openingDate: cap.openingDate,
+                    content: cap.content,
+                    openingMessage: cap.openingMessage,
+                    isLocked: cap.isLocked,
+                    lockType: cap.lockType as 'code' | 'voice' | 'device_shake' | 'device_tilt' | 'device_tap' | 'api' | 'time_based' | null,
+                    lockConfig: cap.lockConfig === null ? null : cap.lockConfig as 
+                        | { type: 'code'; code: string; attempts?: number }
+                        | { type: 'voice'; phrase: string; language?: string }
+                        | { type: 'device_shake' | 'device_tilt' | 'device_tap'; threshold?: number; pattern?: number[] }
+                        | { type: 'api'; endpoint: string; method?: 'GET' | 'POST'; headers?: Record<string, string>; expectedResponse?: unknown }
+                        | { type: 'time_based'; delayMinutes: number },
+                    unlockedAt: cap.unlockedAt ? cap.unlockedAt.toISOString() : null,
+                    openedAt: cap.openedAt ? cap.openedAt.toISOString() : null,
+                    isOpened: cap.openedAt !== null,
+                    attachedMedia,
+                    hasProcessingVideos,
+                    createdAt: cap.createdAt.toISOString(),
+                    updatedAt: cap.updatedAt.toISOString(),
+                };
+            })
         );
-        return transformed.filter((cap): cap is NonNullable<typeof cap> => cap !== null);
+        
+        return transformed;
     }
 
     /**

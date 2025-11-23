@@ -37,11 +37,17 @@ export interface SimpleViewerProps {
   value?: JSONContent
   className?: string
   /**
-   * Map of media source URL IDs to resolver callbacks
-   * Used to resolve media URLs based on srcUrlId attribute
-   * Example: { api: (src) => `https://api.example.com${src}` }
+   * Strategy resolvers for media URL resolution
+   * Used to resolve media URLs based on meta.srcResolveStrategy
    */
-  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+  videoStrategy?: (meta: unknown) => Promise<string> | string
+  imageStrategy?: (meta: unknown) => Promise<string> | string
+  audioStrategy?: (meta: unknown) => Promise<string> | string
+  fileStrategy?: (meta: unknown) => Promise<string> | string
+  /**
+   * Component to render video processing progress
+   */
+  VideoProgressComponent?: import("react").ComponentType<import("@repo/ui/tiptap-node/video-node-extension").VideoProgressComponentProps>
 }
 
 /**
@@ -52,7 +58,11 @@ export interface SimpleViewerProps {
 export function SimpleViewer({
   value,
   className,
-  injectMediaUrl,
+  videoStrategy,
+  imageStrategy,
+  audioStrategy,
+  fileStrategy,
+  VideoProgressComponent,
 }: SimpleViewerProps) {
   const editor = useEditor({
     immediatelyRender: false,
@@ -81,16 +91,17 @@ export function SimpleViewer({
       Color,
       // Display nodes for media with URL injection
       ImageNode.configure({
-        injectMediaUrl,
+        imageStrategy,
       }),
       VideoNode.configure({
-        injectMediaUrl,
+        videoStrategy,
+        VideoProgressComponent,
       }),
       AudioNode.configure({
-        injectMediaUrl,
+        audioStrategy,
       }),
       FileNode.configure({
-        injectMediaUrl,
+        fileStrategy,
       }),
     ],
     content: value ?? [{ type: "paragraph", children: [{ text: "" }] }],

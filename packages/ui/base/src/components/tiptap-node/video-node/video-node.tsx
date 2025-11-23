@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react"
 import {
   ContextMenu,
@@ -11,99 +11,90 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from "@/components/shadcn/context-menu"
-import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize } from "lucide-react"
-import { resolveMediaUrl } from "@/lib/media-url-resolver"
-import { cn } from "@/lib/utils"
-
-interface ProcessingProgress {
-  progress: number
-  status: 'processing' | 'completed' | 'failed'
-  message?: string
-}
+} from "../../shadcn/context-menu"
+import { Card } from "../../shadcn/card"
+import { Progress } from "../../shadcn/progress"
+import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize, Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react"
+import { resolveMediaUrl, type VideoStrategyResolver } from "../../../lib/media-url-resolver"
+import type { ProcessingProgress } from "./video-node-extension"
 
 export function VideoNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
-  const { src, srcUrlId, title, controls = true, width, height, align = "center", meta } = node.attrs
+  const { meta, title, controls = true, width, height, align = "center" } = node.attrs
   
-  // State for resolved URL - start with null to avoid empty string warning
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  // State for resolved URL
+  const [resolvedSrc, setResolvedSrc] = useState<string>("")
   
-  // State for processing progress
-  const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null)
-  const [showProgress, setShowProgress] = useState(false)
+  // Get videoStrategy and VideoProgressComponent from extension options
+  const extension = editor.extensionManager.extensions.find((ext) => ext.name === "video")
+  const videoStrategy = extension?.options.videoStrategy as VideoStrategyResolver | undefined
+  const VideoProgressComponent = extension?.options.VideoProgressComponent
   
-  // Get injected media URL resolvers and progress handlers from extension options
-  const videoExtension = editor.extensionManager.extensions.find(ext => ext.name === 'video')
-  const injectMediaUrl = videoExtension?.options.injectMediaUrl
-  
-  // Resolve the final URL asynchronously
+  // Resolve the final URL asynchronously using strategy with meta only
   useEffect(() => {
     const resolve = async () => {
-      setIsLoading(true)
-      const resolved = await resolveMediaUrl(
-        src as string, 
-        srcUrlId as string | null, 
-        injectMediaUrl,
-        meta as { strategy?: string; contentMediaId?: string } | null
-      )
-      console.log('🎥 Video URL resolved:', {
-        strategy: (meta as { strategy?: string })?.strategy,
-        contentMediaId: (meta as { contentMediaId?: string })?.contentMediaId,
-        srcUrlId,
-        resolvedUrl: resolved,
-        width: node.attrs.width as number | undefined,
-        height: node.attrs.height as number | undefined
-      })
+      if (!videoStrategy || !meta) {
+        setResolvedSrc("")
+        return
+      }
+      const resolved = await resolveMediaUrl(meta, videoStrategy)
       setResolvedSrc(resolved)
-      setIsLoading(false)
     }
     void resolve()
-  }, [src, srcUrlId, injectMediaUrl, meta, node.attrs.width, node.attrs.height])
+  }, [meta, videoStrategy])
   
-  // Handle progress tracking for video processing
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const enableProgress = videoExtension?.options.enableProgress
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    const disableProgress = videoExtension?.options.disableProgress
-    
-    // Store references for this specific video node
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const nodeId = srcUrlId ?? src
-    if (!nodeId || !onProgressUpdate) return
-    
-    // Automatically enable progress tracking for this video when it appears in edit mode
-    if (editor.isEditable && enableProgress) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      enableProgress(nodeId as string)
-    }
-    
-    // Register this node for progress updates
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const unsubscribe = onProgressUpdate(nodeId as string, (progress: ProcessingProgress) => {
-      setProcessingProgress(progress)
-      setShowProgress(progress.status === 'processing')
-      
-      // Auto-hide progress bar when processing is complete or failed
-      if (progress.status === 'completed' || progress.status === 'failed') {
-        setTimeout(() => {
-          setShowProgress(false)
-        }, 2000) // Keep visible for 2 seconds before hiding
-      }
-    })
-    
-    return () => {
-      // Cleanup: unsubscribe and optionally disable progress tracking
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      unsubscribe?.()
-      if (disableProgress) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        disableProgress(nodeId as string)
-      }
-    }
-  }, [src, srcUrlId, videoExtension, onProgressUpdate, editor.isEditable])
+  // Function to render progress bar UI
+  const renderProgressBar = (progress: ProcessingProgress | null, isVisible: boolean): ReactNode => {
+    if (!isVisible || !progress) return null
+
+    return (
+      <div className="video-processing-overlay">
+        <Card className="p-3 bg-background/95 backdrop-blur-sm border shadow-lg">
+          <div className="space-y-2">
+            {/* Header with icon and status */}
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium">Video Processing</span>
+              <div className="flex items-center gap-1.5">
+                {progress.status === 'processing' && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                )}
+                {progress.status === 'completed' && (
+                  <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                )}
+                {progress.status === 'failed' && (
+                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                )}
+                <span className="text-xs font-medium capitalize">
+                  {progress.status}
+                </span>
+              </div>
+            </div>
+            
+            {/* Progress bar */}
+            <Progress value={progress.progress} className="w-full h-1.5" />
+            
+            {/* Message and percentage */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground truncate flex-1">
+                {progress.message ?? 'Processing...'}
+              </span>
+              <span className="font-medium ml-2">
+                {Math.round(progress.progress)}%
+              </span>
+            </div>
+            
+            {/* Error message if failed */}
+            {progress.error && (
+              <div className="flex items-start gap-1.5 p-2 bg-destructive/10 text-destructive rounded text-xs">
+                <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                <span className="leading-tight">{progress.error}</span>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    )
+  }
 
   const alignmentStyles = {
     left: "flex justify-start",
@@ -125,7 +116,7 @@ export function VideoNodeView(props: NodeViewProps) {
       }
     }
   }
-
+  
   const videoElement = (
     <div 
       className="video-node group relative inline-block"
@@ -134,31 +125,11 @@ export function VideoNodeView(props: NodeViewProps) {
         maxWidth: "100%",
       }}
     >
-      {/* Processing Progress Bar */}
-      {showProgress && processingProgress && (
-        <div className="absolute top-0 left-0 right-0 z-10 bg-blue-600 h-1 transition-all duration-300"
-          style={{
-            width: `${String(processingProgress.progress)}%`,
-          }}
-          title={processingProgress.message ?? `Processing: ${String(processingProgress.progress)}%`}
-        />
-      )}
-      
-      {/* Video Element */}
+      {/* Video Element with overlaid progress */}
       <div className="relative w-full overflow-hidden rounded">
-        {isLoading ? (
-          <div 
-            className="flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded"
-            style={{ 
-              minHeight: "300px",
-              width: "100%"
-            }}
-          >
-            <div className="text-gray-400">Loading video...</div>
-          </div>
-        ) : resolvedSrc ? (
+        {resolvedSrc ? (
           <video
-            src={resolvedSrc}
+            {...(resolvedSrc ? { src: resolvedSrc } : {})}
             title={(title as string | undefined) ?? "Video"}
             controls={controls as boolean}
             height={(height as string | undefined) ?? undefined}
@@ -173,15 +144,30 @@ export function VideoNodeView(props: NodeViewProps) {
             Your browser does not support the video tag.
           </video>
         ) : (
-          <div 
-            className="flex items-center justify-center bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800"
-            style={{ 
+          <div
+            className="bg-muted rounded flex items-center justify-center"
+            style={{
+              width: "100%",
               minHeight: "300px",
-              width: "100%"
             }}
           >
-            <div className="text-red-500">Failed to load video</div>
+            <span className="text-muted-foreground text-sm">Loading video...</span>
           </div>
+        )}
+        
+        {/* Processing Progress Component - Overlaid on top of video */}
+        {editor.isEditable && VideoProgressComponent && (
+          <VideoProgressComponent
+            attrs={{
+              meta: meta,
+              title: title as string | null,
+              controls: controls as boolean,
+              width: width as string | number,
+              height: height as string | number | null,
+              align: align as string,
+            }}
+            renderProgress={renderProgressBar}
+          />
         )}
       </div>
     </div>
@@ -192,7 +178,7 @@ export function VideoNodeView(props: NodeViewProps) {
       <div className={alignmentStyles[align as keyof typeof alignmentStyles]}>
         {editor.isEditable ? (
           <ContextMenu>
-            <ContextMenuTrigger>
+            <ContextMenuTrigger asChild>
               {videoElement}
             </ContextMenuTrigger>
             <ContextMenuContent className="w-64">

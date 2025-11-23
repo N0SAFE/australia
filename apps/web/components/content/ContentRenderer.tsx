@@ -44,33 +44,58 @@ export const ContentRenderer: FC<{
     }
   }, [capsule.content]);
 
-  // Create injectMediaUrl callback that resolves contentMediaId strategy
-  const injectMediaUrl = useMemo(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    
-    return {
-      // Existing API resolver for srcUrlId strategy
-      api: (src: string) => `${apiUrl}${src}`,
-      
-      // New contentMediaId resolver
-      contentMediaId: (contentMediaId: string) => {
-        const media = attachedMedia.find(m => m.contentMediaId === contentMediaId);
-        if (media) {
-          const resolvedUrl = `${apiUrl}/storage/files/${media.filePath}`;
-          console.log('✅ Resolved contentMediaId:', { contentMediaId, filePath: media.filePath, url: resolvedUrl });
-          return resolvedUrl;
-        }
-        console.warn('⚠️ Failed to resolve contentMediaId:', contentMediaId, 'Available:', attachedMedia.map(m => m.contentMediaId));
-        return ''; // Return empty string if not found
-      },
-    };
-  }, [attachedMedia]);
+  // Media URL resolution strategies using contentMediaId
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+  
+  const imageStrategy = async (meta: any) => {
+    if (!meta?.contentMediaId) return "";
+    const media = attachedMedia.find(m => m.contentMediaId === meta.contentMediaId);
+    if (!media) {
+      console.warn('⚠️ Image not found for contentMediaId:', meta.contentMediaId);
+      return "";
+    }
+    return `${API_URL}/storage/image/${media.fileId}`;
+  };
+  
+  const videoStrategy = async (meta: any) => {
+    if (!meta?.contentMediaId) return "";
+    const media = attachedMedia.find(m => m.contentMediaId === meta.contentMediaId);
+    if (!media) {
+      console.warn('⚠️ Video not found for contentMediaId:', meta.contentMediaId);
+      return "";
+    }
+    return `${API_URL}/storage/video/${media.fileId}`;
+  };
+  
+  const audioStrategy = async (meta: any) => {
+    if (!meta?.contentMediaId) return "";
+    const media = attachedMedia.find(m => m.contentMediaId === meta.contentMediaId);
+    if (!media) {
+      console.warn('⚠️ Audio not found for contentMediaId:', meta.contentMediaId);
+      return "";
+    }
+    return `${API_URL}/storage/audio/${media.fileId}`;
+  };
+  
+  const fileStrategy = async (meta: any) => {
+    if (!meta?.contentMediaId) return "";
+    const media = attachedMedia.find(m => m.contentMediaId === meta.contentMediaId);
+    if (!media) {
+      console.warn('⚠️ File not found for contentMediaId:', meta.contentMediaId);
+      return "";
+    }
+    return `${API_URL}/storage/file/${media.fileId}`;
+  };
 
   return (
     <SimpleViewer
       value={content}
       className="pink-theme"
-      injectMediaUrl={injectMediaUrl}
+      // Media URL resolution strategies
+      imageStrategy={imageStrategy}
+      videoStrategy={videoStrategy}
+      audioStrategy={audioStrategy}
+      fileStrategy={fileStrategy}
     />
   );
 };

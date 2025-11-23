@@ -1,19 +1,16 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod/v4';
+import { imageSchema } from '../../common/utils/file';
 
-export const uploadImageInput = z.file()
-  .refine(
-    file => file.type.startsWith('image/'),
-    {
-      message: 'Only image files are allowed',
-    }
-  );
+export const uploadImageInput = z.object({
+  file: imageSchema,
+});
 
 export const uploadImageOutput = z.object({
   filename: z.string(),
-  path: z.string(),
-  size: z.number(),
+  size: z.coerce.number(),
   mimeType: z.string(),
+  fileId: z.string(),
 });
 
 export const uploadImageContract = oc

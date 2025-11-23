@@ -11,6 +11,8 @@ import { capsuleUpdateContract } from './update';
 import { capsuleDeleteContract } from './delete';
 import { capsuleUnlockContract } from './unlock';
 import { capsuleMarkAsOpenedContract } from './markAsOpened';
+import { subscribeUploadProgressContract } from './uploadProgress';
+import { subscribeCapsuleVideoProcessingContract } from './subscribeCapsuleVideoProcessing';
 
 // Combine into main capsule contract
 export const capsuleContract = oc.tag("Capsule").prefix("/capsule").router({
@@ -24,6 +26,8 @@ export const capsuleContract = oc.tag("Capsule").prefix("/capsule").router({
   delete: capsuleDeleteContract,
   unlock: capsuleUnlockContract,
   markAsOpened: capsuleMarkAsOpenedContract,
+  subscribeUploadProgress: subscribeUploadProgressContract,
+  subscribeCapsuleVideoProcessing: subscribeCapsuleVideoProcessingContract,
 });
 
 export type CapsuleContract = typeof capsuleContract;
@@ -39,3 +43,5 @@ export * from './update';
 export * from './delete';
 export * from './unlock';
 export * from './markAsOpened';
+export * from './uploadProgress';
+export * from './subscribeCapsuleVideoProcessing';

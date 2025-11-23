@@ -63,10 +63,11 @@ const Item = (props: {
   item: SuggestionItem
   isSelected: boolean
   onSelect: () => void
+  onOpenSubMenu?: () => void
   hasSubMenu?: boolean
   isSubMenuItem?: boolean
 }) => {
-  const { item, isSelected, onSelect, hasSubMenu, isSubMenuItem } = props
+  const { item, isSelected, onSelect, onOpenSubMenu, hasSubMenu, isSubMenuItem } = props
   const itemRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -86,12 +87,23 @@ const Item = (props: {
 
   const BadgeIcon = item.badge
 
+  const handleClick = () => {
+    // If this item has a submenu, open the submenu instead of selecting
+    if (hasSubMenu && onOpenSubMenu) {
+      onOpenSubMenu()
+    } else {
+      // Otherwise, select the item
+      onSelect()
+    }
+  }
+
   return (
     <Button
       ref={itemRef}
+      type="button"
       data-style="ghost"
       data-active-state={isSelected ? "on" : "off"}
-      onClick={onSelect}
+      onClick={handleClick}
       className={isSubMenuItem ? "tiptap-submenu-item" : ""}
     >
       {BadgeIcon && <BadgeIcon className="tiptap-button-icon" />}
@@ -125,6 +137,7 @@ const List = ({
             item={item}
             isSelected={index === selectedIndex}
             onSelect={() => onSelect(item)}
+            onOpenSubMenu={hasSubMenu && onOpenSubMenu ? () => onOpenSubMenu(index) : undefined}
             hasSubMenu={hasSubMenu}
           />
         )
@@ -162,6 +175,7 @@ const List = ({
             item={item}
             isSelected={originalIndex === selectedIndex}
             onSelect={() => onSelect(item)}
+            onOpenSubMenu={hasSubMenu && onOpenSubMenu ? () => onOpenSubMenu(originalIndex) : undefined}
             hasSubMenu={hasSubMenu}
           />
         )
@@ -180,7 +194,7 @@ const List = ({
     })
 
     return rendered
-  }, [items, selectedIndex, onSelect, config?.showGroups, openSubMenuIndex, subMenuSelectedIndex])
+  }, [items, selectedIndex, onSelect, config?.showGroups, openSubMenuIndex, subMenuSelectedIndex, onOpenSubMenu])
 
   if (!renderedItems.length) {
     return null

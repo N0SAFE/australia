@@ -1,22 +1,18 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod/v4';
+import { videoSchema } from '../../common/utils/file';
 
-export const uploadVideoInput = z.file()
-  .refine(
-    file => file.type.startsWith('video/'),
-    {
-      message: 'Only video files are allowed',
-    }
-  );
+export const uploadVideoInput = z.object({
+  file: videoSchema,
+});
 
 export const uploadVideoOutput = z.object({
   filename: z.string(),
-  path: z.string(),
-  size: z.number(),
+  size: z.coerce.number(),
   mimeType: z.string(),
   fileId: z.uuid(),
   videoId: z.uuid(),
-  isProcessed: z.boolean(),
+  isProcessed: z.coerce.boolean(),
   message: z.string().optional(),
 });
 

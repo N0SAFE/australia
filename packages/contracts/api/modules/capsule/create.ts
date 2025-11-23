@@ -28,7 +28,7 @@ export const capsuleCreateInput = z.object({
   openingMessage: z.string().optional(),
   
   // Lock mechanism (optional)
-  isLocked: z.boolean().default(false),
+  isLocked: z.coerce.boolean().default(false),
   lockType: lockTypeSchema.optional(),
   lockConfig: lockConfigSchema.optional(),
   

@@ -67,17 +67,16 @@ export class VideoProcessingService {
       throw new Error('Processing aborted after metadata extraction');
     }
 
-    // Step 2 - Convert to H.264 if needed
+    // Step 2 - Convert to H.264 if needed (converts in-place, overwrites original file)
     const needsConversion = metadata.codec !== 'h264';
-    let newFilePath: string | undefined;
     
     if (needsConversion) {
       onProgress?.(40, 'Converting to H.264...');
       
-      // Use convertVideoToH264AndReplace which handles temp files properly
+      // Convert video in-place (overwrites original file with converted version)
       // This will throw if aborted via abortSignal
       // Map conversion progress (0-100) to our range (40-80)
-      newFilePath = await this.ffmpegService.convertVideoToH264AndReplace(
+      await this.ffmpegService.convertVideoToH264AndReplace(
         filePath,
         abortSignal,
         (conversionProgress) => {
@@ -112,13 +111,14 @@ export class VideoProcessingService {
     onProgress?.(100, 'Processing complete');
     this.logger.log(`Video processing completed for: ${filePath}`);
 
+    // File has been processed in-place, path remains the same
     return {
       duration: metadata.duration,
       width: metadata.width,
       height: metadata.height,
       codec: needsConversion ? 'h264' : metadata.codec,
       wasConverted: needsConversion,
-      newFilePath, // Include new file path if conversion happened
+      newFilePath: filePath, // Same path - file was replaced in-place
     };
   }
 

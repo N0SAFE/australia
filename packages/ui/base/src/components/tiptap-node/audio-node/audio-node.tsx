@@ -13,41 +13,31 @@ import {
   ContextMenuTrigger,
 } from "@/components/shadcn/context-menu"
 import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize } from "lucide-react"
-import { resolveMediaUrl } from "@/lib/media-url-resolver"
+import { resolveMediaUrl, type AudioStrategyResolver } from "../../../lib/media-url-resolver"
 
 export function AudioNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
-  const { src, srcUrlId, title, controls = true, width, align = "center", meta } = node.attrs
+  const { meta, title, controls = true, width, align = "center" } = node.attrs
   
-  // State for resolved URL - start with null to avoid empty string warning
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  // State for resolved URL
+  const [resolvedSrc, setResolvedSrc] = useState<string>("")
   
-  // Get injected media URL resolvers from extension options
-  const injectMediaUrl = editor.extensionManager.extensions.find(ext => ext.name === 'audio')?.options.injectMediaUrl
+  // Get audioStrategy from extension options
+  const extension = editor.extensionManager.extensions.find(ext => ext.name === 'audio')
+  const audioStrategy = extension?.options.audioStrategy as AudioStrategyResolver | undefined
   
-  // Resolve the final URL asynchronously
+  // Resolve the final URL asynchronously using strategy with meta only
   useEffect(() => {
     const resolve = async () => {
-      setIsLoading(true)
-      const resolved = await resolveMediaUrl(
-        src as string, 
-        srcUrlId as string | null, 
-        injectMediaUrl,
-        meta as { strategy?: string; contentMediaId?: string } | null
-      )
-      console.log('🔊 Audio URL resolved:', {
-        strategy: (meta as { strategy?: string })?.strategy,
-        contentMediaId: (meta as { contentMediaId?: string })?.contentMediaId,
-        srcUrlId,
-        resolvedUrl: resolved,
-        title: node.attrs.title as string | undefined
-      })
+      if (!audioStrategy || !meta) {
+        setResolvedSrc("")
+        return
+      }
+      const resolved = await resolveMediaUrl(meta, audioStrategy)
       setResolvedSrc(resolved)
-      setIsLoading(false)
     }
     void resolve()
-  }, [src, srcUrlId, injectMediaUrl, meta, node.attrs.title])
+  }, [meta, audioStrategy])
 
   const alignmentStyles = {
     left: "flex justify-start",
@@ -69,7 +59,7 @@ export function AudioNodeView(props: NodeViewProps) {
       }
     }
   }
-
+  
   const audioElement = (
     <div 
       className="audio-node group relative inline-block"
@@ -78,19 +68,9 @@ export function AudioNodeView(props: NodeViewProps) {
         maxWidth: "100%",
       }}
     >
-      {isLoading ? (
-        <div 
-          className="flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded"
-          style={{ 
-            minHeight: "60px",
-            width: "100%"
-          }}
-        >
-          <div className="text-gray-400">Loading audio...</div>
-        </div>
-      ) : resolvedSrc ? (
+      {resolvedSrc ? (
         <audio
-          src={resolvedSrc}
+          {...(resolvedSrc ? { src: resolvedSrc } : {})}
           title={(title as string | undefined) ?? "Audio"}
           controls={controls as boolean}
           style={{
@@ -103,14 +83,13 @@ export function AudioNodeView(props: NodeViewProps) {
           Your browser does not support the audio tag.
         </audio>
       ) : (
-        <div 
-          className="flex items-center justify-center bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800"
-          style={{ 
-            minHeight: "60px",
-            width: "100%"
+        <div
+          className="bg-muted rounded flex items-center justify-center py-8"
+          style={{
+            width: "100%",
           }}
         >
-          <div className="text-red-500">Failed to load audio</div>
+          <span className="text-muted-foreground text-sm">Loading audio...</span>
         </div>
       )}
     </div>

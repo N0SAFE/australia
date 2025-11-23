@@ -1,5 +1,5 @@
 import { oc } from "@orpc/contract";
-import { z } from "zod";
+import z from "zod/v4";
 
 const invitationCheckInputSchema = z.object({
   token: z.string().min(1, "Token is required"),
@@ -8,7 +8,7 @@ const invitationCheckInputSchema = z.object({
 const invitationCheckOutputSchema = z.discriminatedUnion("success", [
   z.object({
     success: z.literal(true),
-    email: z.string().email(),
+    email: z.email(),
   }),
   z.object({
     success: z.literal(false),

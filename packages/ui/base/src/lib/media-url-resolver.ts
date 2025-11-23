@@ -6,7 +6,29 @@
 export type MediaUrlResolver = (src: string) => Promise<string> | string
 
 /**
- * Resolves media URLs based on meta information and injected resolver callbacks
+ * Type definition for strategy-based media URL resolver
+ * Takes full meta object and returns resolved URL
+ * @param meta - The meta object containing contentMediaId and other metadata
+ * @returns Promise resolving to the full URL to use for the media
+ */
+export type ImageStrategyResolver = (meta: unknown) => Promise<string> | string
+export type VideoStrategyResolver = (meta: unknown) => Promise<string> | string
+export type AudioStrategyResolver = (meta: unknown) => Promise<string> | string
+export type FileStrategyResolver = (meta: unknown) => Promise<string> | string
+
+/**
+ * Resolves media URL using a strategy function (new pattern)
+ * @param meta - Meta object with contentMediaId and strategy info
+ * @param strategy - Strategy resolver function that takes meta and returns URL
+ * @returns Promise resolving to the full media URL
+ */
+export async function resolveMediaUrl(
+  meta: unknown,
+  strategy: ImageStrategyResolver | VideoStrategyResolver | AudioStrategyResolver | FileStrategyResolver | undefined
+): Promise<string>
+
+/**
+ * Resolves media URLs based on meta information and injected resolver callbacks (legacy pattern)
  * 
  * Rules:
  * 1. If meta.strategy is 'contentMediaId': use contentMediaId resolver
@@ -19,7 +41,32 @@ export async function resolveMediaUrl(
   srcUrlId: string | null | undefined,
   mediaUrlResolvers: Record<string, MediaUrlResolver> | undefined,
   meta?: { strategy?: string; contentMediaId?: string } | null
+): Promise<string>
+
+/**
+ * Implementation for both overloads
+ */
+export async function resolveMediaUrl(
+  srcOrMeta: unknown,
+  srcUrlIdOrStrategy?: string | null | ImageStrategyResolver | VideoStrategyResolver | AudioStrategyResolver | FileStrategyResolver,
+  mediaUrlResolvers?: Record<string, MediaUrlResolver>,
+  meta?: { strategy?: string; contentMediaId?: string } | null
 ): Promise<string> {
+  // New pattern: resolveMediaUrl(meta, strategy)
+  if (typeof srcUrlIdOrStrategy === 'function') {
+    const strategy = srcUrlIdOrStrategy
+    try {
+      const resolved = await strategy(srcOrMeta)
+      return resolved || ""
+    } catch (error) {
+      console.error('Strategy resolver failed:', error)
+      return ""
+    }
+  }
+
+  // Legacy pattern: resolveMediaUrl(src, srcUrlId, mediaUrlResolvers, meta)
+  const src = srcOrMeta as string
+  const srcUrlId = srcUrlIdOrStrategy
   // Extract meta properties
   const strategy = meta?.strategy
   const contentMediaId = meta?.contentMediaId

@@ -8,8 +8,8 @@ import { ContextPlugin } from "./plugins/context-plugin";
 import { MasterTokenPlugin } from "./plugins/masterTokenClient";
 import { CookieHeadersPlugin } from "./plugins/cookie-headers-plugin";
 import { RedirectOnUnauthorizedPlugin } from "./plugins/redirect-on-unauthorized-plugin";
-import { BatchLinkPlugin } from "@orpc/client/plugins";
 import { StandardLinkPlugin } from "@orpc/client/standard";
+import { FileUploadOpenAPILink } from "./file-upload-link";
 
 const APP_URL = validateEnvPath(
   process.env.NEXT_PUBLIC_APP_URL ?? "",
@@ -32,7 +32,8 @@ type PluginsContext = {
 }[number] extends infer U ? (U extends unknown ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never : never;
 
 export function createORPCClientWithCookies() {
-  const link = new OpenAPILink<PluginsContext>(appContract, {
+  // Use FileUploadOpenAPILink instead of OpenAPILink to handle file uploads with progress
+  const link = new FileUploadOpenAPILink<PluginsContext>(appContract, {
     // Use direct API URLs, bypassing Next.js proxy
     // Server: API_URL (private Docker network endpoint)
     // Browser: NEXT_PUBLIC_API_URL (public endpoint)
@@ -60,13 +61,16 @@ export function createORPCClientWithCookies() {
     createORPCClient<
       ContractRouterClient<
         AppContract,
-        typeof link extends OpenAPILink<infer C> ? C : never
+        typeof link extends FileUploadOpenAPILink<infer C> ? C : never
       >
     >(link);
 
   return client;
 }
 
+// Create TanStack Query utils directly from the client
+// File upload progress tracking is now handled at the Link level (FileUploadOpenAPILink)
+// This is the correct ORPC architecture pattern
 export const orpc = createTanstackQueryUtils(createORPCClientWithCookies());
 
 export type Context = PluginsContext;

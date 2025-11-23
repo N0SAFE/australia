@@ -1,15 +1,52 @@
-import { Module, Global } from '@nestjs/common';
-import { FileUploadService } from './file-upload.service';
-import { FileUploadMiddleware } from './file-upload.middleware';
+import { Module } from '@nestjs/common';
+import { FileUploadService } from './services/file-upload.service';
+import { FileUploadRepository } from './repositories/file-upload.repository';
+import { DatabaseModule } from '@/core/modules/database/database.module';
+import { StorageModule } from '@/modules/storage/storage.module';
 
 /**
- * Global file upload module
- * Provides file upload processing service and middleware
- * Available to all modules without explicit import
+ * Core File Upload Module
+ * 
+ * Provides centralized file upload functionality with namespace-based organization.
+ * This is a core module that can be used across all features.
+ * 
+ * Features:
+ * - Namespace-based file organization (e.g., ['capsule', 'video'] → capsule/video/{fileId}.ext)
+ * - Layered architecture: Repository → Service pattern
+ * - Support for image, video, audio, and raw files
+ * - Video processing status tracking
+ * 
+ * Usage:
+ * Import this module in any feature module that needs file upload:
+ * 
+ * @example
+ * @Module({
+ *   imports: [FileUploadModule],
+ *   // ...
+ * })
+ * export class CapsuleModule {}
+ * 
+ * Then inject FileUploadService:
+ * @example
+ * constructor(private readonly fileUploadService: FileUploadService) {}
+ * 
+ * const result = await this.fileUploadService.uploadVideo(
+ *   file,
+ *   ['capsule', 'video'],
+ *   userId
+ * );
  */
-@Global()
 @Module({
-  providers: [FileUploadService, FileUploadMiddleware],
-  exports: [FileUploadService, FileUploadMiddleware],
+  imports: [
+    DatabaseModule, // For FileUploadRepository to access DatabaseService
+    StorageModule,  // For FileUploadService to access StorageService
+  ],
+  providers: [
+    FileUploadRepository, // Database operations layer
+    FileUploadService,    // Business logic layer
+  ],
+  exports: [
+    FileUploadService, // Export service for use in other modules
+  ],
 })
 export class FileUploadModule {}

@@ -1,0 +1,56 @@
+.tiptap.ProseMirror {
+  // Audio node wrapper - prevent overflow
+  .audio-node-wrapper {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0.5rem 0;
+  }
+
+  // Audio node container
+  .audio-node {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  audio {
+    width: 100%;
+    height: revert !important;
+    max-width: 100%;
+    display: block;
+  }
+
+  > audio {
+    margin: 2rem 0;
+    outline: 0.125rem solid transparent;
+    border-radius: var(--tt-radius-xs, 0.25rem);
+  }
+
+  audio.ProseMirror-selectednode {
+    outline-color: var(--tt-brand-color-500);
+  }
+
+  // Thread audio handling
+  .tiptap-thread:has(> audio) {
+    margin: 2rem 0;
+
+    audio {
+      outline: 0.125rem solid transparent;
+      border-radius: var(--tt-radius-xs, 0.25rem);
+    }
+  }
+
+  .tiptap-thread audio {
+    margin: 0;
+  }
+
+  // Ensure audio nodes don't cause horizontal overflow
+  .audio-node-wrapper,
+  .audio-node {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}

@@ -4,10 +4,10 @@ export const userSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.email(),
-  emailVerified: z.boolean(),
+  emailVerified: z.coerce.boolean(),
   image: z.string().nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
   invitationStatus: z.enum(['pending', 'accepted', 'expired']).nullable().optional(),
   invitationToken: z.string().nullable().optional(),
 });

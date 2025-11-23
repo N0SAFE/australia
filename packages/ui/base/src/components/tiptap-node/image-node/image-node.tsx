@@ -13,48 +13,31 @@ import {
   ContextMenuTrigger,
 } from "@/components/shadcn/context-menu"
 import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize } from "lucide-react"
-import { resolveMediaUrl } from "@/lib/media-url-resolver"
+import { resolveMediaUrl, type ImageStrategyResolver } from "../../../lib/media-url-resolver"
 
 export function ImageNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
-  const { src, srcUrlId, alt, title, width, align = "center", meta } = node.attrs
+  const { meta, alt, title, width, align = "center" } = node.attrs
   
-  // State for resolved URL - start with null to avoid empty string warning
-  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(true)
+  // State for resolved URL
+  const [resolvedSrc, setResolvedSrc] = useState<string>("")
   
-  // Get injected media URL resolvers from extension options
-  const injectMediaUrl = editor.extensionManager.extensions.find(ext => ext.name === 'image')?.options.injectMediaUrl
+  // Get imageStrategy from extension options
+  const extension = editor.extensionManager.extensions.find(ext => ext.name === 'image')
+  const imageStrategy = extension?.options.imageStrategy as ImageStrategyResolver | undefined
   
-  // Resolve the final URL asynchronously
+  // Resolve the final URL asynchronously using strategy with meta only
   useEffect(() => {
     const resolve = async () => {
-      setIsLoading(true)
-      
-      // Debug: Log what we're receiving
-      console.log('🔍 [ImageNode] node.attrs:', node.attrs)
-      console.log('🔍 [ImageNode] meta value:', meta)
-      console.log('🔍 [ImageNode] injectMediaUrl:', injectMediaUrl)
-      
-      const resolved = await resolveMediaUrl(
-        src as string, 
-        srcUrlId as string | null, 
-        injectMediaUrl,
-        meta as { strategy?: string; contentMediaId?: string } | null
-      )
-      console.log('🖼️ Image URL resolved:', {
-        strategy: (meta as { strategy?: string })?.strategy,
-        contentMediaId: (meta as { contentMediaId?: string })?.contentMediaId,
-        srcUrlId,
-        resolvedUrl: resolved,
-        width: node.attrs.width,
-        height: node.attrs.height
-      })
+      if (!imageStrategy || !meta) {
+        setResolvedSrc("")
+        return
+      }
+      const resolved = await resolveMediaUrl(meta, imageStrategy)
       setResolvedSrc(resolved)
-      setIsLoading(false)
     }
     void resolve()
-  }, [src, srcUrlId, injectMediaUrl, meta])
+  }, [meta, imageStrategy])
 
   const alignmentStyles = {
     left: "flex justify-start",
@@ -76,7 +59,7 @@ export function ImageNodeView(props: NodeViewProps) {
       }
     }
   }
-
+  
   const imageElement = (
     <div
       className="image-node group relative"
@@ -85,17 +68,7 @@ export function ImageNodeView(props: NodeViewProps) {
         maxWidth: "100%",
       }}
     >
-      {isLoading ? (
-        <div 
-          className="flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded"
-          style={{ 
-            minHeight: "200px",
-            width: "100%"
-          }}
-        >
-          <div className="text-gray-400">Loading image...</div>
-        </div>
-      ) : resolvedSrc ? (
+      {resolvedSrc ? (
         <img
           src={resolvedSrc}
           alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
@@ -108,14 +81,14 @@ export function ImageNodeView(props: NodeViewProps) {
           className="rounded"
         />
       ) : (
-        <div 
-          className="flex items-center justify-center bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800"
-          style={{ 
+        <div
+          className="bg-muted rounded flex items-center justify-center"
+          style={{
+            width: "100%",
             minHeight: "200px",
-            width: "100%"
           }}
         >
-          <div className="text-red-500">Failed to load image</div>
+          <span className="text-muted-foreground text-sm">Loading image...</span>
         </div>
       )}
     </div>

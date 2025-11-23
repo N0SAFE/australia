@@ -13,32 +13,28 @@ export class StorageService {
   }
 
   /**
-   * Get the full file path - checks subdirectories
+   * Get the full file path using feature-based organization
+   * Files stored as: uploads/{feature}/{fileId}.{ext}
+   * @param fileId - The unique file identifier (UUID)
+   * @param feature - The feature/module (capsules, presentations, profiles, etc.)
+   * @param extension - Optional file extension (e.g., 'jpg', 'mp4')
    */
-  getFilePath(filename: string): string {
-    // Determine subdirectory based on filename prefix
-    let subdir = '';
-    if (filename.startsWith('image-')) {
-      subdir = 'images';
-    } else if (filename.startsWith('video-')) {
-      subdir = 'videos';
-    } else if (filename.startsWith('audio-')) {
-      subdir = 'audio';
-    }
+  getFilePath(fileId: string, feature: string, extension?: string): string {
+    const filename = extension ? `${fileId}.${extension}` : fileId;
+    const filePath = path.join(this.uploadDir, feature, filename);
     
-    const filePath = subdir 
-      ? path.join(this.uploadDir, subdir, filename)
-      : path.join(this.uploadDir, filename);
-    
-    console.log('[StorageService] getFilePath:', { filename, uploadDir: this.uploadDir, subdir, filePath });
+    console.log('[StorageService] getFilePath:', { fileId, feature, extension, uploadDir: this.uploadDir, filePath });
     return filePath;
   }
 
   /**
    * Check if file exists
+   * @param fileId - The unique file identifier
+   * @param feature - The feature/module name
+   * @param extension - Optional file extension
    */
-  async fileExists(filename: string): Promise<boolean> {
-    const filePath = this.getFilePath(filename);
+  async fileExists(fileId: string, feature: string, extension?: string): Promise<boolean> {
+    const filePath = this.getFilePath(fileId, feature, extension);
     try {
       await fs.access(filePath);
       console.log('[StorageService] fileExists: true -', filePath);
@@ -51,19 +47,25 @@ export class StorageService {
 
   /**
    * Delete a file
+   * @param fileId - The unique file identifier
+   * @param feature - The feature/module name
+   * @param extension - Optional file extension
    */
-  async deleteFile(filename: string): Promise<void> {
-    const filePath = this.getFilePath(filename);
+  async deleteFile(fileId: string, feature: string, extension?: string): Promise<void> {
+    const filePath = this.getFilePath(fileId, feature, extension);
     await fs.unlink(filePath);
   }
 
   /**
    * Get file metadata
+   * @param fileId - The unique file identifier
+   * @param feature - The feature/module name
+   * @param extension - File extension (e.g., 'jpg', 'mp4')
    */
-  async getFileMetadata(filename: string): Promise<{ size: number; mimeType: string }> {
-    const filePath = this.getFilePath(filename);
+  async getFileMetadata(fileId: string, feature: string, extension: string): Promise<{ size: number; mimeType: string }> {
+    const filePath = this.getFilePath(fileId, feature, extension);
     const stats = await fs.stat(filePath);
-    const ext = path.extname(filename).toLowerCase();
+    const ext = `.${extension}`.toLowerCase();
     
     const mimeTypes: Record<string, string> = {
       '.jpg': 'image/jpeg',
@@ -86,32 +88,41 @@ export class StorageService {
 
   /**
    * Save a File object to disk
+   * @param file - The File object to save
+   * @param fileId - The unique file identifier (UUID)
+   * @param feature - The feature/module name (capsules, presentations, etc.)
+   * @param extension - File extension (e.g., 'jpg', 'mp4')
    */
-  async saveFile(file: File, filename: string): Promise<string> {
-    const filePath = this.getFilePath(filename);
+  async saveFile(file: File, fileId: string, feature: string, extension: string): Promise<string> {
+    const filePath = this.getFilePath(fileId, feature, extension);
+    const featurePath = path.join(this.uploadDir, feature);
     
-    // Ensure directory exists
-    await fs.mkdir(this.uploadDir, { recursive: true });
+    // Ensure feature directory exists
+    await fs.mkdir(featurePath, { recursive: true });
     
     // Convert File to Buffer and save
     const buffer = Buffer.from(await file.arrayBuffer());
     await fs.writeFile(filePath, buffer);
     
-    console.log('[StorageService] File saved:', { filename, filePath, size: file.size });
+    console.log('[StorageService] File saved:', { fileId, feature, extension, filePath, size: file.size });
     return filePath;
   }
 
   /**
    * Read file and return as File object
+   * @param fileId - The unique file identifier
+   * @param feature - The feature/module name
+   * @param extension - File extension
+   * @param originalFilename - The original filename to set on the File object
    */
-  async readFile(filename: string): Promise<File> {
-    const filePath = this.getFilePath(filename);
+  async readFile(fileId: string, feature: string, extension: string, originalFilename: string): Promise<File> {
+    const filePath = this.getFilePath(fileId, feature, extension);
     const buffer = await fs.readFile(filePath);
-    const metadata = await this.getFileMetadata(filename);
+    const metadata = await this.getFileMetadata(fileId, feature, extension);
     
-    // Create a File object from buffer
-    const file = new File([buffer], filename, { type: metadata.mimeType });
-    console.log('[StorageService] File read:', { filename, filePath, size: file.size });
+    // Create a File object from buffer with the original filename
+    const file = new File([buffer], originalFilename, { type: metadata.mimeType });
+    console.log('[StorageService] File read:', { fileId, feature, extension, originalFilename, filePath, size: file.size });
     return file;
   }
 }

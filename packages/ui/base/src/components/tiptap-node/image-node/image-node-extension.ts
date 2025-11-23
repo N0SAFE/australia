@@ -1,6 +1,7 @@
 import { mergeAttributes, Node } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { ImageNodeView } from "./image-node"
+import type { ImageStrategyResolver } from "../../../lib/media-url-resolver"
 
 export interface ImageNodeOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,9 +17,9 @@ export interface ImageNodeOptions {
    */
   inline?: boolean
   /**
-   * Media URL resolver callbacks by ID
+   * Image URL strategy resolver that receives meta only
    */
-  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+  imageStrategy?: ImageStrategyResolver
 }
 
 declare module "@tiptap/core" {
@@ -50,16 +51,13 @@ export const ImageNode = Node.create<ImageNodeOptions>({
       HTMLAttributes: {},
       allowBase64: false,
       inline: false,
-      injectMediaUrl: {},
+      imageStrategy: undefined,
     }
   },
 
   addAttributes() {
     return {
-      src: {
-        default: null,
-      },
-      srcUrlId: {
+      meta: {
         default: null,
       },
       contentMediaId: {
@@ -86,9 +84,6 @@ export const ImageNode = Node.create<ImageNodeOptions>({
       },
       align: {
         default: "center",
-      },
-      meta: {
-        default: null,
       },
     }
   },

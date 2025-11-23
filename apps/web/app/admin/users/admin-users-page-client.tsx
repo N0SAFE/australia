@@ -6,7 +6,7 @@ import { flexRender, useReactTable } from '@tanstack/react-table';
 import { useState, useMemo } from 'react';
 import { User, UserListResponse } from '@/types/user';
 import { cn } from '@/lib/utils';
-import { useUsers } from '@/hooks/useUsers';
+import { useUsers } from '@/hooks/users/hooks';
 import {
   Table,
   TableBody,
@@ -52,7 +52,7 @@ import {
 import { authClient } from '@/lib/auth';
 import { toast } from 'sonner';
 import { orpc } from '@/lib/orpc';
-import { useDeleteUser } from '@/hooks/useUsers';
+import { useDeleteUser } from '@/hooks/users/hooks';
 
 const columnHelper = createColumnHelper<User>()
 

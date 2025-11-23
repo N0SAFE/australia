@@ -1,9 +1,6 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { PresentationRepository, type PresentationVideoRecord } from "../repositories/presentation.repository";
-import { FileUploadService } from "@/core/modules/file-upload/file-upload.service";
-import { StorageService } from "@/modules/storage/services/storage.service";
-import { join } from "path";
-import { UPLOADS_DIR } from "@/config/multer.config";
+import { PresentationRepository } from "../repositories/presentation.repository";
+import { FileUploadService } from "@/core/modules/file-upload/services/file-upload.service";
 import { VideoProcessingService } from "@/core/modules/video-processing";
 import { PresentationEventService } from "../events/presentation.event";
 
@@ -14,7 +11,6 @@ export class PresentationService {
     constructor(
         private readonly presentationRepository: PresentationRepository,
         private readonly fileUploadService: FileUploadService,
-        private readonly storageService: StorageService,
         private readonly videoProcessingService: VideoProcessingService,
         private readonly presentationEventService: PresentationEventService
     ) {}
@@ -22,51 +18,41 @@ export class PresentationService {
     /**
      * Upload or replace presentation video
      */
-    async uploadVideo(file: Express.Multer.File): Promise<PresentationVideoRecord & { url: string }> {
-        // Determine subdirectory based on mimetype
-        let subdir = 'videos';
-        if (file.mimetype.startsWith('video/')) {
-            subdir = 'videos';
-        } else if (file.mimetype.startsWith('audio/')) {
-            subdir = 'audio';
-        }
+    async uploadVideo(file: File) {
+        // Upload file using FileUploadService with namespace ['presentation', 'video']
+        const uploadResult = await this.fileUploadService.uploadFile(
+            file,
+            ["presentation", "video"],
+            "video",
+            undefined // uploadedBy - presentation doesn't have user context
+        );
 
-        // Build file data
-        const fileData = {
-            url: `/uploads/${subdir}/${file.filename}`,
-            filePath: `${subdir}/${file.filename}`,
-            filename: file.filename,
-            mimetype: file.mimetype,
-            size: file.size,
-        };
+        this.logger.log(`Video uploaded with fileId: ${uploadResult.fileId}`);
 
         // Get current video to delete old file
-        const currentVideo = await this.presentationRepository.findCurrent();
+        const currentVideo = await this.presentationRepository.findCurrentBasic();
 
         // Delete old file if exists
-        if (currentVideo?.filePath) {
+        if (currentVideo?.fileId) {
             try {
-                await this.storageService.deleteFile(currentVideo.filePath);
-            } catch (error) {
+                // Use FileUploadService's deleteFile method (by fileId)
+                await this.fileUploadService.deleteFile(currentVideo.fileId);
+                this.logger.log(`Deleted old video: ${currentVideo.fileId}`);
+            } catch (error: unknown) {
                 // Ignore deletion errors - continue with upload
-                console.warn("Failed to delete old presentation video:", error);
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                this.logger.warn(`Failed to delete old presentation video: ${errorMessage}`);
             }
         }
 
-        // Save to database (without processing - processing will be triggered but not awaited)
-        const video = await this.presentationRepository.upsert({
-            filePath: fileData.filePath,
-            filename: fileData.filename,
-            mimeType: fileData.mimetype,
-            size: fileData.size,
-            isProcessed: false,
-            processingProgress: 0,
-            processingError: null,
+        // Save to database - only store fileId reference
+        // All file metadata is in the file/videoFile tables
+        await this.presentationRepository.upsert({
+            fileId: uploadResult.fileId,
         });
 
-        // Trigger async video processing (non-blocking) - return immediately
-        // Get absolute file path
-        const absolutePath = this.fileUploadService.getFilePath(fileData.filename, fileData.mimetype);
+        // Get absolute file path for processing (internal use only)
+        const absolutePath = await this.fileUploadService.getAbsoluteFilePath(uploadResult.fileId);
 
         // Start processing in background with abort strategy (don't await)
         this.presentationEventService
@@ -87,13 +73,20 @@ export class PresentationService {
                     )
                     .then(async (metadata) => {
                         // SUCCESS: Update database to mark as processed
-                        await this.presentationRepository.updateVideoProcessingStatus("singleton", {
+                        const updates = {
                             isProcessed: true,
                             processingProgress: 100,
                             processingError: null,
-                        });
+                        };
+
+                        // Video processing complete - update status in videoFile table
+                        await this.presentationRepository.updateVideoProcessingStatus("singleton", updates);
 
                         console.log("metadata", metadata);
+
+                        // Video has been processed in-place (same file, converted content)
+                        // No file replacement needed - just mark as processed
+                        this.logger.log(`Video processing completed for file: ${uploadResult.fileId}`);
 
                         // Emit final completion event with metadata
                         emit({
@@ -137,9 +130,18 @@ export class PresentationService {
                 this.logger.error(`Event processing wrapper failed: ${err.message}`);
             });
 
+        // Get the complete video data with joined file and video metadata
+        const result = await this.presentationRepository.findCurrent();
+        
+        if (!result) {
+            throw new Error('Failed to retrieve uploaded video');
+        }
+
         return {
-            ...video,
-            url: fileData.url,
+            ...result.presentation,
+            file: result.file,
+            video: result.video,
+            url: `/api/presentation/video/stream`, // Stream endpoint
         };
     }
 
@@ -147,18 +149,20 @@ export class PresentationService {
      * Trigger video processing for current presentation video
      */
     async triggerProcessing(): Promise<void> {
-        const video = await this.presentationRepository.findCurrent();
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             throw new NotFoundException("No presentation video found");
         }
+
+        const { file: fileRecord, video } = result;
 
         if (video.isProcessed) {
             throw new Error("Video is already processed");
         }
 
-        // Get absolute file path from stored relative path
-        const absolutePath = join(UPLOADS_DIR, video.filePath);
+        // Get absolute file path from FileUploadService
+        const absolutePath = await this.fileUploadService.getAbsoluteFilePath(fileRecord.id);
 
         // Start processing in background with abort strategy (don't await)
         this.presentationEventService
@@ -179,29 +183,14 @@ export class PresentationService {
                     )
                     .then(async (metadata) => {
                         // SUCCESS: Update database to mark as processed
-                        // If conversion happened and file path changed, update it
-                        const updates: Parameters<typeof this.presentationRepository.updateVideoProcessingStatus>[1] = {
+                        const updates = {
                             isProcessed: true,
                             processingProgress: 100,
-                            processingError: null,
+                            processingError: null as string | null,
                         };
 
-                        // Update file path if it changed during conversion
-                        if (metadata.newFilePath) {
-                            // Extract relative path from absolute path
-                            const uploadsIndex = metadata.newFilePath.indexOf("uploads/");
-                            const relativePath = uploadsIndex >= 0 ? metadata.newFilePath.substring(uploadsIndex) : metadata.newFilePath;
-
-                            await this.presentationRepository.upsert({
-                                filePath: relativePath,
-                                filename: relativePath.split("/").pop() ?? "",
-                                mimeType: "video/mp4",
-                                size: video.size, // Keep original size
-                                ...updates,
-                            });
-                        } else {
-                            await this.presentationRepository.updateVideoProcessingStatus("singleton", updates);
-                        }
+                        // Update processing status
+                        await this.presentationRepository.updateVideoProcessingStatus("singleton", updates);
 
                         // Emit final completion event with metadata
                         emit({
@@ -258,16 +247,19 @@ export class PresentationService {
         };
         timestamp: string;
     }> {
-        const video = await this.presentationRepository.findCurrent();
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             throw new NotFoundException("No presentation video found");
         }
+
+        // Extract video metadata from joined result
+        const { video } = result;
 
         // Subscribe to the event service for videoProcessing events
         const subscription = this.presentationEventService.subscribe("videoProcessing", { videoId: "singleton" });
 
-        // First, yield current state
+        // First, yield current state from videoFile table
         const currentProgress = video.processingProgress ?? 0;
         const currentIsProcessed = video.isProcessed;
         const currentError = video.processingError ?? null;
@@ -304,17 +296,20 @@ export class PresentationService {
 
     /**
      * Get current presentation video
+     * Returns presentation with file metadata from joined tables
      */
-    async getCurrentVideo(): Promise<(PresentationVideoRecord & { url: string }) | null> {
-        const video = await this.presentationRepository.findCurrent();
+    async getCurrentVideo() {
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             return null;
         }
 
         return {
-            ...video,
-            url: `/uploads/${video.filePath}`,
+            ...result.presentation,
+            file: result.file,
+            video: result.video,
+            url: `/api/presentation/video/stream`, // Stream endpoint
         };
     }
 
@@ -322,29 +317,36 @@ export class PresentationService {
      * Delete presentation video
      */
     async deleteVideo() {
-        const video = await this.presentationRepository.findCurrent();
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             throw new NotFoundException("No presentation video found");
         }
 
-        // Delete file from storage
-        await this.storageService.deleteFile(video.filePath);
+        // Delete file from storage using FileUploadService (by fileId)
+        await this.fileUploadService.deleteFile(result.file.id);
 
-        // Delete from database
+        // Delete from database (cascade will handle file table)
         await this.presentationRepository.delete();
     }
 
     /**
-     * Get video stream path for serving
+     * Get video stream for serving
+     * Returns the file stream from FileUploadService
      */
-    async getVideoPath(): Promise<string> {
-        const video = await this.presentationRepository.findCurrent();
+    async getVideoStream(): Promise<{
+        stream: ReadableStream;
+        filename: string;
+        mimeType: string;
+        size: number;
+    }> {
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             throw new NotFoundException("No presentation video found");
         }
 
-        return join(UPLOADS_DIR, video.filePath);
+        // Get file stream from FileUploadService using the fileId
+        return this.fileUploadService.getFileStream(result.file.id);
     }
 }

@@ -9,5 +9,5 @@ export const paginatedOutput = z.object({
   total: z.coerce.number(),
   limit: z.coerce.number(),
   offset: z.coerce.number(),
-  hasMore: z.boolean(),
+  hasMore: z.coerce.boolean(),
 });

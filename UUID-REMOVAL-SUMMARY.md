@@ -13,8 +13,8 @@ Completed the removal of UUID-based operation tracking system from the event-dri
 - **Impact**: Upload API no longer returns operationId to clients
 
 #### `/packages/contracts/api/modules/storage/subscribeVideoProcessing.ts`
-- ✅ **Removed**: `operationId: z.string().uuid().optional()` from input schema
-- ✅ **Removed**: `operationId: z.string().uuid().optional()` from output event schema
+- ✅ **Removed**: `operationId: z.uuid().optional()` from input schema
+- ✅ **Removed**: `operationId: z.uuid().optional()` from output event schema
 - **Impact**: Subscriptions now work solely on videoId, events no longer include operationId
 
 ### 2. Backend Core Event System

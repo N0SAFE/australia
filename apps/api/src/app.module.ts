@@ -12,7 +12,6 @@ import { onError, ORPCModule } from "@orpc/nest";
 import { DATABASE_CONNECTION } from "./core/modules/database/database-connection";
 import { AuthModule } from "./core/modules/auth/auth.module";
 import { LoggerMiddleware } from "./core/middlewares/logger.middleware";
-import { FileUploadModule, FileUploadMiddleware } from "./core/modules/file-upload";
 import { createBetterAuth } from "./config/auth/auth";
 import { EnvService } from "./config/env/env.service";
 import { EnvModule } from "./config/env/env.module";
@@ -30,7 +29,6 @@ import { EventsModule } from "./core/modules/events/events.module";
     EnvModule,
     DatabaseModule,
     EventsModule,
-    FileUploadModule,
     FfmpegModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, EnvModule],
@@ -43,7 +41,7 @@ import { EventsModule } from "./core/modules/events/events.module";
     CapsuleModule,
     InvitationModule,
     StorageModule,
-    PresentationModule,
+    PresentationModule, 
     ORPCModule.forRootAsync({
       useFactory: (request: Request) => ({
         interceptors: [
@@ -73,9 +71,6 @@ import { EventsModule } from "./core/modules/events/events.module";
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Apply file upload middleware FIRST (before ORPC parses body)
-    consumer.apply(FileUploadMiddleware).forRoutes("*");
-    // Then apply logger middleware
     consumer.apply(LoggerMiddleware).forRoutes("*");
   }
 }

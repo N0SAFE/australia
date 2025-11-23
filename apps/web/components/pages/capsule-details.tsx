@@ -7,7 +7,7 @@ import { ContentRenderer } from '@/components/content/ContentRenderer';
 import { UnlockModal } from '@/components/unlock/UnlockModal';
 import { useSession } from '@/lib/auth';
 import { Shield } from 'lucide-react';
-import { useMarkCapsuleAsOpened } from '@/hooks/useCapsules';
+import { useMarkCapsuleAsOpened } from '@/hooks/capsules/hooks';
 
 /**
  * CapsuleContent - Pure content display without interactions

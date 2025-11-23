@@ -26,15 +26,17 @@ import {
 } from "@repo/ui/components/tiptap-ui-primitive/toolbar/index"
 
 // --- Tiptap Node ---
-import { ImageUploadNode } from "@repo/ui/components/tiptap-node/image-upload-node/image-upload-node-extension"
-import { VideoUploadExtension } from "@repo/ui/components/tiptap-node/video-upload-node/video-upload-node-extension"
-import { AudioUploadExtension } from "@repo/ui/components/tiptap-node/audio-upload-node/audio-upload-node-extension"
-import { FileUploadExtension } from "@repo/ui/components/tiptap-node/file-upload-node/file-upload-node-extension"
+import {
+  ImageUploadNodeExtension as ImageUploadNode,
+  VideoUploadNodeExtension as VideoUploadExtension,
+  AudioUploadNodeExtension as AudioUploadExtension,
+  FileUploadNodeExtension as FileUploadExtension,
+  ImageViewNodeExtension as ImageNode,
+  VideoViewNodeExtension as VideoNode,
+  AudioViewNodeExtension as AudioNode,
+  FileViewNodeExtension as FileNode,
+} from "@repo/ui/components/tiptap-node/index"
 import { HorizontalRule } from "@repo/ui/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension"
-import { ImageNode } from "@repo/ui/components/tiptap-node/image-node/image-node-extension"
-import { VideoNode } from "@repo/ui/components/tiptap-node/video-node/video-node-extension"
-import { AudioNode } from "@repo/ui/components/tiptap-node/audio-node/audio-node-extension"
-import { FileNode } from "@repo/ui/components/tiptap-node/file-node/file-node-extension"
 import "@repo/ui/components/tiptap-node/blockquote-node/blockquote-node.scss"
 import "@repo/ui/components/tiptap-node/code-block-node/code-block-node.scss"
 import "@repo/ui/components/tiptap-node/horizontal-rule-node/horizontal-rule-node.scss"
@@ -77,7 +79,7 @@ import { useCursorVisibility } from "@repo/ui/hooks/use-cursor-visibility"
 
 // --- Lib ---
 import { MAX_FILE_SIZE } from "@repo/ui/lib/tiptap-utils"
-import type { UploadFunction } from "@repo/ui/components/tiptap-node/image-upload-node/image-upload-node-extension"
+import type { UploadFunction } from "@repo/ui/components/tiptap-node/media-nodes/image/upload-node/image-upload-node-extension"
 
 // --- Styles ---
 import "./style.scss"
@@ -266,11 +268,18 @@ export interface SimpleEditorProps {
     file?: UploadFunction
   }
   /**
-   * Map of media source URL IDs to resolver callbacks
-   * Used to resolve media URLs based on srcUrlId attribute
-   * Example: { api: (src) => `https://api.example.com${src}` }
+   * Strategy resolvers for media URL resolution
+   * Used to resolve media URLs based on meta.srcResolveStrategy
    */
-  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+  videoStrategy?: (meta: unknown) => Promise<string> | string
+  imageStrategy?: (meta: unknown) => Promise<string> | string
+  audioStrategy?: (meta: unknown) => Promise<string> | string
+  fileStrategy?: (meta: unknown) => Promise<string> | string
+  /**
+   * Video processing progress component for Tiptap video nodes
+   * Component that handles fetching and rendering video processing progress
+   */
+  VideoProgressComponent?: import("react").ComponentType<import("@repo/ui/tiptap-node/video-node-extension").VideoProgressComponentProps>
 }
 
 export function SimpleEditor({
@@ -279,7 +288,11 @@ export function SimpleEditor({
   editable = true,
   placeholder = "Start typing...",
   uploadFunctions,
-  injectMediaUrl,
+  videoStrategy,
+  imageStrategy,
+  audioStrategy,
+  fileStrategy,
+  VideoProgressComponent,
 }: SimpleEditorProps) {
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()
@@ -295,19 +308,45 @@ export function SimpleEditor({
     }
   }, [])
 
-  const editor = useEditor({
-    immediatelyRender: false,
-    editable,
-    editorProps: {
-      attributes: {
-        autocomplete: "off",
-        autocorrect: "off",
-        autocapitalize: "off",
-        "aria-label": "Main content area, start typing to enter text.",
-        class: "simple-editor prose",
-      },
-    },
-    extensions: [
+  // Debug: Check if extensions are defined
+  console.log('🔍 Extension imports:', {
+    ImageUploadNode,
+    VideoUploadExtension,
+    AudioUploadExtension,
+    FileUploadExtension,
+    ImageNode,
+    VideoNode,
+    AudioNode,
+    FileNode,
+    HorizontalRule,
+    NodeBackground,
+    UiState,
+    StarterKit,
+    TextAlign,
+    TaskList,
+    TaskItem,
+    Highlight,
+    Typography,
+    Superscript,
+    Subscript,
+    Selection,
+    Placeholder,
+    TextStyle,
+    Color
+  })
+
+  // Log the strategy values
+  console.log('🔍 Strategy props:', {
+    imageStrategy,
+    videoStrategy,
+    audioStrategy,
+    fileStrategy,
+    VideoProgressComponent,
+    uploadFunctions
+  })
+
+  // Build extensions array with validation
+  const extensionsArray = [
       StarterKit.configure({
         horizontalRule: false,
         link: {
@@ -329,16 +368,17 @@ export function SimpleEditor({
       }),
       // Display nodes for media (required for upload nodes to transform to)
       ImageNode.configure({
-        injectMediaUrl,
+        imageStrategy,
       }),
       VideoNode.configure({
-        injectMediaUrl,
+        videoStrategy,
+        VideoProgressComponent,
       }),
       AudioNode.configure({
-        injectMediaUrl,
+        audioStrategy,
       }),
       FileNode.configure({
-        injectMediaUrl,
+        fileStrategy,
       }),
       // Image upload extension
       ...(uploadFunctions?.image
@@ -398,8 +438,22 @@ export function SimpleEditor({
       NodeBackground,
       
       UiState
-    ],
-    content: value ?? [{ type: "paragraph", children: [{ text: "" }] }],
+    ]
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    editable,
+    editorProps: {
+      attributes: {
+        autocomplete: "off",
+        autocorrect: "off",
+        autocapitalize: "off",
+        "aria-label": "Main content area, start typing to enter text.",
+        class: "simple-editor prose",
+      },
+    },
+    extensions: extensionsArray,
+    content: value ?? { type: "doc", content: [{ type: "paragraph" }] },
     onUpdate: ({ editor }) => {
       if (onChange) {
         onChange(editor.getJSON())

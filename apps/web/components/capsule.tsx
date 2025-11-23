@@ -24,7 +24,7 @@ import {
 import { CapsuleLockModal } from './capsule-lock-modal';
 import { useSession } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-import { useCapsule } from '@/hooks/useCapsules';
+import { useCapsule } from '@/hooks/capsules/hooks';
 
 export const CapsuleCard: FC<{
   data: Capsule

@@ -4,7 +4,7 @@ import { z } from 'zod/v4';
 export const presentationDeleteInput = z.object({});
 
 export const presentationDeleteOutput = z.object({
-  success: z.boolean(),
+  success: z.coerce.boolean(),
   message: z.string(),
 });
 

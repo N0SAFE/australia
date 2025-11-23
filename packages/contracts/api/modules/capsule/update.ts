@@ -10,8 +10,8 @@ const addedMediaSchema = z.object({
 });
 
 const mediaSchema = z.object({
-  kept: z.array(z.string()), // Array of contentMediaIds to keep from existing content
-  added: z.array(addedMediaSchema), // New files with contentMediaIds to upload
+  kept: z.array(z.string()).optional().default([]), // Array of contentMediaIds to keep from existing content
+  added: z.array(addedMediaSchema).optional().default([]), // New files with contentMediaIds to upload
 });
 
 // Define the input for updating a capsule
@@ -20,7 +20,7 @@ export const capsuleUpdateInput = z.object({
   openingDate: z.string().optional(), // YYYY-MM-DD format
   content: z.string().optional(),
   openingMessage: z.string().optional(),
-  isLocked: z.boolean().optional(),
+  isLocked: z.coerce.boolean().optional(),
   lockType: lockTypeSchema.nullable().optional(),
   lockConfig: lockConfigSchema.nullable().optional(),
   

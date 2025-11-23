@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, boolean, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, jsonb, boolean, uuid, integer } from "drizzle-orm/pg-core";
 
 export const capsule = pgTable("capsule", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -15,6 +15,12 @@ export const capsule = pgTable("capsule", {
   lockConfig: jsonb("lock_config"), // Configuration for the lock (code value, voice phrase, API endpoint, etc.)
   unlockedAt: timestamp("unlocked_at"), // When the capsule was unlocked
   openedAt: timestamp("opened_at"), // When the capsule was first viewed/opened
+  
+  // Background upload/processing status
+  uploadStatus: text("upload_status"), // 'uploading', 'processing', 'completed', 'failed'
+  uploadProgress: integer("upload_progress"), // 0-100
+  uploadMessage: text("upload_message"), // Current status message
+  operationId: text("operation_id"), // Operation ID for tracking progress
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")

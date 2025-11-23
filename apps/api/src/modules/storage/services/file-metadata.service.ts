@@ -141,7 +141,7 @@ export class FileMetadataService {
     
     // Calculate aspect ratio if dimensions are available
     if (videoMetadata.width && videoMetadata.height) {
-      videoMetadata.aspectRatio = `${videoMetadata.width.toString()}:${videoMetadata.height.toString()}`;
+      videoMetadata.aspectRatio = `${videoMetadata.width}:${videoMetadata.height}`;
     }
 
     // Save to database via repository

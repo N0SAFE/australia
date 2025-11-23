@@ -2,6 +2,16 @@
 
 ## Latest Achievements ✅
 
+### Admin UI Accessibility (COMPLETED)
+- **Issue**: Admin capsule details form lacked proper semantic structure and ARIA attributes
+- **Solution**: Enhanced `admin-capsule-details-page-client.tsx` with accessible components
+- **Implementation**:
+  - Replaced generic elements with `Field`, `FieldLabel`, `FieldDescription`
+  - Added `aria-describedby` for help text
+  - Added `role="region"` and labels for Tiptap editor
+  - Improved semantic grouping with `FieldSet` and `FieldLegend`
+  - Added `aria-hidden` to decorative icons
+
 ### Capsule Video Processing (COMPLETED)
 - **Issue**: Capsule create/update uploaded files but never triggered FFmpeg processing
 - **Solution**: Enhanced `CapsuleService.uploadAndSaveFile()` to automatically start video processing

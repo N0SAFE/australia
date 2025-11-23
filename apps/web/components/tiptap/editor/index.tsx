@@ -250,6 +250,10 @@ export interface SimpleEditorProps {
   editable?: boolean
   placeholder?: string
   /**
+   * Callback fired when editor is fully initialized and ready
+   */
+  onEditorReady?: () => void
+  /**
    * Upload functions for different media types
    * These should be provided by the parent app (e.g., using useStorage hook)
    */
@@ -279,6 +283,7 @@ export function SimpleEditor({
   onChange,
   editable = true,
   placeholder = "Start typing...",
+  onEditorReady,
   uploadFunctions,
   videoStrategy,
   imageStrategy,
@@ -398,6 +403,12 @@ export function SimpleEditor({
     },
     extensions: extensionsArray,
     content: value ?? { type: "doc", content: [{ type: "paragraph" }] },
+    onCreate: ({ editor }) => {
+      // Editor is ready
+      if (onEditorReady) {
+        onEditorReady()
+      }
+    },
     onUpdate: ({ editor }) => {
       if (onChange) {
         onChange(editor.getJSON())

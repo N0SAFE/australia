@@ -27,6 +27,7 @@ interface TipTapContentRendererProps {
   onChange?: (newValue: any) => void;
   capsule: Capsule | null | undefined;
   placeholder?: string;
+  onEditorReady?: () => void;
 }
 
 export const TipTapContentRenderer: FC<TipTapContentRendererProps> = ({
@@ -35,6 +36,7 @@ export const TipTapContentRenderer: FC<TipTapContentRendererProps> = ({
   onChange,
   capsule,
   placeholder = "Écrivez le contenu de votre capsule temporelle...",
+  onEditorReady,
 }) => {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -152,6 +154,7 @@ export const TipTapContentRenderer: FC<TipTapContentRendererProps> = ({
         editable={true}
         placeholder={placeholder}
         uploadFunctions={uploadFunctions}
+        onEditorReady={onEditorReady}
       />
     );
   }

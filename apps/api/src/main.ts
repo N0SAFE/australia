@@ -43,16 +43,6 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
-      'X-Requested-With', 
-      'Accept', 
-      'Cookie', 
-      'Set-Cookie',
-      'Content-Disposition', // Allow content-disposition header for file uploads
-    ],
-    exposedHeaders: ['Set-Cookie'],
   });
 
   app.useLogger(["log", "error", "warn", "debug", "verbose"]);

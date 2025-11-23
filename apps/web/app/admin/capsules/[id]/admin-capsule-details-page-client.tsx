@@ -2,18 +2,25 @@
 
 import { FC, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { VideoProgressTracker } from "@/components/video-progress/VideoProgressTracker";
+import { Field, FieldLabel, FieldDescription, FieldSet, FieldLegend } from "@/components/ui/field";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { CalendarIcon, Settings } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@repo/ui/components/shadcn/switch";
 import Link from "next/link";
 import { Capsule, LockType } from "@/types/capsule";
 
@@ -55,6 +63,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
   });
 
   const [editorValue, setEditorValue] = useState<any>(getEmptyValue());
+  const [isEditorReady, setIsEditorReady] = useState(false);
   
   const [date, setDate] = useState<Date | undefined>(
     capsule?.openingDate ? new Date(capsule.openingDate) : new Date(),
@@ -63,6 +72,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
   const [lockType, setLockType] = useState<LockType | null>(
     capsule?.lockType || null,
   );
+  const [isLockConfigOpen, setIsLockConfigOpen] = useState(false);
 
   const { mutate: updateCapsule, isPending: isUpdating } = useUpdateCapsule();
   const router = useRouter();
@@ -180,7 +190,7 @@ export const AdminCapsuleDetailsPageClient: FC<{
               href="/admin/capsules"
               className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Retour aux capsules
             </Link>
           </div>
@@ -203,6 +213,82 @@ export const AdminCapsuleDetailsPageClient: FC<{
       <Separator />
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Opening Date - First */}
+        <Field className="max-w-lg">
+          <FieldLabel htmlFor="openingDate">Date d&apos;ouverture</FieldLabel>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="openingDate"
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+                disabled={!update}
+                aria-label={date ? `Date d'ouverture: ${format(date, "PPP")}` : "Sélectionner une date d'ouverture"}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                disabled={!update}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        </Field>
+
+        {/* Tiptap Editor - supports text, images, videos, audio, and more */}
+        <Field>
+          <FieldLabel>Contenu de la capsule</FieldLabel>
+          <Input
+            value={state.content ?? ""}
+            type="hidden"
+            name="content"
+            readOnly
+          />
+          <div 
+            className="border rounded-lg overflow-hidden"
+            role="region"
+            aria-label="Contenu de la capsule"
+            tabIndex={0}
+          >
+            {!isEditorReady && (
+              <div className="p-4 space-y-3 animate-pulse">
+                <div className="h-4 bg-muted rounded w-3/4"></div>
+                <div className="h-4 bg-muted rounded w-full"></div>
+                <div className="h-4 bg-muted rounded w-5/6"></div>
+              </div>
+            )}
+            <div className={!isEditorReady ? 'hidden' : ''}>
+              <TipTapContentRenderer
+                mode={update ? 'editor' : 'viewer'}
+                value={editorValue}
+                onChange={(newValue) => {
+                  console.log(
+                    "📝 [TipTap] Content changed:",
+                    JSON.stringify(newValue, null, 2),
+                  );
+                  setEditorValue(newValue);
+                }}
+                capsule={capsule}
+                placeholder="Écrivez le contenu de votre capsule temporelle..."
+                onEditorReady={() => {
+                  console.log("✅ [TipTap] Editor is ready");
+                  setIsEditorReady(true);
+                }}
+              />
+            </div>
+          </div>
+        </Field>
+
+        {/* Opening Message - After Content */}
         <Field>
           <FieldLabel htmlFor="openingMessage">
             Message d&apos;ouverture
@@ -225,348 +311,318 @@ export const AdminCapsuleDetailsPageClient: FC<{
           />
         </Field>
 
-        {/* Tiptap Editor - supports text, images, videos, audio, and more */}
-        <Field>
-          <FieldLabel>Contenu de la capsule</FieldLabel>
-          <Input
-            value={state.content ?? ""}
-            type="hidden"
-            name="content"
-            readOnly
-          />
-          <div className="border rounded-lg overflow-hidden">
-            <TipTapContentRenderer
-              mode={update ? 'editor' : 'viewer'}
-              value={editorValue}
-              onChange={(newValue) => {
-                console.log(
-                  "📝 [TipTap] Content changed:",
-                  JSON.stringify(newValue, null, 2),
-                );
-                setEditorValue(newValue);
+        {/* Lock Configuration Section */}
+        <div className="space-y-4 rounded-lg border p-6 bg-muted/30">
+          <div className="flex justify-between items-center"> 
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-muted-foreground" />
+                <h3 className="text-lg font-semibold">Verrouillage de la capsule</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Configurez un mécanisme de sécurité pour protéger l&apos;accès à votre capsule temporelle
+              </p>
+            </div>
+            <Switch
+              id="isLocked"
+              checked={isLocked}
+              disabled={!update}
+              onCheckedChange={(checked) => {
+                setIsLocked(checked);
+                setState((prev) => ({ ...prev, isLocked: checked }));
+                if (!checked) {
+                  setLockType(null);
+                  setState((prev) => ({
+                    ...prev,
+                    lockType: null,
+                    lockConfig: null,
+                  }));
+                }
               }}
-              capsule={capsule}
-              placeholder="Écrivez le contenu de votre capsule temporelle..."
             />
           </div>
-        </Field>
 
-        {/* Lock Toggle */}
-        <Field className="flex items-center gap-2">
-          <input
-            id="isLocked"
-            type="checkbox"
-            checked={isLocked}
-            disabled={!update}
-            onChange={(e) => {
-              setIsLocked(e.target.checked);
-              setState((prev) => ({ ...prev, isLocked: e.target.checked }));
-              if (!e.target.checked) {
-                setLockType(null);
-                setState((prev) => ({
-                  ...prev,
-                  lockType: null,
-                  lockConfig: null,
-                }));
-              }
-            }}
-            className="h-4 w-4"
-          />
-          <Label htmlFor="isLocked" className="cursor-pointer">
-            🔒 Capsule verrouillée
-          </Label>
-        </Field>
-
-        {/* Lock Type Selector */}
-        {isLocked && (
-          <Field>
-            <Label htmlFor="lockType">Type de verrouillage</Label>
-            <Select
-              value={lockType || ""}
-              onValueChange={(value) => {
-                setLockType(value as LockType);
-                setState((prev) => ({
-                  ...prev,
-                  lockType: value as LockType,
-                  lockConfig: null,
-                }));
-              }}
-              disabled={!update}
-            >
-              <SelectTrigger id="lockType">
-                <SelectValue placeholder="Sélectionner un type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="code">🔢 Code PIN</SelectItem>
-                <SelectItem value="voice">🎤 Reconnaissance vocale</SelectItem>
-                <SelectItem value="device_shake">
-                  📱 Secouer l&apos;appareil
-                </SelectItem>
-                <SelectItem value="device_tilt">
-                  📱 Incliner l&apos;appareil
-                </SelectItem>
-                <SelectItem value="device_tap">
-                  📱 Taper l&apos;appareil
-                </SelectItem>
-                <SelectItem value="time_based">⏰ Basé sur le temps</SelectItem>
-                <SelectItem value="api">🔗 API externe</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-        )}
-
-        {/* Lock Config Inputs */}
-        {isLocked && lockType === "code" && (
-          <>
-            <Field>
-              <FieldLabel htmlFor="lockCode">Code de déverrouillage</FieldLabel>
-              <Input
-                id="lockCode"
-                type="text"
-                placeholder="1234"
-                name="lockCode"
-                value={(state.lockConfig as any)?.code || ""}
-                {...(!update && { readOnly: true })}
-                {...(update && {
-                  onChange: (e) => {
+          {isLocked && (
+            <div className="space-y-4 pt-4 border-t">
+              <Field>
+                <FieldLabel htmlFor="lockType">Type de verrouillage</FieldLabel>
+                <FieldDescription>
+                  Choisissez le mécanisme qui déverrouillera la capsule
+                </FieldDescription>
+                <Select
+                  value={lockType || ""}
+                  onValueChange={(value) => {
+                    setLockType(value as LockType);
                     setState((prev) => ({
                       ...prev,
-                      lockConfig: {
-                        type: "code",
-                        code: e.target.value,
-                        attempts: (prev.lockConfig as any)?.attempts || 3,
-                      },
+                      lockType: value as LockType,
+                      lockConfig: null,
                     }));
-                  },
-                })}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="lockAttempts">
-                Nombre de tentatives
-              </FieldLabel>
-              <Input
-                id="lockAttempts"
-                type="number"
-                min="1"
-                max="10"
-                value={(state.lockConfig as any)?.attempts || 3}
-                name="lockAttempts"
-                {...(!update && { readOnly: true })}
-                {...(update && {
-                  onChange: (e) => {
-                    setState((prev) => ({
-                      ...prev,
-                      lockConfig: {
-                        type: "code",
-                        code: (prev.lockConfig as any)?.code || "",
-                        attempts: parseInt(e.target.value),
-                      },
-                    }));
-                  },
-                })}
-              />
-            </Field>
-          </>
-        )}
+                  }}
+                  disabled={!update}
+                >
+                  <SelectTrigger id="lockType">
+                    <SelectValue placeholder="Sélectionner un type de verrouillage" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="code">🔢 Code PIN</SelectItem>
+                    <SelectItem value="voice">🎤 Reconnaissance vocale</SelectItem>
+                    <SelectItem value="device_shake">📱 Secouer l&apos;appareil</SelectItem>
+                    <SelectItem value="device_tilt">📱 Incliner l&apos;appareil</SelectItem>
+                    <SelectItem value="device_tap">📱 Taper l&apos;appareil</SelectItem>
+                    <SelectItem value="time_based">⏰ Basé sur le temps</SelectItem>
+                    <SelectItem value="api">🔗 API externe</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-        {isLocked && lockType === "voice" && (
-          <>
-            <Field>
-              <FieldLabel htmlFor="voicePhrase">Phrase à prononcer</FieldLabel>
-              <Input
-                id="voicePhrase"
-                type="text"
-                placeholder="ouvre toi"
-                name="voicePhrase"
-                value={(state.lockConfig as any)?.phrase || ""}
-                {...(!update && { readOnly: true })}
-                {...(update && {
-                  onChange: (e) => {
-                    setState((prev) => ({
-                      ...prev,
-                      lockConfig: {
-                        type: "voice",
-                        phrase: e.target.value,
-                        language: (prev.lockConfig as any)?.language || "fr-FR",
-                      },
-                    }));
-                  },
-                })}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="voiceLanguage">Langue</FieldLabel>
-              <Input
-                id="voiceLanguage"
-                type="text"
-                placeholder="fr-FR"
-                value={(state.lockConfig as any)?.language || "fr-FR"}
-                name="voiceLanguage"
-                {...(!update && { readOnly: true })}
-                {...(update && {
-                  onChange: (e) => {
-                    setState((prev) => ({
-                      ...prev,
-                      lockConfig: {
-                        type: "voice",
-                        phrase: (prev.lockConfig as any)?.phrase || "",
-                        language: e.target.value,
-                      },
-                    }));
-                  },
-                })}
-              />
-            </Field>
-          </>
-        )}
+              {lockType && update && (
+                <Dialog open={isLockConfigOpen} onOpenChange={setIsLockConfigOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Configurer le verrouillage
+                    </Button>
+                  </DialogTrigger>
+                    <DialogContent className="sm:max-w-[525px]">
+                      <DialogHeader>
+                        <DialogTitle>Configuration du verrouillage</DialogTitle>
+                        <DialogDescription>
+                          Configurez les paramètres du type de verrouillage sélectionné
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        {lockType === "code" && (
+                          <>
+                            <Field>
+                              <FieldLabel htmlFor="lockCode">Code de déverrouillage</FieldLabel>
+                              <Input
+                                id="lockCode"
+                                type="text"
+                                placeholder="1234"
+                                name="lockCode"
+                                value={(state.lockConfig as any)?.code || ""}
+                                onChange={(e) => {
+                                  setState((prev) => ({
+                                    ...prev,
+                                    lockConfig: {
+                                      type: "code",
+                                      code: e.target.value,
+                                      attempts: (prev.lockConfig as any)?.attempts || 3,
+                                    },
+                                  }));
+                                }}
+                              />
+                            </Field>
+                            <Field>
+                              <FieldLabel htmlFor="lockAttempts">
+                                Nombre de tentatives
+                              </FieldLabel>
+                              <Input
+                                id="lockAttempts"
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={(state.lockConfig as any)?.attempts || 3}
+                                name="lockAttempts"
+                                onChange={(e) => {
+                                  setState((prev) => ({
+                                    ...prev,
+                                    lockConfig: {
+                                      type: "code",
+                                      code: (prev.lockConfig as any)?.code || "",
+                                      attempts: parseInt(e.target.value),
+                                    },
+                                  }));
+                                }}
+                              />
+                            </Field>
+                          </>
+                        )}
 
-        {isLocked &&
-          (lockType === "device_shake" ||
-            lockType === "device_tilt" ||
-            lockType === "device_tap") && (
-            <Field>
-              <FieldLabel htmlFor="deviceThreshold">
-                Seuil de détection
-              </FieldLabel>
-              <Input
-                id="deviceThreshold"
-                type="number"
-                min="1"
-                max="100"
-                step="0.1"
-                value={(state.lockConfig as any)?.threshold || 15}
-                name="deviceThreshold"
-                {...(!update && { readOnly: true })}
-                {...(update && {
-                  onChange: (e) => {
-                    setState((prev) => ({
-                      ...prev,
-                      lockConfig: {
-                        type: lockType as
-                          | "device_shake"
-                          | "device_tilt"
-                          | "device_tap",
-                        threshold: parseFloat(e.target.value),
-                      },
-                    }));
-                  },
-                })}
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Sensibilité de détection du geste (plus bas = plus sensible)
-              </p>
-            </Field>
-          )}
+                        {lockType === "voice" && (
+                          <>
+                            <Field>
+                              <FieldLabel htmlFor="voicePhrase">Phrase à prononcer</FieldLabel>
+                              <Input
+                                id="voicePhrase"
+                                type="text"
+                                placeholder="ouvre toi"
+                                name="voicePhrase"
+                                value={(state.lockConfig as any)?.phrase || ""}
+                                onChange={(e) => {
+                                  setState((prev) => ({
+                                    ...prev,
+                                    lockConfig: {
+                                      type: "voice",
+                                      phrase: e.target.value,
+                                      language: (prev.lockConfig as any)?.language || "fr-FR",
+                                    },
+                                  }));
+                                }}
+                                aria-describedby="voicePhrase-description"
+                              />
+                              <FieldDescription id="voicePhrase-description">
+                                La phrase exacte que l&apos;utilisateur devra prononcer pour déverrouiller
+                              </FieldDescription>
+                            </Field>
+                            <Field>
+                              <FieldLabel htmlFor="voiceLanguage">Langue</FieldLabel>
+                              <Input
+                                id="voiceLanguage"
+                                type="text"
+                                placeholder="fr-FR"
+                                value={(state.lockConfig as any)?.language || "fr-FR"}
+                                name="voiceLanguage"
+                                onChange={(e) => {
+                                  setState((prev) => ({
+                                    ...prev,
+                                    lockConfig: {
+                                      type: "voice",
+                                      phrase: (prev.lockConfig as any)?.phrase || "",
+                                      language: e.target.value,
+                                    },
+                                  }));
+                                }}
+                                aria-describedby="voiceLanguage-description"
+                              />
+                              <FieldDescription id="voiceLanguage-description">
+                                Code de langue BCP 47 (ex: fr-FR, en-US)
+                              </FieldDescription>
+                            </Field>
+                          </>
+                        )}
 
-        {isLocked && lockType === "time_based" && (
-          <Field>
-            <FieldLabel htmlFor="delayMinutes">Délai en minutes</FieldLabel>
-            <Input
-              id="delayMinutes"
-              type="number"
-              min="1"
-              placeholder="60"
-              value={(state.lockConfig as any)?.delayMinutes || ""}
-              name="delayMinutes"
-              {...(!update && { readOnly: true })}
-              {...(update && {
-                onChange: (e) => {
-                  setState((prev) => ({
-                    ...prev,
-                    lockConfig: {
-                      type: "time_based",
-                      delayMinutes: parseInt(e.target.value),
-                    },
-                  }));
-                },
-              })}
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Temps d&apos;attente après la date d&apos;ouverture
-            </p>
-          </Field>
-        )}
+                        {(lockType === "device_shake" ||
+                          lockType === "device_tilt" ||
+                          lockType === "device_tap") && (
+                          <Field>
+                            <FieldLabel htmlFor="deviceThreshold">
+                              Seuil de détection
+                            </FieldLabel>
+                            <Input
+                              id="deviceThreshold"
+                              type="number"
+                              min="1"
+                              max="100"
+                              step="0.1"
+                              value={(state.lockConfig as any)?.threshold || 15}
+                              name="deviceThreshold"
+                              onChange={(e) => {
+                                setState((prev) => ({
+                                  ...prev,
+                                  lockConfig: {
+                                    type: lockType as
+                                      | "device_shake"
+                                      | "device_tilt"
+                                      | "device_tap",
+                                    threshold: parseFloat(e.target.value),
+                                  },
+                                }));
+                              }}
+                              aria-describedby="deviceThreshold-description"
+                            />
+                            <FieldDescription id="deviceThreshold-description">
+                              Sensibilité de détection du geste (plus bas = plus sensible)
+                            </FieldDescription>
+                          </Field>
+                        )}
 
-        {isLocked && lockType === "api" && (
-          <>
-            <Field>
-              <FieldLabel htmlFor="apiEndpoint">URL de l&apos;API</FieldLabel>
-              <Input
-                id="apiEndpoint"
-                type="url"
-                placeholder="https://api.example.com/unlock"
-                name="apiEndpoint"
-                value={(state.lockConfig as any)?.endpoint || ""}
-                {...(!update && { readOnly: true })}
-                {...(update && {
-                  onChange: (e) => {
-                    setState((prev) => ({
-                      ...prev,
-                      lockConfig: {
-                        type: "api",
-                        endpoint: e.target.value,
-                        method: (prev.lockConfig as any)?.method || "POST",
-                      },
-                    }));
-                  },
-                })}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="apiMethod">Méthode HTTP</FieldLabel>
-              <Select
-                defaultValue="POST"
-                onValueChange={(value) => {
-                  setState((prev) => ({
-                    ...prev,
-                    lockConfig: {
-                      type: "api",
-                      endpoint: (prev.lockConfig as any)?.endpoint || "",
-                      method: value as "GET" | "POST",
-                    },
-                  }));
-                }}
-                disabled={!update}
-              >
-                <SelectTrigger id="apiMethod">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="GET">GET</SelectItem>
-                  <SelectItem value="POST">POST</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-          </>
-        )}
-        <Field className="max-w-lg">
-          <FieldLabel htmlFor="openingDate">Date d&apos;ouverture</FieldLabel>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !date && "text-muted-foreground"
+                        {lockType === "time_based" && (
+                          <Field>
+                            <FieldLabel htmlFor="delayMinutes">Délai en minutes</FieldLabel>
+                            <Input
+                              id="delayMinutes"
+                              type="number"
+                              min="1"
+                              placeholder="60"
+                              value={(state.lockConfig as any)?.delayMinutes || ""}
+                              name="delayMinutes"
+                              onChange={(e) => {
+                                setState((prev) => ({
+                                  ...prev,
+                                  lockConfig: {
+                                    type: "time_based",
+                                    delayMinutes: parseInt(e.target.value),
+                                  },
+                                }));
+                              }}
+                              aria-describedby="delayMinutes-description"
+                            />
+                            <FieldDescription id="delayMinutes-description">
+                              Temps d&apos;attente après la date d&apos;ouverture
+                            </FieldDescription>
+                          </Field>
+                        )}
+
+                        {lockType === "api" && (
+                          <>
+                            <Field>
+                              <FieldLabel htmlFor="apiEndpoint">URL de l&apos;API</FieldLabel>
+                              <Input
+                                id="apiEndpoint"
+                                type="url"
+                                placeholder="https://api.example.com/unlock"
+                                name="apiEndpoint"
+                                value={(state.lockConfig as any)?.endpoint || ""}
+                                onChange={(e) => {
+                                  setState((prev) => ({
+                                    ...prev,
+                                    lockConfig: {
+                                      type: "api",
+                                      endpoint: e.target.value,
+                                      method: (prev.lockConfig as any)?.method || "POST",
+                                    },
+                                  }));
+                                }}
+                                aria-describedby="apiEndpoint-description"
+                              />
+                              <FieldDescription id="apiEndpoint-description">
+                                L&apos;URL qui sera appelée pour vérifier le déverrouillage
+                              </FieldDescription>
+                            </Field>
+                            <Field>
+                              <FieldLabel htmlFor="apiMethod">Méthode HTTP</FieldLabel>
+                              <Select
+                                defaultValue="POST"
+                                onValueChange={(value) => {
+                                  setState((prev) => ({
+                                    ...prev,
+                                    lockConfig: {
+                                      type: "api",
+                                      endpoint: (prev.lockConfig as any)?.endpoint || "",
+                                      method: value as "GET" | "POST",
+                                    },
+                                  }));
+                                }}
+                              >
+                                <SelectTrigger id="apiMethod" aria-describedby="apiMethod-description">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="GET">GET</SelectItem>
+                                  <SelectItem value="POST">POST</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FieldDescription id="apiMethod-description">
+                                La méthode HTTP utilisée pour l&apos;appel
+                              </FieldDescription>
+                            </Field>
+                          </>
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" onClick={() => setIsLockConfigOpen(false)}>
+                          Fermer
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 )}
-                disabled={!update}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date ? format(date, "PPP") : <span>Pick a date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                disabled={!update}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </Field>
+              </div>
+            )}
+          </div>
+        
         {update && (
           <Field>
             <Button type="submit" disabled={isUpdating}>

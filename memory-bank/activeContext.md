@@ -1,11 +1,37 @@
 # Active Context
 
 ## Current Task
+✅ COMPLETED: Admin UI Accessibility Enhancements
+
+Successfully enhanced the accessibility of the admin capsule details form.
+
+## Recent Changes (Latest Session)
+- **Problem**: Admin capsule details form lacked proper semantic structure and ARIA attributes
+- **Solution**: Refactored `admin-capsule-details-page-client.tsx` to use accessible components and patterns
+
+### Code Changes
+1. **AdminCapsuleDetailsPageClient** (`apps/web/app/admin/capsules/[id]/admin-capsule-details-page-client.tsx`):
+   - Replaced generic `div`/`p` with `Field`, `FieldLabel`, `FieldDescription`
+   - Added `aria-describedby` to link inputs with their descriptions
+   - Added `role="region"` and `aria-label` to Tiptap editor container
+   - Grouped lock configuration fields in `FieldSet` with `FieldLegend`
+   - Added `aria-hidden="true"` to decorative icons
+   - Removed unused imports (`VideoProgressTracker`, `Label`)
+   - Standardized component usage (`FieldLabel` instead of `Label`)
+
+## What Works Now
+- ✅ Screen readers can associate help text with inputs
+- ✅ Tiptap editor is discoverable as a region
+- ✅ Lock configuration fields are semantically grouped
+- ✅ Decorative icons are hidden from assistive technology
+- ✅ Code is cleaner and more consistent
+
+## Previous Task
 ✅ COMPLETED: Capsule Video Processing Implementation
 
 Successfully implemented automatic video processing for capsule create/update operations.
 
-## Recent Changes (Latest Session)
+## Recent Changes (Previous Session)
 - **Problem**: Capsule uploads didn't trigger FFmpeg processing (files uploaded but never processed)
 - **Root Cause**: `CapsuleService.uploadAndSaveFile()` only uploaded files, didn't start processing
 - **Solution**: Enhanced `uploadAndSaveFile()` to trigger background video processing for video files

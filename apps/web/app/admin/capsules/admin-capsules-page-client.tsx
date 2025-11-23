@@ -105,7 +105,7 @@ function CreateCapsuleDialog() {
   const [date, setDate] = useState<Date>();
   const [formData, setFormData] = useState({
     openingMessage: "",
-    isLocked: true,
+    isLocked: false,
   });
   
   // Default empty Tiptap value (proper doc structure)
@@ -159,7 +159,7 @@ function CreateCapsuleDialog() {
           setDate(undefined);
           setFormData({
             openingMessage: "",
-            isLocked: true,
+            isLocked: false,
           });
         },
         // Error notification is handled by the hook

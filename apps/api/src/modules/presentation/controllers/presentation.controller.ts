@@ -101,7 +101,7 @@ export class PresentationController {
                 return await this.fileRangeService.streamVideo(
                     currentVideo.file.id,
                     headers.range,
-                    { maxChunkSize: 512000 }, // 500KB chunks
+                    { maxChunkSize: 5 * 1024 * 1024 }, // 5MB chunks
                 );
             } catch (error) {
                 console.error("[PresentationController] Error in getVideo:", error);

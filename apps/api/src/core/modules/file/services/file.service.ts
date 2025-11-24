@@ -263,6 +263,25 @@ export class FileService {
   }
 
   /**
+   * Check if a file exists on the filesystem
+   * 
+   * @param fileId - The file ID
+   * @returns True if file exists, false otherwise
+   */
+  async fileExists(fileId: string): Promise<boolean> {
+    try {
+      const file = await this.fileUploadRepository.getFileById(fileId);
+      if (!file.namespace || !file.storedFilename) {
+        return false;
+      }
+      const filePath = this.buildRelativePath(file.namespace, file.storedFilename);
+      return await this.storageProvider.exists(filePath);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Delete a file by its file ID
    * 
    * @param fileId - The file ID

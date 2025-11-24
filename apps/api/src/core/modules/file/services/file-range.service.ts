@@ -53,7 +53,7 @@ export class FileRangeService {
     rangeHeader?: string,
     options: { maxChunkSize?: number } = {},
   ): Promise<FileRangeResponse> {
-    const maxChunkSize = options.maxChunkSize ?? 512000; // Default 500KB
+    const maxChunkSize = options.maxChunkSize ?? 5 * 1024 * 1024; // Default 5MB
     
     // Get file metadata from FileService
     const file = await this.fileService.getFileById(fileId);
@@ -135,13 +135,13 @@ export class FileRangeService {
    * 
    * @param rangeHeader - Range header value (e.g., "bytes=0-499999")
    * @param fileSize - Total file size in bytes
-   * @param maxChunkSize - Maximum allowed chunk size (default 500KB)
+   * @param maxChunkSize - Maximum allowed chunk size (default 5mb)
    * @returns Parsed range with enforced limits, or null if invalid
    */
   parseRangeHeader(
     rangeHeader: string,
     fileSize: number,
-    maxChunkSize = 512000,
+    maxChunkSize = 5 * 1024 * 1024,
   ): RangeResult | null {
     // Parse "bytes=start-end" format
     const match = /^bytes=(\d+)-(\d*)$/.exec(rangeHeader);

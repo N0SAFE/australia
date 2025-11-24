@@ -373,7 +373,7 @@ getVideo(@Headers() headers: Record<string, string>) {
     return this.videoStreamService.streamVideo(
       currentVideo.file,
       headers.range,
-      { maxChunkSize: 512000 } // 500KB chunks
+      { maxChunkSize: 5 * 1024 * 1024 } // 5MB chunks
     );
   });
 }

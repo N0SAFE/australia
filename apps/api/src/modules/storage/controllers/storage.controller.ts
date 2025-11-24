@@ -228,6 +228,14 @@ export class StorageController {
                 });
             }
 
+            // Check if file exists before attempting to read
+            const fileExists = await this.fileService.fileExists(fileId);
+            if (!fileExists) {
+                throw new ORPCError("NOT_FOUND", {
+                    message: "Image file not found on filesystem",
+                });
+            }
+
             // Get file stream from FileService (supports any storage provider)
             const { buffer } = await this.fileService.getFileBuffer(fileId);
 
@@ -262,6 +270,14 @@ export class StorageController {
                 });
             }
 
+            // Check if file exists before attempting to read
+            const fileExists = await this.fileService.fileExists(fileId);
+            if (!fileExists) {
+                throw new ORPCError("NOT_FOUND", {
+                    message: "Audio file not found on filesystem",
+                });
+            }
+
             // Get file stream from FileService (supports any storage provider)
             const { buffer } = await this.fileService.getFileBuffer(fileId);
 
@@ -293,6 +309,14 @@ export class StorageController {
             if (!rawFile.namespace || !rawFile.storedFilename) {
                 throw new ORPCError("NOT_FOUND", {
                     message: "File metadata incomplete",
+                });
+            }
+
+            // Check if file exists before attempting to read
+            const fileExists = await this.fileService.fileExists(fileId);
+            if (!fileExists) {
+                throw new ORPCError("NOT_FOUND", {
+                    message: "File not found on filesystem",
                 });
             }
 
@@ -337,10 +361,25 @@ export class StorageController {
                 filename: video.filename,
             });
 
+            // Check if file exists before attempting to stream
+            try {
+                const fileExists = await this.fileService.fileExists(fileId);
+                if (!fileExists) {
+                    throw new ORPCError("NOT_FOUND", {
+                        message: "Video file not found on filesystem",
+                    });
+                }
+            } catch (error) {
+                // If error checking existence, also return 404
+                throw new ORPCError("NOT_FOUND", {
+                    message: "Video file not found on filesystem",
+                });
+            }
+
             return await this.fileRangeService.streamVideo(
                 fileId,
                 headers.range,
-                { maxChunkSize: 512000 } // 500KB chunks
+                { maxChunkSize: 5 * 1024 * 1024 } // 5MB chunks
             );
         });
     }

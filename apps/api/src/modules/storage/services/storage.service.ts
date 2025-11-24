@@ -177,7 +177,7 @@ export class StorageService {
     return await this.fileRangeService.streamVideo(
       fileId,
       rangeHeader,
-      { maxChunkSize: 512000 }, // 500KB chunks
+      { maxChunkSize: 5 * 1024 * 1024 }, // 5MB chunks
     );
   }
   
@@ -197,7 +197,7 @@ export class StorageService {
     return await this.fileRangeService.streamAudio(
       fileId,
       rangeHeader,
-      { maxChunkSize: 512000 }, // 500KB chunks
+      { maxChunkSize: 5 * 1024 * 1024 }, // 5MB chunks
     );
   }
   
@@ -217,7 +217,7 @@ export class StorageService {
     return await this.fileRangeService.streamFile(
       fileId,
       rangeHeader,
-      { maxChunkSize: 512000 }, // 500KB chunks
+      { maxChunkSize: 5 * 1024 * 1024 }, // 5MB chunks
     );
   }
 }

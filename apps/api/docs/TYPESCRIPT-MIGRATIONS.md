@@ -42,7 +42,7 @@ While SQL migrations are perfect for schema changes, sometimes you need more:
 Create a new file in `src/core/migration/migrations/`:
 
 ```typescript
-// 20241124120000_migrate_user_avatars.migration.ts
+// 0024_migrate_user_avatars.migration.ts
 import { Injectable } from '@nestjs/common';
 import { BaseMigration } from '../abstract/base-migration';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -53,7 +53,7 @@ import { eq } from 'drizzle-orm';
 
 @Injectable()
 export class MigrateUserAvatarsMigration extends BaseMigration {
-  readonly id = '20241124120000_migrate_user_avatars';
+  readonly id = '0024_migrate_user_avatars';
   readonly description = 'Migrate user avatars to new storage system';
 
   constructor(private readonly fileService: FileService) {
@@ -104,7 +104,7 @@ export class MigrateUserAvatarsMigration extends BaseMigration {
 Add your migration to `src/core/migration/migrations/index.ts`:
 
 ```typescript
-import { MigrateUserAvatarsMigration } from './20241124120000_migrate_user_avatars.migration';
+import { MigrateUserAvatarsMigration } from './0024_migrate_user_avatars.migration';
 
 export const MIGRATIONS: Type<Migration>[] = [
   ExampleDataTransformationMigration,
@@ -131,11 +131,11 @@ bun run api -- db:migrate --status
 
 ## Migration Naming Convention
 
-**Format**: `YYYYMMDDHHMMSS_description.migration.ts`
+**Format**: `XXXX_description.migration.ts`
 
 **Examples**:
-- `20241124120000_add_user_preferences.migration.ts`
-- `20241124153000_migrate_file_storage.migration.ts`
+- `0024_add_user_preferences.migration.ts`
+- `0025_migrate_file_storage.migration.ts`
 - `20241125080000_cleanup_orphaned_records.migration.ts`
 
 The timestamp ensures migrations run in chronological order.

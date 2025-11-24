@@ -23,7 +23,7 @@ import { sql } from 'drizzle-orm';
  */
 @Injectable()
 export class ExampleDataTransformationMigration extends BaseMigration {
-  readonly id = '20241124000000_example_data_transformation';
+  readonly id = '0021_example_data_transformation';
   readonly description = 'Example: Transform user data with complex logic';
 
   /**

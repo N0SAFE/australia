@@ -22,7 +22,7 @@ import { DatabaseService } from '@/core/modules/database/services/database.servi
  */
 @Injectable()
 export class ExampleWithServiceInjectionMigration extends BaseMigration {
-  readonly id = '20241124000001_example_with_service_injection';
+  readonly id = '0022_example_with_service_injection';
   readonly description = 'Example: Using NestJS services in migrations';
 
   constructor(

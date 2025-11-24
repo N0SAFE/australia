@@ -14,7 +14,7 @@ migration/
 │   └── migration.interface.ts     # Migration interface definition
 ├── migrations/
 │   ├── index.ts                   # Central registry of all migrations
-│   ├── 20241124000000_*.migration.ts  # Example migrations
+│   ├── 0021_*.migration.ts        # Example migrations
 │   └── ...                        # Your migrations here
 ├── services/
 │   └── migration-runner.service.ts    # Executes migrations
@@ -28,7 +28,7 @@ migration/
 ### 1. Create a New Migration
 
 ```typescript
-// src/core/migration/migrations/20241124120000_your_migration.migration.ts
+// src/core/migration/migrations/0024_your_migration.migration.ts
 import { Injectable } from '@nestjs/common';
 import { BaseMigration } from '../abstract/base-migration';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -36,7 +36,7 @@ import type * as schema from '@/config/drizzle/schema';
 
 @Injectable()
 export class YourMigration extends BaseMigration {
-  readonly id = '20241124120000_your_migration';
+  readonly id = '0024_your_migration';
   readonly description = 'What this migration does';
 
   // Inject any services you need
@@ -153,16 +153,22 @@ async up(db: NodePgDatabase<typeof schema>): Promise<void> {
 
 ## Migration Naming Convention
 
-**Format**: `YYYYMMDDHHMMSS_description.migration.ts`
+**Format**: `XXXX_description.migration.ts`
 
-- `YYYYMMDDHHMMSS`: Timestamp ensuring chronological order
+- `XXXX`: 4-digit index matching Drizzle SQL migration numbering
 - `description`: Brief description using snake_case
 - `.migration.ts`: Suffix identifying it as a migration
 
 **Examples**:
-- `20241124120000_add_user_preferences.migration.ts`
-- `20241124153000_migrate_file_storage.migration.ts`
-- `20241125080000_cleanup_orphaned_records.migration.ts`
+- `0021_add_user_preferences.migration.ts`
+- `0022_migrate_file_storage.migration.ts`
+- `0023_cleanup_orphaned_records.migration.ts`
+
+**Important**: TypeScript migrations use the same numbering scheme as SQL migrations and are executed in interleaved order:
+- `0020_fearless_gressill.sql` (SQL)
+- `0021_add_user_preferences.migration.ts` (TypeScript)
+- `0022_brave_hero.sql` (SQL)
+- `0023_migrate_files.migration.ts` (TypeScript)
 
 ## Common Patterns
 

@@ -80,7 +80,7 @@
     "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",
     "lodash.snakecase": "catalog:utils",
-    "lucide-react": "^0.552.0",
+    "lucide-react": "^0.554.0",
     "next": "16.0.1",
     "next-pwa": "^5.6.0",
     "nprogress": "catalog:web",

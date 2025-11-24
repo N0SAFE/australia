@@ -112,7 +112,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/lodash": "^4.17.20",
     "@types/lodash.snakecase": "catalog:utils",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "catalog:testing",

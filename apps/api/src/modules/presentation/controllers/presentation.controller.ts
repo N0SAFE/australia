@@ -5,6 +5,7 @@ import { PresentationService } from "../services/presentation.service";
 import { presentationContract } from "@repo/api-contracts";
 import { Headers } from "@nestjs/common";
 import { FileRangeService, FileService } from "@/core/modules/file";
+import { AllowAnonymous } from "@/core/modules/auth/decorators/decorators";
 
 @Controller()
 export class PresentationController {

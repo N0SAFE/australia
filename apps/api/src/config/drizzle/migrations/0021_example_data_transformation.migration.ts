@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BaseMigration } from '../abstract/base-migration';
+import { BaseMigration } from '../../../core/migration/abstract/base-migration';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '@/config/drizzle/schema';
 import { user } from '@/config/drizzle/schema';

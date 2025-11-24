@@ -4,6 +4,20 @@
 
 This directory contains the TypeScript-based migration system that complements Drizzle's SQL migrations with support for complex data transformations and business logic.
 
+**Key Feature:** TypeScript migrations are **automatically generated** alongside SQL migrations when you run `bun run api -- db:generate`. Both files share the same name and execute in sequence.
+
+## How It Works
+
+1. **Change your schema** in `src/config/drizzle/schema/`
+2. **Run `bun run api -- db:generate`**
+   - Creates SQL migration: `0024_brave_hero.sql`
+   - **Automatically creates** TS migration: `0024_brave_hero.migration.ts`
+   - Registers TS migration in the migrations index
+3. **Edit the TS file** to add your data transformation logic
+4. **Run `bun run api -- db:migrate`**
+   - Executes SQL migration (schema changes)
+   - Executes TS migration immediately after (data transformations)
+
 ## Structure
 
 ```
@@ -13,24 +27,44 @@ migration/
 ├── interfaces/
 │   └── migration.interface.ts     # Migration interface definition
 ├── migrations/
-│   ├── index.ts                   # Central registry of all migrations
-│   ├── 0021_*.migration.ts        # Example migrations
-│   └── ...                        # Your migrations here
+│   └── index.ts                   # Central registry (auto-updated)
 ├── services/
 │   └── migration-runner.service.ts    # Executes migrations
 ├── migration.module.ts            # NestJS module
-├── migration.registry.ts          # Migration registry service
-└── README.md                      # This file
+└── migration.registry.ts          # Migration registry service
+
+config/drizzle/migrations/
+├── 0020_fearless_gressill.sql     # SQL migrations
+├── 0021_example_data.migration.ts # TS migrations (same folder!)
+└── meta/                          # Drizzle metadata
 ```
 
 ## Quick Start
 
-### 1. Create a New Migration
+### 1. Generate a New Migration
+
+When you change your database schema, run:
+
+```bash
+bun run api -- db:generate
+```
+
+This command will:
+1. Generate the SQL migration file using Drizzle Kit
+2. **Automatically create a companion TypeScript migration file** with the same name
+3. Register the TypeScript migration in the migrations index
+
+The TypeScript file is created as a template at:
+`src/config/drizzle/migrations/XXXX_description.migration.ts`
+
+### 2. Implement Your Migration Logic
+
+Edit the generated TypeScript file:
 
 ```typescript
-// src/core/migration/migrations/0024_your_migration.migration.ts
+// src/config/drizzle/migrations/0024_your_migration.migration.ts
 import { Injectable } from '@nestjs/common';
-import { BaseMigration } from '../abstract/base-migration';
+import { BaseMigration } from '../../../core/migration/abstract/base-migration';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '@/config/drizzle/schema';
 
@@ -63,34 +97,33 @@ export class YourMigration extends BaseMigration {
 }
 ```
 
-### 2. Register Your Migration
+### 3. Automatic Registration
 
-Add it to `migrations/index.ts`:
+The migration is **automatically registered** in `src/core/migration/migrations/index.ts` by the generate script. You don't need to manually edit this file.
 
-```typescript
-import { YourMigration } from './20241124120000_your_migration.migration';
-
-export const MIGRATIONS: Type<Migration>[] = [
-  ExampleDataTransformationMigration,
-  ExampleWithServiceInjectionMigration,
-  YourMigration, // Add here
-];
-```
-
-### 3. Run Migrations
+### 4. Run Migrations
 
 ```bash
-# Run all migrations (SQL + TypeScript)
+# Run all migrations (SQL + TypeScript in interleaved order)
 bun run api -- db:migrate
 
 # Check migration status
 bun run api -- db:migrate --status
+```
 
-# Run only TypeScript migrations
-bun run api -- db:migrate --ts-only
+**Migration Execution Order:**
 
-# Run only SQL migrations
-bun run api -- db:migrate --sql-only
+When you run migrations, they execute in interleaved order based on their index:
+1. SQL migration runs first (schema changes)
+2. TypeScript migration runs immediately after (data transformations)
+
+Example:
+```
+0020_fearless_gressill.sql       ✅ (schema change)
+0021_brave_hero.sql              ✅ (schema change)
+0021_brave_hero.migration.ts     ✅ (data transformation)
+0022_epic_saga.sql               ✅ (schema change)
+0022_epic_saga.migration.ts      ✅ (data transformation)
 ```
 
 ## Key Features

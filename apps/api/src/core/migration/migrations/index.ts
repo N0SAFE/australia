@@ -1,17 +1,20 @@
 /**
  * Central registry of all TypeScript migrations.
  * 
+ * TypeScript migrations are now stored in src/config/drizzle/migrations/
+ * alongside SQL migrations. They use the same naming convention.
+ * 
  * To add a new migration:
- * 1. Create a new file in this directory: XXXX_description.migration.ts
- *    where XXXX is a 4-digit index (same format as Drizzle SQL migrations)
- * 2. Extend BaseMigration and implement up() method
- * 3. Add the migration class to the MIGRATIONS array below
- * 4. The migration will be automatically registered and run in interleaved order with SQL migrations
+ * 1. Run: bun run api -- db:generate
+ *    This creates both SQL and TypeScript migration files automatically
+ * 2. Edit the generated .migration.ts file
+ * 3. The migration will be automatically registered here by the generate script
+ * 4. Run: bun run api -- db:migrate
  * 
  * Migration naming convention:
- * - Format: XXXX_description.migration.ts
- * - Example: 0021_add_user_preferences.migration.ts, 0022_migrate_files.migration.ts
- * - The 4-digit index must match the Drizzle migration numbering
+ * - Format: XXXX_description.migration.ts (same as SQL: XXXX_description.sql)
+ * - Example: 0021_add_user_preferences.migration.ts
+ * - The 4-digit index is assigned by Drizzle
  * - Migrations are executed in order: SQL and TS are interleaved based on index
  * 
  * Example order:
@@ -24,13 +27,13 @@
 import { Type } from '@nestjs/common';
 import { Migration } from '../interfaces/migration.interface';
 
-// Import all migrations here
-import { ExampleDataTransformationMigration } from './0021_example_data_transformation.migration';
-import { ExampleWithServiceInjectionMigration } from './0022_example_with_service_injection.migration';
+// Import all migrations from drizzle migrations folder
+import { ExampleDataTransformationMigration } from '../../../config/drizzle/migrations/0021_example_data_transformation.migration';
+import { ExampleWithServiceInjectionMigration } from '../../../config/drizzle/migrations/0022_example_with_service_injection.migration';
 
 /**
  * List of all TypeScript migrations.
- * Add new migrations to this array.
+ * New migrations are automatically added here by the generate script.
  */
 export const MIGRATIONS: Type<Migration>[] = [
   ExampleDataTransformationMigration,

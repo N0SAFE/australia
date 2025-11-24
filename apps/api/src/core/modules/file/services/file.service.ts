@@ -1,6 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { ReadStream } from 'fs';
 import { LazyFile } from '@mjackson/lazy-file';
+import { lookup } from 'mime-types';
 import type { IStorageProvider, StreamOptions } from '../interfaces/storage-provider.interface';
 import { FileUploadRepository } from '../repositories/file-upload.repository';
 
@@ -54,11 +55,19 @@ export class FileService {
     namespace: string[];
     storedFilename: string;
   }> {
+    // Ensure MIME type is never empty - detect from extension if needed
+    let mimeType = file.type;
+    if (!mimeType || mimeType.trim() === '') {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      mimeType = lookup(ext ?? '') || 'application/octet-stream';
+      console.warn(`[FileService] Empty MIME type for ${file.name}, detected: ${mimeType}`);
+    }
+
     // Step 1: Create placeholder database record to get fileId
     const fileRecord = await this.fileUploadRepository.createPlaceholderFile({
       type,
       filename: file.name,
-      mimeType: file.type,
+      mimeType,
       size: file.size,
       uploadedBy,
     });
@@ -89,7 +98,7 @@ export class FileService {
       fileId: fileRecord.id,
       filename: file.name,
       size: file.size,
-      mimeType: file.type,
+      mimeType, // Use the corrected mimeType, not file.type
       filePath, // Computed path (not stored in database)
       absolutePath,
       namespace,

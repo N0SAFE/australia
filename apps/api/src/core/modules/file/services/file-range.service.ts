@@ -58,7 +58,29 @@ export class FileRangeService {
     // Get file metadata from FileService
     const file = await this.fileService.getFileById(fileId);
     const fileSize = file.size;
-    const mimeType = file.mimeType;
+    
+    // Fix empty MIME type - detect from filename or use default
+    let mimeType = file.mimeType;
+    if (!mimeType || mimeType.trim() === '') {
+      // Detect from filename extension
+      const ext = file.filename.split('.').pop()?.toLowerCase();
+      const mimeTypeMap: Record<string, string> = {
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'ogg': 'video/ogg',
+        'mov': 'video/quicktime',
+        'avi': 'video/x-msvideo',
+        'mp3': 'audio/mpeg',
+        'wav': 'audio/wav',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'pdf': 'application/pdf',
+      };
+      mimeType = ext ? (mimeTypeMap[ext] || 'application/octet-stream') : 'application/octet-stream';
+      console.log('[FileRangeService] Empty MIME type detected, using fallback:', mimeType);
+    }
 
     console.log('[FileRangeService] File size:', fileSize, 'MIME:', mimeType);
     console.log('[FileRangeService] Range header:', rangeHeader);
@@ -195,11 +217,14 @@ export class FileRangeService {
     mimeType: string,
     contentLength: number,
   ): Record<string, string> {
+    // Ensure content-type is never empty (critical for HTTP/2)
+    const contentType = mimeType && mimeType.trim() !== '' ? mimeType : 'application/octet-stream';
+    
     return {
       'content-range': `bytes ${start.toString()}-${end.toString()}/${totalSize.toString()}`,
       'accept-ranges': 'bytes',
       'content-length': contentLength.toString(),
-      'content-type': mimeType,
+      'content-type': contentType,
       'cache-control': 'public, max-age=3600',
     };
   }
@@ -212,10 +237,13 @@ export class FileRangeService {
     fileSize: number,
     mimeType: string,
   ): Record<string, string> {
+    // Ensure content-type is never empty (critical for HTTP/2)
+    const contentType = mimeType && mimeType.trim() !== '' ? mimeType : 'application/octet-stream';
+    
     return {
       'accept-ranges': 'bytes',
       'content-length': fileSize.toString(),
-      'content-type': mimeType,
+      'content-type': contentType,
       'cache-control': 'public, max-age=3600',
     };
   }

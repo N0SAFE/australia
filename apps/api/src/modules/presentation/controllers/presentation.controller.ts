@@ -88,7 +88,7 @@ export class PresentationController {
     @Implement(presentationContract.getVideo)
     @AllowAnonymous()
     getVideo(@Headers() headers: Record<string, string>) {
-        return implement(presentationContract.getVideo).handler(async () => {
+        return implement(presentationContract.getVideo).handler(async ({ context }) => {
             try {
                 const currentVideo = await this.presentationService.getCurrentVideo();
 
@@ -114,6 +114,22 @@ export class PresentationController {
                 
                 console.log('[PresentationController] Response status:', result.status);
                 console.log('[PresentationController] Response headers:', JSON.stringify(result.headers));
+                
+                // CRITICAL: Set HTTP response headers explicitly via request context
+                // ORPC with outputStructure: "detailed" doesn't automatically set HTTP headers
+                const request = (context as any).request;
+                if (request?.res && result.headers) {
+                    Object.entries(result.headers).forEach(([key, value]) => {
+                        if (value) {
+                            request.res.setHeader(key, value);
+                        }
+                    });
+                }
+                
+                // Set status code if provided
+                if (request?.res && result.status) {
+                    request.res.status(result.status);
+                }
                 
                 return result;
             } catch (error) {

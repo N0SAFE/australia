@@ -9,7 +9,6 @@ import { UserModule } from "./modules/user/user.module";
 import { CapsuleModule } from "./modules/capsule/capsule.module";
 import { InvitationModule } from "./modules/invitation/invitation.module";
 import { onError, ORPCModule } from "@orpc/nest";
-import { ResponseHeadersPlugin } from "@orpc/server/plugins";
 import { DATABASE_CONNECTION } from "./core/modules/database/database-connection";
 import { AuthModule } from "./core/modules/auth/auth.module";
 import { LoggerMiddleware } from "./core/middlewares/logger.middleware";
@@ -52,9 +51,6 @@ import { EventsModule } from "./core/modules/events/events.module";
               JSON.stringify(error)
             );
           })
-        ],
-        plugins: [
-          new ResponseHeadersPlugin(),
         ],
         context: { request },
         eventIteratorKeepAliveInterval: 5000, // 5 seconds

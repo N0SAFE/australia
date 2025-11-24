@@ -5,8 +5,6 @@ import { PresentationService } from "../services/presentation.service";
 import { presentationContract } from "@repo/api-contracts";
 import { Headers } from "@nestjs/common";
 import { FileRangeService, FileService } from "@/core/modules/file";
-import type { ResponseHeadersPluginContext } from "@orpc/server/plugins";
-import { AllowAnonymous } from "@/core/modules/auth/decorators/decorators";
 
 @Controller()
 export class PresentationController {
@@ -89,7 +87,7 @@ export class PresentationController {
     @Implement(presentationContract.getVideo)
     @AllowAnonymous()
     getVideo(@Headers() headers: Record<string, string>) {
-        return implement(presentationContract.getVideo).handler(async ({ context }: { context: ResponseHeadersPluginContext }) => {
+        return implement(presentationContract.getVideo).handler(async () => {
             try {
                 const currentVideo = await this.presentationService.getCurrentVideo();
 
@@ -115,16 +113,6 @@ export class PresentationController {
                 
                 console.log('[PresentationController] Response status:', result.status);
                 console.log('[PresentationController] Response headers:', JSON.stringify(result.headers));
-                
-                // CRITICAL: Set HTTP response headers using ORPC ResponseHeadersPlugin
-                // The resHeaders object is injected by ResponseHeadersPlugin
-                if (result.headers && context.resHeaders) {
-                    Object.entries(result.headers).forEach(([key, value]) => {
-                        if (value && context.resHeaders) {
-                            context.resHeaders.set(key, value);
-                        }
-                    });
-                }
                 
                 return result;
             } catch (error) {

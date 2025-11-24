@@ -60,16 +60,22 @@ export class FileRangeService {
     const fileSize = file.size;
     const mimeType = file.mimeType;
 
+    console.log('[FileRangeService] File size:', fileSize, 'MIME:', mimeType);
+    console.log('[FileRangeService] Range header:', rangeHeader);
+
     // Handle Range requests
     if (rangeHeader) {
       const rangeResult = this.parseRangeHeader(rangeHeader, fileSize, maxChunkSize);
       
       if (!rangeResult) {
         // Invalid range - return 416 Range Not Satisfiable
+        console.error('[FileRangeService] Invalid range header:', rangeHeader);
         throw new Error(`Invalid range: ${rangeHeader}`);
       }
 
       const { start, end, contentLength } = rangeResult;
+      
+      console.log('[FileRangeService] Parsed range:', { start, end, contentLength });
       
       // Create stream with range
       const lazyFile = await this.fileService.createLazyFile(fileId, {
@@ -79,6 +85,8 @@ export class FileRangeService {
 
       // Build Range response headers
       const headers = this.buildRangeHeaders(start, end, fileSize, mimeType, contentLength);
+      
+      console.log('[FileRangeService] Returning 206 with headers:', headers);
 
       return {
         status: 206, // Partial Content
@@ -88,6 +96,7 @@ export class FileRangeService {
     }
 
     // No Range header - return full file
+    console.log('[FileRangeService] No range header, returning full file');
     const lazyFile = await this.fileService.createLazyFile(fileId);
     const headers = this.buildFullFileHeaders(fileSize, mimeType);
 
@@ -177,6 +186,7 @@ export class FileRangeService {
 
   /**
    * Build headers for Range response (206 Partial Content)
+   * Note: All header values must be strings for HTTP/2 compatibility
    */
   buildRangeHeaders(
     start: number,
@@ -186,26 +196,27 @@ export class FileRangeService {
     contentLength: number,
   ): Record<string, string> {
     return {
-      'Content-Range': `bytes ${start.toString()}-${end.toString()}/${totalSize.toString()}`,
-      'Accept-Ranges': 'bytes',
-      'Content-Length': contentLength.toString(),
-      'Content-Type': mimeType,
-      'Cache-Control': 'public, max-age=3600',
+      'content-range': `bytes ${start.toString()}-${end.toString()}/${totalSize.toString()}`,
+      'accept-ranges': 'bytes',
+      'content-length': contentLength.toString(),
+      'content-type': mimeType,
+      'cache-control': 'public, max-age=3600',
     };
   }
 
   /**
    * Build headers for full file response (200 OK)
+   * Note: All header values must be strings for HTTP/2 compatibility
    */
   buildFullFileHeaders(
     fileSize: number,
     mimeType: string,
   ): Record<string, string> {
     return {
-      'Accept-Ranges': 'bytes',
-      'Content-Length': fileSize.toString(),
-      'Content-Type': mimeType,
-      'Cache-Control': 'public, max-age=3600',
+      'accept-ranges': 'bytes',
+      'content-length': fileSize.toString(),
+      'content-type': mimeType,
+      'cache-control': 'public, max-age=3600',
     };
   }
 }

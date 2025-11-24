@@ -96,13 +96,24 @@ export class PresentationController {
                     });
                 }
 
+                // Get Range header (case-insensitive)
+                const rangeHeader = headers.range || headers.Range;
+                
+                console.log('[PresentationController] Range header:', rangeHeader);
+                console.log('[PresentationController] All headers:', JSON.stringify(headers));
+
                 // Stream video using FileRangeService (all Range logic handled there)
                 // Pass fileId directly - FileRangeService handles file retrieval
-                return await this.fileRangeService.streamVideo(
+                const result = await this.fileRangeService.streamVideo(
                     currentVideo.file.id,
-                    headers.range,
+                    rangeHeader,
                     { maxChunkSize: 5 * 1024 * 1024 }, // 5MB chunks
                 );
+                
+                console.log('[PresentationController] Response status:', result.status);
+                console.log('[PresentationController] Response headers:', JSON.stringify(result.headers));
+                
+                return result;
             } catch (error) {
                 console.error("[PresentationController] Error in getVideo:", error);
                 if (error instanceof ORPCError) {

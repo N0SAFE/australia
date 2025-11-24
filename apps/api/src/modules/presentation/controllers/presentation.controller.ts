@@ -5,6 +5,7 @@ import { PresentationService } from "../services/presentation.service";
 import { presentationContract } from "@repo/api-contracts";
 import { Headers } from "@nestjs/common";
 import { FileRangeService, FileService } from "@/core/modules/file";
+import { AllowAnonymous } from "@/core/modules/auth/decorators/decorators";
 
 @Controller()
 export class PresentationController {
@@ -85,6 +86,7 @@ export class PresentationController {
      * Delegates to FileRangeService for all streaming logic
      */
     @Implement(presentationContract.getVideo)
+    @AllowAnonymous()
     getVideo(@Headers() headers: Record<string, string>) {
         return implement(presentationContract.getVideo).handler(async () => {
             try {

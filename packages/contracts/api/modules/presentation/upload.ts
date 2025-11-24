@@ -9,7 +9,6 @@ export const presentationUploadInput = z.object({
 export const presentationUploadOutput = z.object({
   id: z.string(),
   filename: z.string(),
-  filePath: z.string(),
   mimeType: z.string(),
   size: z.coerce.number(),
   duration: z.coerce.number().nullable(),

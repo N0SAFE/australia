@@ -154,11 +154,13 @@ export class UserRepository {
                 image: user.image,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
+                role: user.role,
                 invitationStatus: sql<string | null>`
                     CASE 
                         WHEN ${invite.usedAt} IS NOT NULL THEN 'accepted'
                         WHEN ${invite.expiresAt} < NOW() THEN 'expired'
                         WHEN ${invite.token} IS NOT NULL THEN 'pending'
+                        WHEN ${user.emailVerified} = TRUE THEN 'accepted'
                         ELSE NULL
                     END
                 `.as('invitation_status'),
@@ -210,8 +212,9 @@ export class UserRepository {
                     email: inv.email,
                     emailVerified: false,
                     image: null,
-                    createdAt: inv.createdAt,
-                    updatedAt: inv.createdAt,
+                    createdAt: inv.createdAt ?? new Date(),
+                    updatedAt: inv.createdAt ?? new Date(),
+                    role: null,
                     invitationStatus: status,
                     invitationToken: inv.token,
                 };
@@ -230,8 +233,15 @@ export class UserRepository {
 
         return {
             users: paginatedRecords.map(u => ({
-                ...this.transformUser(u),
-                invitationStatus: u.invitationStatus,
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                emailVerified: u.emailVerified,
+                image: u.image,
+                createdAt: u.createdAt.toISOString(),
+                updatedAt: u.updatedAt.toISOString(),
+                role: u.role,
+                invitationStatus: u.invitationStatus as 'pending' | 'accepted' | 'expired' | null,
                 invitationToken: u.invitationToken,
             })),
             meta: {

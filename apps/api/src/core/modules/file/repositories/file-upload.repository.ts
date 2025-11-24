@@ -60,15 +60,15 @@ export class FileUploadRepository {
       contentId = metadata.id;
     }
     
-    // Create file entry with placeholder path (will be updated after save)
+    // Create file entry with placeholder values (will be updated after save)
     const [fileEntry] = await db
       .insert(file)
       .values({
         type: data.type,
         contentId,
-        filePath: 'pending', // Temporary - will be updated
+        namespace: '', // Will be set when file is saved
         filename: data.filename,
-        storedFilename: 'pending', // Temporary - will be updated
+        storedFilename: 'pending', // Will be set to fileId.ext when saved
         mimeType: data.mimeType,
         size: data.size,
         extension: data.filename.split('.').pop() ?? '',
@@ -81,18 +81,18 @@ export class FileUploadRepository {
   }
 
   /**
-   * Update file paths after physical file has been saved
+   * Update file metadata after physical file has been saved
    */
-  async updateFilePaths(fileId: string, paths: {
-    filePath: string;
+  async updateFileMetadata(fileId: string, metadata: {
+    namespace: string;
     storedFilename: string;
   }) {
     const db = this.databaseService.db;
     await db
       .update(file)
       .set({
-        filePath: paths.filePath,
-        storedFilename: paths.storedFilename,
+        namespace: metadata.namespace,
+        storedFilename: metadata.storedFilename,
       })
       .where(eq(file.id, fileId));
   }
@@ -133,7 +133,109 @@ export class FileUploadRepository {
   }
 
   /**
+   * Get image metadata by file ID
+   */
+  async getImageByFileId(fileId: string) {
+    const db = this.databaseService.db;
+    const [fileRecord] = await db
+      .select()
+      .from(file)
+      .where(eq(file.id, fileId));
+
+    if (!fileRecord || fileRecord.type !== 'image') {
+      return null;
+    }
+
+    const [imageMetadata] = await db
+      .select()
+      .from(imageFile)
+      .where(eq(imageFile.id, fileRecord.contentId));
+
+    return {
+      file: fileRecord,
+      imageMetadata,
+    };
+  }
+
+  /**
+   * Get audio metadata by file ID
+   */
+  async getAudioByFileId(fileId: string) {
+    const db = this.databaseService.db;
+    const [fileRecord] = await db
+      .select()
+      .from(file)
+      .where(eq(file.id, fileId));
+
+    if (!fileRecord || fileRecord.type !== 'audio') {
+      return null;
+    }
+
+    const [audioMetadata] = await db
+      .select()
+      .from(audioFile)
+      .where(eq(audioFile.id, fileRecord.contentId));
+
+    return {
+      file: fileRecord,
+      audioMetadata,
+    };
+  }
+
+  /**
+   * Get raw file metadata by file ID
+   */
+  async getRawFileByFileId(fileId: string) {
+    const db = this.databaseService.db;
+    const [fileRecord] = await db
+      .select()
+      .from(file)
+      .where(eq(file.id, fileId));
+
+    if (!fileRecord || fileRecord.type !== 'raw') {
+      return null;
+    }
+
+    const [rawMetadata] = await db
+      .select()
+      .from(rawFile)
+      .where(eq(rawFile.id, fileRecord.contentId));
+
+    return {
+      file: fileRecord,
+      rawMetadata,
+    };
+  }
+
+  /**
+   * Get video with file metadata by file ID
+   * Returns null if not found or if file is not a video
+   */
+  async getVideoByFileId(fileId: string) {
+    const db = this.databaseService.db;
+    const [fileRecord] = await db
+      .select()
+      .from(file)
+      .where(eq(file.id, fileId));
+
+    if (!fileRecord || fileRecord.type !== 'video') {
+      return null;
+    }
+
+    const [videoMetadata] = await db
+      .select()
+      .from(videoFile)
+      .where(eq(videoFile.id, fileRecord.contentId));
+
+    return {
+      file: fileRecord,
+      videoMetadata,
+    };
+  }
+
+  /**
    * Update video processing status
+   * Note: File paths are now computed from namespace + storedFilename, not stored
    */
   async updateVideoProcessingStatus(
     videoId: string,
@@ -141,9 +243,7 @@ export class FileUploadRepository {
       isProcessed: boolean;
       processingProgress?: number;
       processingError?: string;
-    },
-    fileId?: string,
-    newFilePath?: string
+    }
   ) {
     const db = this.databaseService.db;
     
@@ -156,15 +256,5 @@ export class FileUploadRepository {
         processingError: status.processingError,
       })
       .where(eq(videoFile.id, videoId));
-
-    // Update file path if provided (when video was converted)
-    if (fileId && newFilePath) {
-      await db
-        .update(file)
-        .set({
-          filePath: newFilePath,
-        })
-        .where(eq(file.id, fileId));
-    }
   }
 }

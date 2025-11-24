@@ -35,6 +35,7 @@
     "cli-cursor": "^5"
   },
   "dependencies": {
+    "@mjackson/lazy-file": "^3.4.0",
     "@nestjs/common": "catalog:api:nest",
     "@nestjs/config": "catalog:api:nest",
     "@nestjs/core": "catalog:api:nest",
@@ -51,6 +52,7 @@
     "@repo/auth": "*",
     "@repo/env": "*",
     "@scalar/nestjs-api-reference": "catalog:api:nest",
+    "@types/mime-types": "^3.0.1",
     "@types/multer": "^2.0.0",
     "@vitest/coverage-istanbul": "catalog:testing",
     "bcrypt": "catalog:database",
@@ -62,6 +64,7 @@
     "express": "catalog:api:nest",
     "express-list-routes": "catalog:api:nest",
     "fluent-ffmpeg": "^2.1.3",
+    "mime-types": "^3.0.2",
     "multer": "^2.0.2",
     "nanoid": "catalog:database",
     "nest-commander": "catalog:api:nest",

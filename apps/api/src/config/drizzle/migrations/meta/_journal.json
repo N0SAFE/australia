@@ -134,6 +134,13 @@
       "when": 1763843715014,
       "tag": "0018_narrow_next_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1763991386704,
+      "tag": "0019_bent_ultragirl",
+      "breakpoints": true
     }
   ]
 }

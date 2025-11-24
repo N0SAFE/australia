@@ -3,12 +3,12 @@ import { PresentationService } from './services/presentation.service';
 import { PresentationRepository } from './repositories/presentation.repository';
 import { PresentationController } from './controllers/presentation.controller';
 import { PresentationEventService } from './events/presentation.event';
-import { FileUploadModule } from '@/core/modules/file-upload/file-upload.module';
 import { VideoProcessingModule } from '@/core/modules/video-processing';
+import { FileModule } from '@/core/modules/file';
 
 @Module({
   imports: [
-    FileUploadModule,
+    FileModule, // Unified file module (replaces deprecated FileUploadModule)
     VideoProcessingModule,
   ],
   providers: [PresentationService, PresentationRepository, PresentationEventService],

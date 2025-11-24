@@ -18,7 +18,6 @@ import * as UserRegisterRoute from "@/app/(user)/register/page.info";
 import * as UnlockRoute from "@/app/(user)/unlock/page.info";
 import * as AdminRoute from "@/app/admin/page.info";
 import * as AdminCapsulesRoute from "@/app/admin/capsules/page.info";
-import * as AdminCapsulesIdRoute from "@/app/admin/capsules/[id]/page.info";
 import * as AdminCapsulesIdEditRoute from "@/app/admin/capsules/[id]/edit/page.info";
 import * as AdminPresentationRoute from "@/app/admin/presentation/page.info";
 import * as AdminUsersRoute from "@/app/admin/users/page.info";
@@ -111,13 +110,6 @@ export const AdminCapsules = makeRoute(
   {
     ...defaultInfo,
     ...AdminCapsulesRoute.Route
-  }
-);
-export const AdminCapsulesId = makeRoute(
-  "/admin/capsules/[id]",
-  {
-    ...defaultInfo,
-    ...AdminCapsulesIdRoute.Route
   }
 );
 export const AdminCapsulesIdEdit = makeRoute(

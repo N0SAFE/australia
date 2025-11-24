@@ -21,9 +21,10 @@ export const file = pgTable("file", {
   contentId: uuid("content_id").notNull(), // References the specific type table (imageFile.id, videoFile.id, etc.)
   
   // File system information
-  filePath: text("file_path").notNull().unique(), // Relative path from uploads directory
+  // NOTE: filePath is computed from namespace + storedFilename via storage provider
+  namespace: text("namespace").notNull(), // Namespace path (e.g., 'capsule/video', 'storage')
   filename: text("filename").notNull(), // Original filename
-  storedFilename: text("stored_filename").notNull(), // Filename on disk (may be different from original)
+  storedFilename: text("stored_filename").notNull(), // Filename on disk (fileId.ext)
   
   // Generic file metadata
   mimeType: text("mime_type").notNull(),
@@ -135,14 +136,14 @@ export const imageFile = pgTable("image_file", {
   thumbnailLargePath: text("thumbnail_large_path"),
   
   // Image variants (different sizes/formats)
-  variants: jsonb("variants").$type<Array<{
+  variants: jsonb("variants").$type<{
     size: string; // e.g., 'small', 'medium', 'large', '1920x1080'
     path: string;
     width: number;
     height: number;
     format: string;
     fileSize: number;
-  }>>(),
+  }[]>(),
   
   // Accessibility
   altText: text("alt_text"),

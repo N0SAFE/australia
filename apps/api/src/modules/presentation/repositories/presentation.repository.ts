@@ -129,7 +129,8 @@ export class PresentationRepository {
       id: row.presentation.id,
       fileId: row.file.id,
       isProcessed: row.video.isProcessed,
-      filePath: row.file.filePath,
+      namespace: row.file.namespace,
+      storedFilename: row.file.storedFilename,
       filename: row.file.filename,
     }));
   }
@@ -137,7 +138,7 @@ export class PresentationRepository {
   /**
    * Get video file ID for processing
    * Since presentation uses singleton pattern, videoId should be 'singleton'
-   * Returns the fileId which can be used with FileUploadService
+   * Returns the fileId which can be used with FileService
    */
   async getVideoFileId(videoId: string): Promise<string> {
     const db = this.databaseService.db;
@@ -157,20 +158,20 @@ export class PresentationRepository {
 
   /**
    * Get video file path for processing (DEPRECATED)
-   * This method should not be used - use FileUploadService.getFileAbsolutePath(fileId) instead
+   * This method should not be used - use FileService.getFileAbsolutePath(fileId) instead
    * Kept for backward compatibility during transition
-   * @deprecated Use FileUploadService.getFileAbsolutePath() instead
+   * @deprecated Use FileService.getFileAbsolutePath() instead
    */
   getVideoFilePath(_videoId: string): Promise<string> {
     throw new Error(
-      'getVideoFilePath is deprecated. Use getVideoFileId() and FileUploadService.getFileAbsolutePath() instead'
+      'getVideoFilePath is deprecated. Use getVideoFileId() and FileService.getFileAbsolutePath() instead'
     );
   }
 
   /**
    * Update video processing status
    * Now updates the videoFile table via the file relationship
-   * Note: This should ideally be done through FileUploadService
+   * Note: This should ideally be done through FileService
    */
   async updateVideoProcessingStatus(
     videoId: string,

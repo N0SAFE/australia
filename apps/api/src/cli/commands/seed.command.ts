@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { AuthService } from '@/core/modules/auth/services/auth.service';
 import { DatabaseService } from '@/core/modules/database/services/database.service';
 import { EnvService } from '@/config/env/env.service';
-import { FileMetadataService } from '@/modules/storage/services/file-metadata.service';
+import { FileService } from '@/core/modules/file/services/file.service';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -28,7 +28,7 @@ function addDays(date: Date, days: number): Date {
 // Helper function to upload a seed asset file using the FileMetadataService
 // Returns the fileId for use in strategy.meta.contentMediaId
 async function uploadSeedAsset(
-  fileMetadataService: FileMetadataService,
+  fileService: FileService,
   assetFilename: string,
   type: 'image' | 'video' | 'audio',
   uploadedById?: string
@@ -71,51 +71,23 @@ async function uploadSeedAsset(
     const uniqueSuffix = `${String(Date.now())}-${String(Math.round(Math.random() * 1e9))}`;
     const storedFilename = `${type}-${uniqueSuffix}${ext}`;
     
-    // Build paths
-    const relativePath = fileMetadataService.buildRelativePath(mimeType, storedFilename);
-    const absoluteFilePath = path.join(process.cwd(), 'uploads', relativePath.replace(/^\//, ''));
-    
-    // Ensure directory exists
-    await fs.mkdir(path.dirname(absoluteFilePath), { recursive: true });
-    
-    // Write file to destination
-    await fs.writeFile(absoluteFilePath, buffer);
-    
     // Create File object from buffer
     const file = new File([buffer], assetFilename, { type: mimeType });
     
     // Register in database using appropriate method
     let dbResult;
     if (type === 'image') {
-      dbResult = await fileMetadataService.createImageFile({
-        file,
-        filePath: relativePath,
-        absoluteFilePath,
-        storedFilename,
-        uploadedBy: uploadedById,
-      });
+      dbResult = await fileService.uploadImage(file, ['seed', 'assets'], uploadedById);
     } else if (type === 'video') {
-      dbResult = await fileMetadataService.createVideoFile({
-        file,
-        filePath: relativePath,
-        absoluteFilePath,
-        storedFilename,
-        uploadedBy: uploadedById,
-      });
+      dbResult = await fileService.uploadVideo(file, ['seed', 'assets'], uploadedById);
     } else {
-      dbResult = await fileMetadataService.createAudioFile({
-        file,
-        filePath: relativePath,
-        absoluteFilePath,
-        storedFilename,
-        uploadedBy: uploadedById,
-      });
+      dbResult = await fileService.uploadAudio(file, ['seed', 'assets'], uploadedById);
     }
     
-    console.log(`✅ Uploaded ${type} as: ${storedFilename} (File ID: ${dbResult.file.id})`);
+    console.log(`✅ Uploaded ${type} as: ${dbResult.storedFilename} (File ID: ${dbResult.fileId})`);
 
     // Return the fileId for use in meta
-    return dbResult.file.id;
+    return dbResult.fileId;
   } catch (error) {
     console.error(`❌ Failed to upload ${type} asset ${assetFilename}:`, error);
     throw error;
@@ -132,7 +104,7 @@ export class SeedCommand extends CommandRunner {
     private readonly databaseService: DatabaseService,
 		private readonly authService: AuthService,
     private readonly envService: EnvService,
-    private readonly fileMetadataService: FileMetadataService,
+    private readonly fileService: FileService,
   ) {
     super();
   }
@@ -265,9 +237,9 @@ export class SeedCommand extends CommandRunner {
 
       // 1. TEXT CONTENT WITH FILE LINKS - Past opening date (already unlocked AND opened)
       // Upload seed files for demonstration
-      const demoImage = await uploadSeedAsset(this.fileMetadataService, 'mountain-sunset.jpg', 'image', defaultAdminResult.user.id);
-      const demoVideo = await uploadSeedAsset(this.fileMetadataService, 'big-buck-bunny.mp4', 'video', defaultAdminResult.user.id);
-      const demoAudio = await uploadSeedAsset(this.fileMetadataService, 'soundhelix-song-1.mp3', 'audio', defaultAdminResult.user.id);
+      const demoImage = await uploadSeedAsset(this.fileService, 'mountain-sunset.jpg', 'image', defaultAdminResult.user.id);
+      const demoVideo = await uploadSeedAsset(this.fileService, 'big-buck-bunny.mp4', 'video', defaultAdminResult.user.id);
+      const demoAudio = await uploadSeedAsset(this.fileService, 'soundhelix-song-1.mp3', 'audio', defaultAdminResult.user.id);
       
       // Generate contentMediaIds for each media item
       const demoImageContentId = randomUUID();
@@ -471,7 +443,7 @@ export class SeedCommand extends CommandRunner {
       });
 
       // 1d. PAST CAPSULE - Was locked, unlocked but not opened
-      const pastImagePath = await uploadSeedAsset(this.fileMetadataService, 'forest-trail.jpg', 'image', defaultAdminResult.user.id);
+      const pastImagePath = await uploadSeedAsset(this.fileService, 'forest-trail.jpg', 'image', defaultAdminResult.user.id);
       const pastImageContentId = randomUUID();
       const capsule1dId = randomUUID();
       
@@ -528,7 +500,7 @@ export class SeedCommand extends CommandRunner {
       );
 
       // 2. IMAGE CONTENT - Locked with CODE (simple)
-      const image1Path = await uploadSeedAsset(this.fileMetadataService, 'mountain-sunset.jpg', 'image', defaultAdminResult.user.id);
+      const image1Path = await uploadSeedAsset(this.fileService, 'mountain-sunset.jpg', 'image', defaultAdminResult.user.id);
       const image1ContentId = randomUUID();
       const capsule2Id = randomUUID();
       
@@ -570,7 +542,7 @@ export class SeedCommand extends CommandRunner {
       );
 
       // 3. VIDEO CONTENT - Locked with VOICE
-      const video1Path = await uploadSeedAsset(this.fileMetadataService, 'big-buck-bunny.mp4', 'video', defaultAdminResult.user.id);
+      const video1Path = await uploadSeedAsset(this.fileService, 'big-buck-bunny.mp4', 'video', defaultAdminResult.user.id);
       const video1ContentId = randomUUID();
       const capsule3Id = randomUUID();
       
@@ -614,7 +586,7 @@ export class SeedCommand extends CommandRunner {
       );
 
       // 4. AUDIO CONTENT - Locked with DEVICE_SHAKE
-      const audio1Path = await uploadSeedAsset(this.fileMetadataService, 'soundhelix-song-1.mp3', 'audio', defaultAdminResult.user.id);
+      const audio1Path = await uploadSeedAsset(this.fileService, 'soundhelix-song-1.mp3', 'audio', defaultAdminResult.user.id);
       const audio1ContentId = randomUUID();
       const capsule4Id = randomUUID();
       
@@ -704,7 +676,7 @@ export class SeedCommand extends CommandRunner {
       });
 
       // 6. IMAGE CONTENT - Locked with DEVICE_TAP
-      const image2Path = await uploadSeedAsset(this.fileMetadataService, 'forest-trail.jpg', 'image', defaultAdminResult.user.id);
+      const image2Path = await uploadSeedAsset(this.fileService, 'forest-trail.jpg', 'image', defaultAdminResult.user.id);
       const image2ContentId = randomUUID();
       const capsule6Id = randomUUID();
       
@@ -747,7 +719,7 @@ export class SeedCommand extends CommandRunner {
       );
 
       // 7. VIDEO CONTENT - Locked with API
-      const video2Path = await uploadSeedAsset(this.fileMetadataService, 'elephants-dream.mp4', 'video', defaultAdminResult.user.id);
+      const video2Path = await uploadSeedAsset(this.fileService, 'elephants-dream.mp4', 'video', defaultAdminResult.user.id);
       const video2ContentId = randomUUID();
       const capsule7Id = randomUUID();
       
@@ -788,7 +760,7 @@ export class SeedCommand extends CommandRunner {
       );
 
       // 8. AUDIO CONTENT - No lock, future opening
-      const audio2Path = await uploadSeedAsset(this.fileMetadataService, 'soundhelix-song-2.mp3', 'audio', defaultAdminResult.user.id);
+      const audio2Path = await uploadSeedAsset(this.fileService, 'soundhelix-song-2.mp3', 'audio', defaultAdminResult.user.id);
       const audio2ContentId = randomUUID();
       const capsule8Id = randomUUID();
       
@@ -878,7 +850,7 @@ export class SeedCommand extends CommandRunner {
       });
 
       // 10. IMAGE CONTENT - Opening today, no lock
-      const image3Path = await uploadSeedAsset(this.fileMetadataService, 'ocean-waves.jpg', 'image', defaultAdminResult.user.id);
+      const image3Path = await uploadSeedAsset(this.fileService, 'ocean-waves.jpg', 'image', defaultAdminResult.user.id);
       const image3ContentId = randomUUID();
       const capsule10Id = randomUUID();
       
@@ -963,7 +935,7 @@ export class SeedCommand extends CommandRunner {
       });
 
       // 12. VIDEO CONTENT - Far future, no lock
-      const video3Path = await uploadSeedAsset(this.fileMetadataService, 'for-bigger-blazes.mp4', 'video', defaultAdminResult.user.id);
+      const video3Path = await uploadSeedAsset(this.fileService, 'for-bigger-blazes.mp4', 'video', defaultAdminResult.user.id);
       const video3ContentId = randomUUID();
       const capsule12Id = randomUUID();
       

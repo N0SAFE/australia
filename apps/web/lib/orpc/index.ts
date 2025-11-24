@@ -1,5 +1,9 @@
 import { ClientLink, createORPCClient, InferClientContext } from "@orpc/client";
-import { type AppContract, appContract } from "@repo/api-contracts";
+import {
+  type AppContract,
+  appContract,
+  capsuleCreateInput,
+} from "@repo/api-contracts";
 import { OpenAPILink } from "@orpc/openapi-client/fetch";
 import { ContractRouterClient } from "@orpc/contract";
 import { validateEnvPath } from "#/env";
@@ -9,12 +13,7 @@ import { MasterTokenPlugin } from "./plugins/masterTokenClient";
 import { CookieHeadersPlugin } from "./plugins/cookie-headers-plugin";
 import { RedirectOnUnauthorizedPlugin } from "./plugins/redirect-on-unauthorized-plugin";
 import { StandardLinkPlugin } from "@orpc/client/standard";
-import { FileUploadOpenAPILink } from "./file-upload-link";
-
-const APP_URL = validateEnvPath(
-  process.env.NEXT_PUBLIC_APP_URL ?? "",
-  "NEXT_PUBLIC_APP_URL",
-);
+import { FileUploadOpenAPILink, WithFileUploadsClient } from "./links/file-upload-link";
 
 const Plugins = [
   new CookieHeadersPlugin(),
@@ -29,7 +28,11 @@ type PluginsContext = {
   >
     ? C
     : never;
-}[number] extends infer U ? (U extends unknown ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never : never;
+}[number] extends infer U
+  ? (U extends unknown ? (k: U) => void : never) extends (k: infer I) => void
+    ? I
+    : never
+  : never;
 
 export function createORPCClientWithCookies() {
   // Use FileUploadOpenAPILink instead of OpenAPILink to handle file uploads with progress
@@ -54,7 +57,7 @@ export function createORPCClientWithCookies() {
         },
       });
     },
-    plugins: Plugins
+    plugins: Plugins,
   });
 
   const client =
@@ -65,12 +68,16 @@ export function createORPCClientWithCookies() {
       >
     >(link);
 
-  return client;
+  // Apply the type transformation to add FileUploadContext to routes with file inputs
+  return client as WithFileUploadsClient<typeof client>;
 }
 
 // Create TanStack Query utils directly from the client
 // File upload progress tracking is now handled at the Link level (FileUploadOpenAPILink)
 // This is the correct ORPC architecture pattern
-export const orpc = createTanstackQueryUtils(createORPCClientWithCookies());
+// The WithFileUploadsClient type transformation ensures onProgress is available in context
+export const orpc = createTanstackQueryUtils(
+  createORPCClientWithCookies(),
+);
 
 export type Context = PluginsContext;

@@ -1,6 +1,9 @@
 'use client';
 
 import React, { createContext, useContext } from 'react';
+import { getPath } from '@/lib/orpc/utils/getPath';
+import { appContract } from '@repo/api-contracts';
+import { validateEnvPath } from '#/env';
 
 /**
  * Attached media metadata from capsule API responses
@@ -85,8 +88,29 @@ export function useResolveMediaUrl(): (contentMediaId: string | undefined) => st
       return null;
     }
     
-    // Return full URL for the file
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    return `${apiUrl}/storage/files/${media.filePath}`;
+    // Return full URL for the file using getPath
+    const apiUrl = validateEnvPath(
+      process.env.NEXT_PUBLIC_API_URL ?? '',
+      'NEXT_PUBLIC_API_URL'
+    );
+    
+    // Map media type to appropriate contract
+    const contractMap = {
+      image: appContract.storage.getImage,
+      video: appContract.storage.getVideo,
+      audio: appContract.storage.getAudio,
+    };
+    
+    const contract = contractMap[media.type];
+    if (!contract) {
+      console.warn(`Unknown media type: ${media.type}`);
+      return null;
+    }
+    
+    return getPath(
+      contract,
+      { fileId: media.fileId },
+      { baseURL: apiUrl }
+    );
   }, [attachedMedia]);
 }

@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import type { ReadStream } from 'fs';
 import { PresentationRepository } from "../repositories/presentation.repository";
-import { FileUploadService } from "@/core/modules/file-upload/services/file-upload.service";
+import { FileService } from "@/core/modules/file";
 import { VideoProcessingService } from "@/core/modules/video-processing";
 import { PresentationEventService } from "../events/presentation.event";
 
@@ -10,7 +11,7 @@ export class PresentationService {
 
     constructor(
         private readonly presentationRepository: PresentationRepository,
-        private readonly fileUploadService: FileUploadService,
+        private readonly fileService: FileService,
         private readonly videoProcessingService: VideoProcessingService,
         private readonly presentationEventService: PresentationEventService
     ) {}
@@ -19,8 +20,8 @@ export class PresentationService {
      * Upload or replace presentation video
      */
     async uploadVideo(file: File) {
-        // Upload file using FileUploadService with namespace ['presentation', 'video']
-        const uploadResult = await this.fileUploadService.uploadFile(
+        // Upload file using FileService with namespace ['presentation', 'video']
+        const uploadResult = await this.fileService.uploadFile(
             file,
             ["presentation", "video"],
             "video",
@@ -35,8 +36,8 @@ export class PresentationService {
         // Delete old file if exists
         if (currentVideo?.fileId) {
             try {
-                // Use FileUploadService's deleteFile method (by fileId)
-                await this.fileUploadService.deleteFile(currentVideo.fileId);
+                // Use FileService's deleteFile method (by fileId)
+                await this.fileService.deleteFile(currentVideo.fileId);
                 this.logger.log(`Deleted old video: ${currentVideo.fileId}`);
             } catch (error: unknown) {
                 // Ignore deletion errors - continue with upload
@@ -52,7 +53,7 @@ export class PresentationService {
         });
 
         // Get absolute file path for processing (internal use only)
-        const absolutePath = await this.fileUploadService.getAbsoluteFilePath(uploadResult.fileId);
+        const absolutePath = await this.fileService.getAbsoluteFilePath(uploadResult.fileId);
 
         // Start processing in background with abort strategy (don't await)
         this.presentationEventService
@@ -161,8 +162,8 @@ export class PresentationService {
             throw new Error("Video is already processed");
         }
 
-        // Get absolute file path from FileUploadService
-        const absolutePath = await this.fileUploadService.getAbsoluteFilePath(fileRecord.id);
+        // Get absolute file path from FileService
+        const absolutePath = await this.fileService.getAbsoluteFilePath(fileRecord.id);
 
         // Start processing in background with abort strategy (don't await)
         this.presentationEventService
@@ -309,7 +310,7 @@ export class PresentationService {
             ...result.presentation,
             file: result.file,
             video: result.video,
-            url: `/api/presentation/video/stream`, // Stream endpoint
+            url: `/presentation/video`, // Stream endpoint (matches ORPC contract path)
         };
     }
 
@@ -323,8 +324,8 @@ export class PresentationService {
             throw new NotFoundException("No presentation video found");
         }
 
-        // Delete file from storage using FileUploadService (by fileId)
-        await this.fileUploadService.deleteFile(result.file.id);
+        // Delete file from storage using FileService (by fileId)
+        await this.fileService.deleteFile(result.file.id);
 
         // Delete from database (cascade will handle file table)
         await this.presentationRepository.delete();
@@ -332,10 +333,10 @@ export class PresentationService {
 
     /**
      * Get video stream for serving
-     * Returns the file stream from FileUploadService
+     * Returns the file stream from FileService
      */
     async getVideoStream(): Promise<{
-        stream: ReadableStream;
+        stream: ReadStream;
         filename: string;
         mimeType: string;
         size: number;
@@ -346,7 +347,14 @@ export class PresentationService {
             throw new NotFoundException("No presentation video found");
         }
 
-        // Get file stream from FileUploadService using the fileId
-        return this.fileUploadService.getFileStream(result.file.id);
+        // Get file stream from FileService using the fileId
+        return this.fileService.getFileStream(result.file.id);
+    }
+
+    /**
+     * Get absolute file path for the video file
+     */
+    async getAbsoluteFilePath(fileId: string): Promise<string> {
+        return this.fileService.getAbsoluteFilePath(fileId);
     }
 }

@@ -86,6 +86,9 @@ export class UserController {
                         image: user.image,
                         createdAt: user.createdAt,
                         updatedAt: user.updatedAt,
+                        role: user.role ?? null,
+                        invitationStatus: (user.invitationStatus as 'pending' | 'accepted' | 'expired' | null) ?? null,
+                        invitationToken: user.invitationToken ?? null,
                     })),
                 meta: result.meta,
             };

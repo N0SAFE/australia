@@ -7,7 +7,9 @@ import { Upload, Video, Trash2, Loader2, AlertCircle, CheckCircle, XCircle } fro
 import { toast } from 'sonner';
 import { orpc } from '@/lib/orpc';
 import { useQuery } from '@tanstack/react-query';
-import { getApiUrl } from '@/lib/api-url';
+import { getPath } from '@/lib/orpc/utils/getPath';
+import { appContract } from '@repo/api-contracts';
+import { validateEnvPath } from '#/env';
 import { Progress } from '@repo/ui/components/shadcn/progress';
 import { useUploadPresentation, useSubscribeProcessingProgress } from '@/hooks/presentation/hooks';
 
@@ -105,7 +107,7 @@ export function AdminPresentationClient() {
   
   // Log and display processing errors
   useEffect(() => {
-    if (processingError) {
+    if (processingError) {  
       console.error('Processing progress error:', processingError);
       console.error('Error details:', JSON.stringify(processingError, null, 2));
       toast.error(`Processing error: ${processingError.message || 'Unknown error'}`);
@@ -346,7 +348,12 @@ export function AdminPresentationClient() {
                   controls
                   muted
                   className="w-full rounded-lg shadow-lg"
-                  src={getApiUrl('/presentation/video')}
+                  src={getPath(appContract.presentation.getVideo, {}, {
+                    baseURL: validateEnvPath(
+                      process.env.NEXT_PUBLIC_API_URL ?? '',
+                      'NEXT_PUBLIC_API_URL'
+                    )
+                  })}
                 >
                   Your browser does not support the video tag.
                 </video>

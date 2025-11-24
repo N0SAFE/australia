@@ -1,13 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DatabaseService } from "../../../core/modules/database/services/database.service";
 import { StorageEventService } from "@/modules/storage/events/storage.event";
+import { FileService } from "@/core/modules/file/services/file.service";
 import { capsule } from "@/config/drizzle/schema/capsule";
 import { capsuleMedia } from "@/config/drizzle/schema/capsule-media";
 import { file } from "@/config/drizzle/schema/file";
 import { imageFile } from "@/config/drizzle/schema/file";
 import { videoFile } from "@/config/drizzle/schema/file";
 import { audioFile } from "@/config/drizzle/schema/file";
-import { eq, desc, asc, count, and, SQL, gte, lt, lte, inArray, isNull, not } from "drizzle-orm";
+import { eq, desc, asc, count, and, SQL, gte, lt, lte, inArray } from "drizzle-orm";
 import { capsuleCreateInput, capsuleUpdateInput, capsuleListInput, capsuleFindByIdOutput } from "@repo/api-contracts";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -25,6 +26,7 @@ export class CapsuleRepository {
     constructor(
         private readonly databaseService: DatabaseService,
         private readonly storageEventService: StorageEventService,
+        private readonly fileService: FileService,
     ) {}
 
     /**
@@ -60,7 +62,7 @@ export class CapsuleRepository {
                     contentMediaId: mediaRecord.contentMediaId,
                     type: mediaRecord.type,
                     fileId: f.id,
-                    filePath: f.filePath,
+                    filePath: this.fileService.buildRelativePathFromFile(f),
                     filename: f.filename,
                     mimeType: f.mimeType,
                     size: f.size,

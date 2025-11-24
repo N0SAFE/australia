@@ -6,7 +6,9 @@ import { useRef, useState, useEffect } from 'react'
 import { UserAppLayoutHome } from '@/routes'
 import { useQuery } from '@tanstack/react-query'
 import { orpc } from '@/lib/orpc'
-import { getApiUrl } from '@/lib/api-url'
+import { getPath } from '@/lib/orpc/utils/getPath'
+import { appContract } from '@repo/api-contracts'
+import { validateEnvPath } from '#/env'
 
 export default function PresentationPage() {
   const router = useRouter()
@@ -123,7 +125,12 @@ export default function PresentationPage() {
         playsInline
         onEnded={handleVideoEnd}
         controls={true}
-        src={getApiUrl('/presentation/video')}
+        src={getPath(appContract.presentation.getVideo, {}, {
+          baseURL: validateEnvPath(
+            process.env.NEXT_PUBLIC_API_URL ?? '',
+            'NEXT_PUBLIC_API_URL'
+          )
+        })}
       >
         Your browser does not support the video tag.
       </video>

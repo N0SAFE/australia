@@ -1,14 +1,12 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { CapsuleRepository, type GetCapsulesInput } from '../repositories/capsule.repository';
 import type { User } from '@repo/auth';
-import { FileMetadataService } from '@/modules/storage/services/file-metadata.service';
-import { StorageService } from '@/modules/storage/services/storage.service';
+import { FileService } from '@/core/modules/file/services/file.service';
 import { StorageEventService } from '@/modules/storage/events/storage.event';
 import { VideoProcessingService } from '@/core/modules/video-processing/services/video-processing.service';
 import { DatabaseService } from '@/core/modules/database/services/database.service';
 import { capsuleMedia } from '@/config/drizzle/schema/capsule-media';
 import { capsule as capsuleTable } from '@/config/drizzle/schema/capsule';
-import { file as fileTable } from '@/config/drizzle/schema/file';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { capsuleCreateInput, capsuleUpdateInput } from '@repo/api-contracts';
@@ -24,8 +22,7 @@ export class CapsuleService {
 
   constructor(
     private readonly capsuleRepository: CapsuleRepository,
-    private readonly fileMetadataService: FileMetadataService,
-    private readonly storageService: StorageService,
+    private readonly fileService: FileService,
     private readonly storageEventService: StorageEventService,
     private readonly videoProcessingService: VideoProcessingService,
     private readonly databaseService: DatabaseService,
@@ -35,6 +32,7 @@ export class CapsuleService {
   /**
    * Upload a file, save to database, and create capsuleMedia junction record
    * For video files, this also triggers video processing in the background
+   * Uses core FileService for integrated DB + filesystem operations
    */
   private async uploadAndSaveFile(
     file: File,
@@ -43,61 +41,38 @@ export class CapsuleService {
     capsuleId: string,
     order: number
   ): Promise<string> {
-    // Extract file extension from original filename
-    const ext = file.name.split('.').pop() ?? 'bin';
+    // Use core FileService for integrated upload (DB + filesystem in one operation)
+    let result: { fileId: string; filename: string; size: number; mimeType: string; filePath: string; absolutePath: string; namespace: string[]; storedFilename: string };
     
-    // First create database entry to get the file ID
-    let dbResult: { file: { id: string } };
-    const feature = 'capsules'; // Feature-based organization
-    
-    // Create database record (without file path yet)
-    // The file path will be determined by: {feature}/{fileId}.{ext}
+    // Upload file using core FileService with 'capsules' namespace
     switch (type) {
       case 'image':
-        dbResult = await this.fileMetadataService.createImageFile({
+        result = await this.fileService.uploadImage(
           file,
-          filePath: `${feature}/${file.name}`, // Temporary, will be updated
-          absoluteFilePath: '', // Temporary
-          storedFilename: file.name, // Use original name for now
-        });
+          ['capsules'],
+          undefined // uploadedBy - optional for capsule uploads
+        );
         break;
       
       case 'video':
-        dbResult = await this.fileMetadataService.createVideoFile({
+        result = await this.fileService.uploadVideo(
           file,
-          filePath: `${feature}/${file.name}`, // Temporary, will be updated
-          absoluteFilePath: '', // Temporary
-          storedFilename: file.name, // Use original name for now
-        });
+          ['capsules'],
+          undefined // uploadedBy - optional for capsule uploads
+        );
         break;
       
       case 'audio':
-        dbResult = await this.fileMetadataService.createAudioFile({
+        result = await this.fileService.uploadAudio(
           file,
-          filePath: `${feature}/${file.name}`, // Temporary, will be updated
-          absoluteFilePath: '', // Temporary
-          storedFilename: file.name, // Use original name for now
-        });
+          ['capsules'],
+          undefined // uploadedBy - optional for capsule uploads
+        );
         break;
     }
 
-    const fileId = dbResult.file.id;
-    
-    // Now save file to disk using the fileId as filename
-    const absolutePath = await this.storageService.saveFile(file, fileId, feature, ext);
-    
-    // Build relative path for database: capsules/{fileId}.{ext}
-    const storedFilename = `${fileId}.${ext}`;
-    const relativePath = `${feature}/${storedFilename}`;
-    
-    // Update database record with correct paths
-    await this.databaseService.db
-      .update(fileTable)
-      .set({
-        filePath: relativePath,
-        storedFilename: storedFilename,
-      })
-      .where(eq(fileTable.id, fileId));
+    const fileId = result.fileId;
+    const absolutePath = result.absolutePath;
 
     // Create capsuleMedia junction record
     await this.databaseService.db
@@ -115,7 +90,7 @@ export class CapsuleService {
       this.logger.log(`Starting video processing for capsule ${capsuleId}, fileId: ${fileId}`);
       
       // Get video metadata for processing
-      const videoResult = await this.fileMetadataService.getVideoByFileId(fileId);
+      const videoResult = await this.fileService.getVideoByFileId(fileId);
       if (!videoResult?.videoMetadata) {
         this.logger.error(`Failed to retrieve video metadata for fileId: ${fileId}`);
         return fileId;
@@ -141,15 +116,13 @@ export class CapsuleService {
             )
             .then(async (metadata) => {
               // SUCCESS: Update database to mark as processed
-              await this.fileMetadataService.updateVideoProcessingStatus(
+              await this.fileService.updateVideoProcessingStatus(
                 videoMetadataId,
                 {
                   isProcessed: true,
                   processingProgress: 100,
                   processingError: undefined,
-                },
-                fileId,
-                metadata.newFilePath
+                }
               );
 
               // Emit final completion event
@@ -179,14 +152,13 @@ export class CapsuleService {
               // FAILURE: Update database with error
               this.logger.error(`Video processing failed for capsule ${capsuleId}, fileId: ${fileId}: ${err.message}`);
               
-              await this.fileMetadataService.updateVideoProcessingStatus(
+              await this.fileService.updateVideoProcessingStatus(
                 videoMetadataId,
                 {
                   isProcessed: false,
                   processingProgress: 0,
                   processingError: err.message,
-                },
-                fileId
+                }
               );
 
               // Emit final completion event with error (without 'error' property)

@@ -1,11 +1,64 @@
 # Active Context
 
 ## Current Task
+✅ COMPLETED: Fixed Missing Invitation Status and Roles in Admin User Management UI
+
+Successfully resolved the issue where invitation status and user roles were not displaying in the admin user management table.
+
+## Recent Changes (Latest Session)
+- **Problem**: Admin user management UI was not showing invitation status or user roles
+- **Root Cause**: 
+  1. `UserRepository.findMany()` was fetching `role`, `invitationStatus`, and `invitationToken` from database
+  2. `UserController.list()` was NOT including these fields in the response mapping
+  3. Frontend UI component was trying to display `roles` (array) but API returned `role` (string)
+  4. **ADDITIONAL**: SQL CASE statement was returning `NULL` for users with verified emails but no invite record, causing "Active" status to not display
+
+### Code Changes
+1. **API Contract** (`packages/contracts/api/common/user.ts`):
+   - Added `role` field to `userSchema` with type `z.string().nullable().optional()`
+
+2. **UserRepository** (`apps/api/src/modules/user/repositories/user.repository.ts`):
+   - Already fetched `role` from user table and `invitationStatus`/`invitationToken` from join with invite table
+   - Added explicit type assertion for `invitationStatus` to match schema enum: `'pending' | 'accepted' | 'expired' | null`
+   - Fixed pending invitation records to use non-null dates (fallback to `new Date()`)
+   - **FIXED**: Updated SQL CASE statement to return `'accepted'` for users with `emailVerified = TRUE` but no invite record:
+     ```sql
+     CASE 
+         WHEN invite.usedAt IS NOT NULL THEN 'accepted'
+         WHEN invite.expiresAt < NOW() THEN 'expired'
+         WHEN invite.token IS NOT NULL THEN 'pending'
+         WHEN user.emailVerified = TRUE THEN 'accepted'  -- NEW LINE
+         ELSE NULL
+     END
+     ```
+
+3. **UserController** (`apps/api/src/modules/user/controllers/user.controller.ts`):
+   - Updated `list()` handler to include `role`, `invitationStatus`, and `invitationToken` in response
+   - Added type assertions to ensure proper type matching with contract schema
+
+4. **Frontend User Type** (`apps/web/types/user.ts`):
+   - Updated comment to reflect that `role` comes from API (not mock data)
+   - Added `'sarah'` to roles array type for backward compatibility
+
+5. **Admin UI Component** (`apps/web/app/admin/users/admin-users-page-client.tsx`):
+   - Changed column from `roles` (array accessor) to `role` (string accessor)
+   - Updated styling to handle single role display instead of array
+   - Added color coding for `sarah` role (purple badge)
+
+## What Works Now
+- ✅ Invitation status displays correctly (Pending/Active/Expired badges)
+- ✅ User roles display correctly (admin, sarah, user, content)
+- ✅ **Users with verified emails show "✓ Active" status** even without invite records
+- ✅ Copy invitation link button appears for pending invitations
+- ✅ Proper color coding for different roles and statuses
+- ✅ Type safety maintained throughout backend and frontend
+
+## Previous Task
 ✅ COMPLETED: Admin UI Accessibility Enhancements
 
 Successfully enhanced the accessibility of the admin capsule details form.
 
-## Recent Changes (Latest Session)
+## Previous Changes
 - **Problem**: Admin capsule details form lacked proper semantic structure and ARIA attributes
 - **Solution**: Refactored `admin-capsule-details-page-client.tsx` to use accessible components and patterns
 

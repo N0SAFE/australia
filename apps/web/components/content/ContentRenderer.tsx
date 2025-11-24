@@ -3,7 +3,9 @@
 import { FC, useMemo } from 'react';
 import { Capsule } from '@/types/capsule';
 import { SimpleViewer } from '@/components/tiptap/viewer';
-import { VideoProgressTracker } from '@/components/video-progress/VideoProgressTracker';
+import { getPath } from '@/lib/orpc/utils/getPath';
+import { appContract } from '@repo/api-contracts';
+import { validateEnvPath } from '#/env';
 
 // AttachedMedia type from API response
 type AttachedMedia = {
@@ -41,7 +43,10 @@ export const ContentRenderer: FC<{
   }, [capsule.content]);
 
   // Media URL resolution strategies using contentMediaId
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+  const API_URL = validateEnvPath(
+    process.env.NEXT_PUBLIC_API_URL ?? "",
+    "NEXT_PUBLIC_API_URL"
+  );
   
   console.log('🔵 [ContentRenderer] Attached media:', attachedMedia.length, attachedMedia);
   
@@ -56,7 +61,11 @@ export const ContentRenderer: FC<{
       console.warn('⚠️ Image not found for contentMediaId:', meta.contentMediaId);
       return "";
     }
-    const url = `${API_URL}/storage/image/${media.fileId}`;
+    const url = getPath(
+      appContract.storage.getImage,
+      { fileId: media.fileId },
+      { baseURL: API_URL }
+    );
     console.log('✅ [ContentRenderer] Image URL resolved:', url);
     return url;
   };
@@ -72,7 +81,11 @@ export const ContentRenderer: FC<{
       console.warn('⚠️ Video not found for contentMediaId:', meta.contentMediaId);
       return "";
     }
-    const url = `${API_URL}/storage/video/${media.fileId}`;
+    const url = getPath(
+      appContract.storage.getVideo,
+      { fileId: media.fileId },
+      { baseURL: API_URL }
+    );
     console.log('✅ [ContentRenderer] Video URL resolved:', url);
     return url;
   };
@@ -88,7 +101,11 @@ export const ContentRenderer: FC<{
       console.warn('⚠️ Audio not found for contentMediaId:', meta.contentMediaId);
       return "";
     }
-    const url = `${API_URL}/storage/audio/${media.fileId}`;
+    const url = getPath(
+      appContract.storage.getAudio,
+      { fileId: media.fileId },
+      { baseURL: API_URL }
+    );
     console.log('✅ [ContentRenderer] Audio URL resolved:', url);
     return url;
   };
@@ -104,7 +121,11 @@ export const ContentRenderer: FC<{
       console.warn('⚠️ File not found for contentMediaId:', meta.contentMediaId);
       return "";
     }
-    const url = `${API_URL}/storage/file/${media.fileId}`;
+    const url = getPath(
+      appContract.storage.getRawFile,
+      { fileId: media.fileId },
+      { baseURL: API_URL }
+    );
     console.log('✅ [ContentRenderer] File URL resolved:', url);
     return url;
   };
@@ -118,7 +139,6 @@ export const ContentRenderer: FC<{
       videoStrategy={videoStrategy}
       audioStrategy={audioStrategy}
       fileStrategy={fileStrategy}
-      VideoProgressComponent={VideoProgressTracker}
     />
   );
 };

@@ -3,7 +3,9 @@
 import { FC, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Capsule } from "@/types/capsule";
-import { VideoProgressTracker } from "@/components/video-progress/VideoProgressTracker";
+import { getPath } from "@/lib/orpc/utils/getPath";
+import { appContract } from "@repo/api-contracts";
+import { validateEnvPath } from "#/env";
 
 const SimpleEditor = dynamic(
   () =>
@@ -38,7 +40,10 @@ export const TipTapContentRenderer: FC<TipTapContentRendererProps> = ({
   placeholder = "Écrivez le contenu de votre capsule temporelle...",
   onEditorReady,
 }) => {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+  const API_URL = validateEnvPath(
+    process.env.NEXT_PUBLIC_API_URL ?? "",
+    "NEXT_PUBLIC_API_URL"
+  );
 
   /**
    * Resolve media URL based on strategy meta
@@ -65,7 +70,19 @@ export const TipTapContentRenderer: FC<TipTapContentRendererProps> = ({
       return "";
     }
     
-    const url = `${API_URL}/storage/${mediaType}/${media.fileId}`;
+    // Map media type to the correct contract
+    const contractMap = {
+      image: appContract.storage.getImage,
+      video: appContract.storage.getVideo,
+      audio: appContract.storage.getAudio,
+      file: appContract.storage.getRawFile,
+    };
+    
+    const url = getPath(
+      contractMap[mediaType],
+      { fileId: media.fileId },
+      { baseURL: API_URL }
+    );
     console.log(`✅ [${mediaType}] URL resolved:`, url);
     return url;
   }, [capsule?.attachedMedia, API_URL]);
@@ -143,7 +160,6 @@ export const TipTapContentRenderer: FC<TipTapContentRendererProps> = ({
     videoStrategy,
     audioStrategy,
     fileStrategy,
-    VideoProgressComponent: VideoProgressTracker,
   };
 
   if (mode === 'editor') {

@@ -10,7 +10,25 @@
 
 import { OpenAPILink } from "@orpc/openapi-client/fetch";
 import type { ContractRouter } from "@orpc/contract";
-import type { ClientContext, ClientOptions } from "@orpc/client";
+import type { ClientContext, ClientOptions, NestedClient, Client } from "@orpc/client";
+
+/**
+ * Progress event for file uploads
+ */
+export type FileUploadProgressEvent = {
+  loaded: number;
+  total: number;
+  percentage: number;
+  progress: number; // alias for percentage
+}
+
+/**
+ * Context extension for file upload routes
+ * This is merged with the existing ORPC context type
+ */
+export type FileUploadContext = {
+  onProgress?: (event: FileUploadProgressEvent) => void;
+}
 
 /**
  * Upload tracking registry
@@ -419,6 +437,38 @@ function containsFile(input: any): boolean {
 
   return Object.values(input).some(value => containsFile(value));
 }
+
+/**
+ * Type-level detection of File in TypeScript types
+ * Returns true if the type contains File at any level
+ * Note: This checks the INFERRED TypeScript type, not the Zod schema
+ */
+type HasFileInType<T> = T extends File
+  ? true
+  : T extends Array<infer Element>
+    ? HasFileInType<Element>
+    : T extends object
+      ? keyof T extends never
+        ? false // Empty object has no keys, no File
+        : true extends { [K in keyof T]: HasFileInType<T[K]> }[keyof T]
+          ? true
+          : false
+      : false;
+
+/**
+ * Transform a client type to extend context with FileUploadContext ONLY for routes with files
+ * Routes without files will NOT have FileUploadContext in their type
+ */
+export type WithFileUploadsClient<T extends NestedClient<any>> = 
+  T extends Client<infer UContext, infer UInput, infer UOutput, infer UError>
+    ? HasFileInType<UInput> extends true
+      ? Client<UContext & FileUploadContext, UInput, UOutput, UError>
+      : Client<UContext, UInput, UOutput, UError>
+    : {
+        [K in keyof T]: T[K] extends NestedClient<any> 
+          ? WithFileUploadsClient<T[K]>
+          : T[K]
+      }
 
 /**
  * Custom OpenAPILink that handles file uploads with progress tracking

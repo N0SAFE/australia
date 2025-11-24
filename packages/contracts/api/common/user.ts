@@ -8,6 +8,7 @@ export const userSchema = z.object({
   image: z.string().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  role: z.string().nullable().optional(),
   invitationStatus: z.enum(['pending', 'accepted', 'expired']).nullable().optional(),
   invitationToken: z.string().nullable().optional(),
 });

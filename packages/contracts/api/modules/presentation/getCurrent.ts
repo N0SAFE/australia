@@ -6,7 +6,6 @@ export const presentationGetCurrentInput = z.object({});
 export const presentationGetCurrentOutput = z.object({
   id: z.string(),
   filename: z.string(),
-  filePath: z.string(),
   mimeType: z.string(),
   size: z.coerce.number(),
   duration: z.coerce.number().nullable(),

@@ -14,7 +14,7 @@ export const UPLOADS_DIR = process.env.UPLOADS_DIR;
 
 /**
  * Subdirectories for different file types
- */
+ */ 
 export const STORAGE_SUBDIRS = {
   images: 'images',
   videos: 'videos',

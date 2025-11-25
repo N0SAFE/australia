@@ -178,6 +178,37 @@ export class FileService {
   }
 
   /**
+   * Refresh file size from disk and update database
+   * Used after video processing when the file has been converted in-place
+   * 
+   * @param fileId - The file ID
+   * @returns The new file size
+   */
+  async refreshFileSizeFromDisk(fileId: string): Promise<number> {
+    // Get file metadata to find the path
+    const fileRecord = await this.fileUploadRepository.getFileById(fileId);
+    
+    // Check if file exists and has required fields
+    if (!fileRecord) {
+      throw new Error(`File not found: ${fileId}`);
+    }
+    if (!fileRecord.namespace || !fileRecord.storedFilename) {
+      throw new Error(`File incomplete (missing namespace or storedFilename): ${fileId}`);
+    }
+
+    // Build relative path and get actual size from disk
+    const relativePath = this.buildRelativePath(fileRecord.namespace, fileRecord.storedFilename);
+    const actualSize = await this.storageProvider.getSize(relativePath);
+
+    // Update database with actual size
+    await this.fileUploadRepository.updateFileSize(fileId, actualSize);
+
+    console.log(`[FileService] refreshFileSizeFromDisk: Updated file ${fileId} size from ${String(fileRecord.size)} to ${String(actualSize)}`);
+
+    return actualSize;
+  }
+
+  /**
    * Get video metadata for a specific file
    * 
    * @param fileId - The file ID

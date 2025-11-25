@@ -98,6 +98,20 @@ export class FileUploadRepository {
   }
 
   /**
+   * Update file size in database
+   * Used after video processing when the file has been converted in-place
+   */
+  async updateFileSize(fileId: string, newSize: number) {
+    const db = this.databaseService.db;
+    await db
+      .update(file)
+      .set({
+        size: newSize,
+      })
+      .where(eq(file.id, fileId));
+  }
+
+  /**
    * Get file by ID
    */
   async getFileById(fileId: string) {

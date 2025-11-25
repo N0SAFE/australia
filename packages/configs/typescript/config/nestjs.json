@@ -1,5 +1,23 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "NestJS",
-  "extends": "./base.json"
+  "extends": "./base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "declaration": false,
+    "outDir": "./dist",
+    "removeComments": true,
+    "sourceMap": true,
+    "allowSyntheticDefaultImports": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false,
+    "noImplicitAny": false
+  }
 }

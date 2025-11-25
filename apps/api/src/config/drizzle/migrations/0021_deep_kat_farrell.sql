@@ -1,0 +1,1 @@
+DROP TABLE "ts_migration" CASCADE;

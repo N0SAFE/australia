@@ -3,12 +3,12 @@ import { ModuleRef } from '@nestjs/core';
 import { DATABASE_CONNECTION } from '@/core/modules/database/database-connection';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '@/config/drizzle/schema';
-import { tsMigration } from '@/config/drizzle/schema';
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { Migration } from '../interfaces/migration.interface';
 import { MigrationRegistry } from '../migration.registry';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 
 export interface MigrationResult {
   id: string;
@@ -19,22 +19,45 @@ export interface MigrationResult {
   type: 'sql' | 'ts';
 }
 
+interface JournalEntry {
+  idx: number;
+  version: string;
+  when: number;
+  tag: string;
+  breakpoints: boolean;
+}
+
+interface Journal {
+  version: string;
+  dialect: string;
+  entries: JournalEntry[];
+}
+
 interface MigrationEntry {
-  id: string; // e.g., "0021_brave_hero" or "0022_epic_saga.ts"
+  tag: string;           // e.g., "0021_brave_hero" (same as Drizzle)
   type: 'sql' | 'ts';
-  index: number; // e.g., 21, 22
+  folderMillis: number;  // timestamp from journal's `when` field
+  hash: string;          // SHA256 hash of migration content
   migrationClass?: Type<Migration>;
   filePath?: string;
   description?: string;
 }
 
+interface DrizzleMigrationRecord {
+  id: number;
+  hash: string;
+  created_at: string;
+}
+
 /**
- * Service for running SQL and TypeScript migrations in interleaved order.
- * Migrations are sorted by their numeric index and executed sequentially.
+ * Service for running SQL and TypeScript migrations using Drizzle's migration table.
+ * Uses the same drizzle.__drizzle_migrations table for tracking both SQL and TS migrations.
  */
 @Injectable()
 export class MigrationRunnerService {
   private readonly migrationsFolder = './src/config/drizzle/migrations';
+  private readonly migrationsSchema = 'drizzle';
+  private readonly migrationsTable = '__drizzle_migrations';
 
   constructor(
     @Inject(DATABASE_CONNECTION)
@@ -44,15 +67,16 @@ export class MigrationRunnerService {
   ) {}
 
   /**
-   * Run all pending migrations (SQL and TypeScript) in interleaved order
+   * Run all pending migrations (SQL and TypeScript) in order.
+   * Uses Drizzle's migration tracking table and workflow.
    */
   async runAllMigrations(): Promise<MigrationResult[]> {
     const results: MigrationResult[] = [];
     
-    // Ensure migration tracking table exists
+    // Ensure migration schema and table exist (same as Drizzle does)
     await this.ensureMigrationTable();
 
-    // Get all migrations (SQL + TS) sorted by index
+    // Get all migrations sorted by timestamp
     const allMigrations = await this.getAllMigrationsSorted();
     
     if (allMigrations.length === 0) {
@@ -60,140 +84,155 @@ export class MigrationRunnerService {
       return results;
     }
 
-    // Get already executed migrations
-    const executedMigrations = await this.getExecutedMigrations();
-    const executedIds = new Set(executedMigrations.map(m => m.id));
-
-    // Check Drizzle's __drizzle_migrations table for SQL migrations
-    const sqlExecutedIds = await this.getDrizzleExecutedMigrations();
-    executedIds.add(...sqlExecutedIds);
+    // Get the last executed migration from Drizzle's table
+    const lastMigration = await this.getLastExecutedMigration();
 
     console.log(`📋 Found ${allMigrations.length} total migrations`);
-    console.log(`✅ ${executedIds.size} already executed\n`);
-
-    // Execute pending migrations in order
-    for (const migration of allMigrations) {
-      if (executedIds.has(migration.id)) {
-        console.log(`⏭️  Skipping [${migration.type.toUpperCase()}] ${migration.id}`);
-        results.push({
-          id: migration.id,
-          description: migration.description || '',
-          status: 'skipped',
-          type: migration.type,
-        });
-        continue;
-      }
-
-      let result: MigrationResult;
-      if (migration.type === 'sql') {
-        result = await this.runSqlMigration(migration);
-      } else {
-        result = await this.runTsMigration(migration);
-      }
-
-      results.push(result);
-
-      if (result.status === 'failed') {
-        console.error(`❌ Migration ${migration.id} failed, stopping execution`);
-        break;
-      }
+    if (lastMigration) {
+      console.log(`✅ Last executed: ${lastMigration.created_at}\n`);
+    } else {
+      console.log(`ℹ️  No migrations executed yet\n`);
     }
+
+    // Execute pending migrations in a transaction
+    await this.db.transaction(async (tx) => {
+      for (const migration of allMigrations) {
+        // Skip if already executed (compare timestamps like Drizzle does)
+        if (lastMigration && Number(lastMigration.created_at) >= migration.folderMillis) {
+          console.log(`⏭️  Skipping [${migration.type.toUpperCase()}] ${migration.tag}`);
+          results.push({
+            id: migration.tag,
+            description: migration.description || '',
+            status: 'skipped',
+            type: migration.type,
+          });
+          continue;
+        }
+
+        let result: MigrationResult;
+        if (migration.type === 'sql') {
+          result = await this.runSqlMigration(migration, tx);
+        } else {
+          result = await this.runTsMigration(migration, tx);
+        }
+
+        results.push(result);
+
+        if (result.status === 'failed') {
+          console.error(`❌ Migration ${migration.tag} failed, stopping execution`);
+          throw new Error(`Migration ${migration.tag} failed: ${result.error}`);
+        }
+      }
+    });
 
     return results;
   }
 
   /**
-   * Get all migrations (SQL and TS) sorted by index
+   * Get all migrations (SQL and TS) sorted by timestamp
    */
   private async getAllMigrationsSorted(): Promise<MigrationEntry[]> {
     const migrations: MigrationEntry[] = [];
 
-    // Get SQL migrations from Drizzle migrations folder
-    const sqlMigrations = this.getSqlMigrations();
-    migrations.push(...sqlMigrations);
-
-    // Get TypeScript migrations from registry
-    const tsMigrations = this.getTsMigrations();
-    migrations.push(...tsMigrations);
-
-    // Sort by index
-    migrations.sort((a, b) => a.index - b.index);
-
-    return migrations;
-  }
-
-  /**
-   * Get SQL migrations from migrations folder
-   */
-  private getSqlMigrations(): MigrationEntry[] {
-    const migrations: MigrationEntry[] = [];
-    const migrationsPath = path.resolve(process.cwd(), this.migrationsFolder);
-
-    try {
-      const files = fs.readdirSync(migrationsPath);
-      
-      for (const file of files) {
-        if (file.endsWith('.sql')) {
-          const match = file.match(/^(\d{4})_(.+)\.sql$/);
-          if (match) {
-            const [, indexStr, name] = match;
-            const index = parseInt(indexStr, 10);
-            const id = `${indexStr}_${name}`;
-            
-            migrations.push({
-              id,
-              type: 'sql',
-              index,
-              filePath: path.join(migrationsPath, file),
-              description: `SQL migration: ${name.replace(/_/g, ' ')}`,
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('Could not read SQL migrations:', error);
+    // Read journal file (like Drizzle does)
+    const journal = this.readJournal();
+    if (!journal) {
+      return migrations;
     }
 
-    return migrations;
-  }
-
-  /**
-   * Get TypeScript migrations from registry
-   */
-  private getTsMigrations(): MigrationEntry[] {
-    const migrations: MigrationEntry[] = [];
-    const migrationClasses = this.registry.getAll();
-
-    for (const MigrationClass of migrationClasses) {
-      // Create temporary instance to get metadata
-      const tempInstance = new MigrationClass();
-      const id = tempInstance.id;
-      
-      // Parse index from ID (format: 0001_description or 0001_description.ts)
-      const match = id.match(/^(\d{4})_/);
-      if (match) {
-        const index = parseInt(match[1], 10);
+    // Get SQL and TS migrations from journal entries
+    for (const entry of journal.entries) {
+      // SQL migration
+      const sqlPath = path.resolve(process.cwd(), this.migrationsFolder, `${entry.tag}.sql`);
+      if (fs.existsSync(sqlPath)) {
+        const sqlContent = fs.readFileSync(sqlPath, 'utf-8');
+        const hash = crypto.createHash('sha256').update(sqlContent).digest('hex');
         
         migrations.push({
-          id: id.endsWith('.ts') ? id : `${id}.ts`,
-          type: 'ts',
-          index,
-          migrationClass: MigrationClass,
-          description: tempInstance.description,
+          tag: entry.tag,
+          type: 'sql',
+          folderMillis: entry.when,
+          hash,
+          filePath: sqlPath,
+          description: `SQL: ${entry.tag}`,
         });
+      }
+
+      // TS migration (same tag, different extension)
+      const tsPath = path.resolve(process.cwd(), this.migrationsFolder, `${entry.tag}.migration.ts`);
+      if (fs.existsSync(tsPath)) {
+        // Get TS migration from registry
+        const migrationClass = this.findMigrationClass(entry.tag);
+        if (migrationClass) {
+          const tempInstance = new migrationClass();
+          const tsContent = fs.readFileSync(tsPath, 'utf-8');
+          const hash = crypto.createHash('sha256').update(tsContent).digest('hex');
+          
+          migrations.push({
+            tag: `${entry.tag}.ts`,  // Add .ts suffix to distinguish from SQL
+            type: 'ts',
+            folderMillis: entry.when + 1,  // Run TS right after SQL (add 1ms)
+            hash,
+            migrationClass,
+            filePath: tsPath,
+            description: tempInstance.description,
+          });
+        }
       }
     }
 
+    // Sort by timestamp
+    migrations.sort((a, b) => a.folderMillis - b.folderMillis);
+
     return migrations;
+  }
+
+  /**
+   * Read the journal file
+   */
+  private readJournal(): Journal | null {
+    const journalPath = path.resolve(process.cwd(), this.migrationsFolder, 'meta/_journal.json');
+    
+    try {
+      if (!fs.existsSync(journalPath)) {
+        console.warn('No journal file found');
+        return null;
+      }
+      
+      const content = fs.readFileSync(journalPath, 'utf-8');
+      return JSON.parse(content) as Journal;
+    } catch (error) {
+      console.error('Failed to read journal:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Find migration class by tag
+   */
+  private findMigrationClass(tag: string): Type<Migration> | undefined {
+    const migrationClasses = this.registry.getAll();
+    
+    for (const MigrationClass of migrationClasses) {
+      const tempInstance = new MigrationClass();
+      // Match by tag (e.g., "0021_brave_hero")
+      if (tempInstance.id === tag || tempInstance.id === `${tag}.ts`) {
+        return MigrationClass;
+      }
+    }
+    
+    return undefined;
   }
 
   /**
    * Run a SQL migration
    */
-  private async runSqlMigration(migration: MigrationEntry): Promise<MigrationResult> {
+  private async runSqlMigration(
+    migration: MigrationEntry,
+    tx: NodePgDatabase<typeof schema>
+  ): Promise<MigrationResult> {
     const startTime = Date.now();
-    console.log(`\n🔄 Running [SQL] ${migration.id}`);
-    console.log(`   Description: ${migration.description}`);
+    console.log(`\n🔄 Running [SQL] ${migration.tag}`);
 
     try {
       // Read SQL file
@@ -205,26 +244,21 @@ export class MigrationRunnerService {
         .map(s => s.trim())
         .filter(s => s.length > 0);
 
-      // Execute in transaction
-      await this.db.transaction(async (tx) => {
-        for (const statement of statements) {
-          await tx.execute(sql.raw(statement));
-        }
+      for (const statement of statements) {
+        await tx.execute(sql.raw(statement));
+      }
 
-        // Record in tracking table
-        await tx.insert(tsMigration).values({
-          id: migration.id,
-          description: migration.description || 'SQL migration',
-          success: true,
-          executionTimeMs: String(Date.now() - startTime),
-        });
-      });
+      // Record in Drizzle's migration table (same format as Drizzle)
+      await tx.execute(
+        sql`INSERT INTO ${sql.identifier(this.migrationsSchema)}.${sql.identifier(this.migrationsTable)} 
+            ("hash", "created_at") VALUES (${migration.hash}, ${migration.folderMillis})`
+      );
 
       const executionTime = Date.now() - startTime;
-      console.log(`✅ SQL migration ${migration.id} completed in ${executionTime}ms`);
+      console.log(`✅ SQL migration ${migration.tag} completed in ${executionTime}ms`);
 
       return {
-        id: migration.id,
+        id: migration.tag,
         description: migration.description || '',
         status: 'success',
         executionTimeMs: executionTime,
@@ -234,23 +268,10 @@ export class MigrationRunnerService {
       const executionTime = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      console.error(`❌ SQL migration ${migration.id} failed:`, errorMessage);
-
-      // Record failure
-      try {
-        await this.db.insert(tsMigration).values({
-          id: migration.id,
-          description: migration.description || 'SQL migration',
-          success: false,
-          errorMessage,
-          executionTimeMs: String(executionTime),
-        });
-      } catch (recordError) {
-        console.error('Failed to record migration failure:', recordError);
-      }
+      console.error(`❌ SQL migration ${migration.tag} failed:`, errorMessage);
 
       return {
-        id: migration.id,
+        id: migration.tag,
         description: migration.description || '',
         status: 'failed',
         executionTimeMs: executionTime,
@@ -263,35 +284,33 @@ export class MigrationRunnerService {
   /**
    * Run a TypeScript migration
    */
-  private async runTsMigration(migration: MigrationEntry): Promise<MigrationResult> {
+  private async runTsMigration(
+    migration: MigrationEntry,
+    tx: NodePgDatabase<typeof schema>
+  ): Promise<MigrationResult> {
     const startTime = Date.now();
     
     try {
       // Resolve the migration instance with DI
       const migrationInstance = await this.moduleRef.create(migration.migrationClass!);
       
-      console.log(`\n🔄 Running [TS] ${migration.id}`);
+      console.log(`\n🔄 Running [TS] ${migration.tag}`);
       console.log(`   Description: ${migrationInstance.description}`);
 
-      // Run migration in a transaction
-      await this.db.transaction(async (tx) => {
-        // Execute the migration logic
-        await migrationInstance.up(tx as NodePgDatabase<typeof schema>);
+      // Execute the migration logic
+      await migrationInstance.up(tx as NodePgDatabase<typeof schema>);
 
-        // Record success in migration tracking table
-        await tx.insert(tsMigration).values({
-          id: migration.id,
-          description: migrationInstance.description,
-          success: true,
-          executionTimeMs: String(Date.now() - startTime),
-        });
-      });
+      // Record in Drizzle's migration table (same format as Drizzle)
+      await tx.execute(
+        sql`INSERT INTO ${sql.identifier(this.migrationsSchema)}.${sql.identifier(this.migrationsTable)} 
+            ("hash", "created_at") VALUES (${migration.hash}, ${migration.folderMillis})`
+      );
 
       const executionTime = Date.now() - startTime;
-      console.log(`✅ TypeScript migration ${migration.id} completed in ${executionTime}ms`);
+      console.log(`✅ TypeScript migration ${migration.tag} completed in ${executionTime}ms`);
 
       return {
-        id: migration.id,
+        id: migration.tag,
         description: migrationInstance.description,
         status: 'success',
         executionTimeMs: executionTime,
@@ -301,23 +320,10 @@ export class MigrationRunnerService {
       const executionTime = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      console.error(`❌ TypeScript migration ${migration.id} failed:`, errorMessage);
-
-      // Record failure (outside transaction since transaction was rolled back)
-      try {
-        await this.db.insert(tsMigration).values({
-          id: migration.id,
-          description: migration.description || '',
-          success: false,
-          errorMessage,
-          executionTimeMs: String(executionTime),
-        });
-      } catch (recordError) {
-        console.error('Failed to record migration failure:', recordError);
-      }
+      console.error(`❌ TypeScript migration ${migration.tag} failed:`, errorMessage);
 
       return {
-        id: migration.id,
+        id: migration.tag,
         description: migration.description || '',
         status: 'failed',
         executionTimeMs: executionTime,
@@ -328,55 +334,44 @@ export class MigrationRunnerService {
   }
 
   /**
-   * Get list of executed migrations from database
+   * Get the last executed migration from Drizzle's table
    */
-  private async getExecutedMigrations() {
+  private async getLastExecutedMigration(): Promise<DrizzleMigrationRecord | null> {
     try {
-      return await this.db
-        .select()
-        .from(tsMigration)
-        .where(eq(tsMigration.success, true));
-    } catch (error) {
-      // Table might not exist yet
-      return [];
-    }
-  }
-
-  /**
-   * Get executed SQL migrations from Drizzle's tracking table
-   */
-  private async getDrizzleExecutedMigrations(): Promise<Set<string>> {
-    try {
-      const result = await this.db.execute(
-        sql`SELECT tag FROM __drizzle_migrations`
+      const result = await this.db.execute<DrizzleMigrationRecord>(
+        sql`SELECT id, hash, created_at FROM ${sql.identifier(this.migrationsSchema)}.${sql.identifier(this.migrationsTable)} 
+            ORDER BY created_at DESC LIMIT 1`
       );
-      return new Set(result.rows.map((row: any) => row.tag));
+      
+      if (result.rows.length === 0) {
+        return null;
+      }
+      
+      return result.rows[0] as DrizzleMigrationRecord;
     } catch (error) {
       // Table might not exist yet
-      return new Set();
+      return null;
     }
   }
 
   /**
-   * Ensure the migration tracking table exists
+   * Ensure the migration schema and table exist (same as Drizzle does)
    */
   private async ensureMigrationTable(): Promise<void> {
     try {
-      // Try to query the table to see if it exists
-      await this.db.select().from(tsMigration).limit(1);
-    } catch (error) {
-      // Table doesn't exist, create it
-      console.log('📝 Creating ts_migration tracking table...');
+      // Create schema if not exists
+      await this.db.execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.identifier(this.migrationsSchema)}`);
+      
+      // Create table if not exists (same structure as Drizzle)
       await this.db.execute(sql`
-        CREATE TABLE IF NOT EXISTS ts_migration (
-          id TEXT PRIMARY KEY,
-          description TEXT NOT NULL,
-          executed_at TIMESTAMP DEFAULT NOW() NOT NULL,
-          success BOOLEAN DEFAULT TRUE NOT NULL,
-          error_message TEXT,
-          execution_time_ms TEXT
+        CREATE TABLE IF NOT EXISTS ${sql.identifier(this.migrationsSchema)}.${sql.identifier(this.migrationsTable)} (
+          id SERIAL PRIMARY KEY,
+          hash TEXT NOT NULL,
+          created_at BIGINT
         )
       `);
+    } catch (error) {
+      console.error('Failed to create migration table:', error);
     }
   }
 
@@ -386,27 +381,32 @@ export class MigrationRunnerService {
   async getMigrationStatus() {
     await this.ensureMigrationTable();
     
-    const executed = await this.getExecutedMigrations();
-    const executedIds = new Set(executed.map(m => m.id));
+    // Get all executed migrations from Drizzle's table
+    const executedResult = await this.db.execute<DrizzleMigrationRecord>(
+      sql`SELECT id, hash, created_at FROM ${sql.identifier(this.migrationsSchema)}.${sql.identifier(this.migrationsTable)} 
+          ORDER BY created_at ASC`
+    );
     
-    // Also check Drizzle migrations
-    const sqlExecutedIds = await this.getDrizzleExecutedMigrations();
-    
-    // Combine both
-    for (const id of sqlExecutedIds) {
-      executedIds.add(id);
-    }
+    const executed = executedResult.rows as DrizzleMigrationRecord[];
+    const lastMigration = executed.length > 0 ? executed[executed.length - 1] : null;
     
     const allMigrations = await this.getAllMigrationsSorted();
-    const allIds = allMigrations.map(m => m.id);
-    const pending = allIds.filter(id => !executedIds.has(id));
+    
+    // Count pending migrations
+    const pending = allMigrations.filter(m => {
+      if (!lastMigration) return true;
+      return m.folderMillis > Number(lastMigration.created_at);
+    });
 
     return {
-      total: allIds.length,
-      executed: executedIds.size,
+      total: allMigrations.length,
+      executed: executed.length,
       pending: pending.length,
-      executedMigrations: executed,
-      pendingMigrations: pending,
+      executedMigrations: executed.map(m => ({
+        id: m.hash.substring(0, 8),
+        created_at: m.created_at,
+      })),
+      pendingMigrations: pending.map(m => m.tag),
     };
   }
 }

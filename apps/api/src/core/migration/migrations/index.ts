@@ -30,6 +30,7 @@ import { Migration } from '../interfaces/migration.interface';
 // Import all migrations from drizzle migrations folder
 import { ExampleDataTransformationMigration } from '../../../config/drizzle/migrations/0021_example_data_transformation.migration';
 import { ExampleWithServiceInjectionMigration } from '../../../config/drizzle/migrations/0022_example_with_service_injection.migration';
+import { 0021DeepKatFarrellMigration } from '../../../config/drizzle/migrations/0021_deep_kat_farrell.migration';
 
 /**
  * List of all TypeScript migrations.
@@ -38,5 +39,6 @@ import { ExampleWithServiceInjectionMigration } from '../../../config/drizzle/mi
 export const MIGRATIONS: Type<Migration>[] = [
   ExampleDataTransformationMigration,
   ExampleWithServiceInjectionMigration,
+  0021DeepKatFarrellMigration,
   // Add new migrations here...
 ];

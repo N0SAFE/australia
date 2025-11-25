@@ -51,8 +51,9 @@ function getLatestMigration(): JournalEntry | null {
  * Create TypeScript migration template
  */
 function createTsMigrationTemplate(migrationTag: string): string {
-  const className = migrationTag
-    .split('_')
+  // Create valid class name (can't start with number)
+  const parts = migrationTag.split('_');
+  const className = 'Migration' + parts
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join('');
 
@@ -137,8 +138,9 @@ function createTsMigrationFile(migrationTag: string): string {
  */
 function updateMigrationsIndex(migrationTag: string) {
   const indexPath = './src/core/migration/migrations/index.ts';
-  const className = migrationTag
-    .split('_')
+  // Create valid class name (can't start with number)
+  const parts = migrationTag.split('_');
+  const className = 'Migration' + parts
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join('');
   

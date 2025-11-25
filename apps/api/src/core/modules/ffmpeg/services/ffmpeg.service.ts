@@ -115,9 +115,15 @@ export class FfmpegService {
     const parts = timemark.split(':');
     if (parts.length !== 3) return 0;
     
-    const hours = parseInt(parts[0], 10);
-    const minutes = parseInt(parts[1], 10);
-    const seconds = parseFloat(parts[2]);
+    const hoursPart = parts[0];
+    const minutesPart = parts[1];
+    const secondsPart = parts[2];
+    
+    if (!hoursPart || !minutesPart || !secondsPart) return 0;
+    
+    const hours = parseInt(hoursPart, 10);
+    const minutes = parseInt(minutesPart, 10);
+    const seconds = parseFloat(secondsPart);
     
     return hours * 3600 + minutes * 60 + seconds;
   }

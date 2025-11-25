@@ -26,7 +26,7 @@ export class FileUploadRepository {
     const db = this.databaseService.db;
     
     // Create appropriate metadata entry first
-    let contentId: string;
+    let contentId: string | undefined;
     
     if (data.type === 'image') {
       const [metadata] = await db.insert(imageFile).values({
@@ -34,7 +34,7 @@ export class FileUploadRepository {
         height: 0,
         isProcessed: false,
       }).returning();
-      contentId = metadata.id;
+      contentId = metadata?.id;
     } else if (data.type === 'video') {
       const [metadata] = await db.insert(videoFile).values({
         width: 0,
@@ -43,7 +43,7 @@ export class FileUploadRepository {
         hasAudio: true,
         isProcessed: false,
       }).returning();
-      contentId = metadata.id;
+      contentId = metadata?.id;
     } else if (data.type === 'audio') {
       const [metadata] = await db.insert(audioFile).values({
         duration: 0,
@@ -51,13 +51,17 @@ export class FileUploadRepository {
         channels: 2,
         isProcessed: false,
       }).returning();
-      contentId = metadata.id;
+      contentId = metadata?.id;
     } else {
       const [metadata] = await db.insert(rawFile).values({
         encoding: 'binary',
         isProcessed: false,
       }).returning();
-      contentId = metadata.id;
+      contentId = metadata?.id;
+    }
+    
+    if (!contentId) {
+      throw new Error('Failed to create file metadata entry');
     }
     
     // Create file entry with placeholder values (will be updated after save)
@@ -134,7 +138,7 @@ export class FileUploadRepository {
       .from(file)
       .where(eq(file.id, fileId));
 
-    if (fileRecord.type !== 'video') {
+    if (fileRecord?.type !== 'video') {
       return null;
     }
 
@@ -156,7 +160,7 @@ export class FileUploadRepository {
       .from(file)
       .where(eq(file.id, fileId));
 
-    if (!fileRecord || fileRecord.type !== 'image') {
+    if (fileRecord?.type !== 'image') {
       return null;
     }
 
@@ -181,7 +185,7 @@ export class FileUploadRepository {
       .from(file)
       .where(eq(file.id, fileId));
 
-    if (!fileRecord || fileRecord.type !== 'audio') {
+    if (fileRecord?.type !== 'audio') {
       return null;
     }
 
@@ -206,7 +210,7 @@ export class FileUploadRepository {
       .from(file)
       .where(eq(file.id, fileId));
 
-    if (!fileRecord || fileRecord.type !== 'raw') {
+    if (fileRecord?.type !== 'raw') {
       return null;
     }
 
@@ -232,7 +236,7 @@ export class FileUploadRepository {
       .from(file)
       .where(eq(file.id, fileId));
 
-    if (!fileRecord || fileRecord.type !== 'video') {
+    if (fileRecord?.type !== 'video') {
       return null;
     }
 

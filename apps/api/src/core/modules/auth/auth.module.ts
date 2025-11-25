@@ -88,8 +88,10 @@ export class AuthModule
             const methods = this.metadataScanner.getAllMethodNames(providerPrototype);
 
             for (const method of methods) {
-                const providerMethod = providerPrototype[method];
-                this.setupHooks(providerMethod, provider.instance);
+                const providerMethod = providerPrototype[method] as ((...args: unknown[]) => unknown) | undefined;
+                if (providerMethod) {
+                    this.setupHooks(providerMethod, provider.instance);
+                }
             }
         }
 	}

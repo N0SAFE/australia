@@ -77,7 +77,6 @@ export class UserController {
             const result = await this.userService.getUsers(input);
             return {
                 users: result.users
-                    .filter((user): user is NonNullable<typeof user> => user !== null)
                     .map((user) => ({
                         id: user.id,
                         name: user.name,
@@ -87,7 +86,7 @@ export class UserController {
                         createdAt: user.createdAt,
                         updatedAt: user.updatedAt,
                         role: user.role ?? null,
-                        invitationStatus: (user.invitationStatus as 'pending' | 'accepted' | 'expired' | null) ?? null,
+                        invitationStatus: (user.invitationStatus) ?? null,
                         invitationToken: user.invitationToken ?? null,
                     })),
                 meta: result.meta,

@@ -63,7 +63,10 @@ export async function* combineAsyncIterators<T>(
         count--;
       } else {
         // Iterator has a value, queue its next() call and yield the value
-        nextPromises[index] = getNext(asyncIterators[index], index);
+        const iterator = asyncIterators[index];
+        if (iterator) {
+          nextPromises[index] = getNext(iterator, index);
+        }
         yield result.value;
       }
     }
@@ -267,7 +270,10 @@ export async function* combineAsyncIteratorsLatest<T>(
         latestValues[index] = result.value;
         
         // Queue the next value from this iterator
-        nextPromises[index] = getNext(asyncIterators[index], index);
+        const iterator = asyncIterators[index];
+        if (iterator) {
+          nextPromises[index] = getNext(iterator, index);
+        }
         
         // Yield a snapshot of all latest values
         yield [...latestValues];

@@ -28,6 +28,9 @@ export class FileMetadataService {
    */
   async getFileSize(fileId: string): Promise<number> {
     const file = await this.fileService.getFileById(fileId);
+    if (!file) {
+      throw new Error(`File not found: ${fileId}`);
+    }
     return file.size;
   }
 
@@ -39,7 +42,7 @@ export class FileMetadataService {
    */
   async getFileStats(fileId: string): Promise<FileStats> {
     const file = await this.fileService.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
     
@@ -55,12 +58,12 @@ export class FileMetadataService {
   async fileExists(fileId: string): Promise<boolean> {
     try {
       const file = await this.fileService.getFileById(fileId);
-      if (!file.namespace || !file.storedFilename) {
+      if (!file?.namespace || !file.storedFilename) {
         return false;
       }
       
       const relativePath = this.fileService.buildRelativePath(file.namespace, file.storedFilename);
-      return this.storageProvider.exists(relativePath);
+      return await this.storageProvider.exists(relativePath);
     } catch {
       return false;
     }
@@ -73,6 +76,9 @@ export class FileMetadataService {
    */
   async getMimeType(fileId: string): Promise<string> {
     const file = await this.fileService.getFileById(fileId);
+    if (!file) {
+      throw new Error(`File not found: ${fileId}`);
+    }
     return file.mimeType;
   }
 

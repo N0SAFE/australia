@@ -106,6 +106,9 @@ export class StorageController {
                             abortSignal
                         )
                         .then(async (metadata) => {
+                            if (!videoResult.videoMetadata) {
+                                throw new Error("Video processing returned no metadata");
+                            }
                             // SUCCESS: Update database to mark as processed
                             await this.storageService.updateVideoProcessingStatus(videoResult.videoMetadata.id, {
                                 isProcessed: true,
@@ -127,6 +130,10 @@ export class StorageController {
                             });
                         })
                         .catch(async (error: unknown) => {
+                            if (!videoResult.videoMetadata) {
+                                throw new Error("Video processing failed and no video metadata available");
+                            }
+                            
                             const err = error instanceof Error ? error : new Error(String(error));
 
                             // Check if this was an abort
@@ -369,7 +376,7 @@ export class StorageController {
                         message: "Video file not found on filesystem",
                     });
                 }
-            } catch (error) {
+            } catch {
                 // If error checking existence, also return 404
                 throw new ORPCError("NOT_FOUND", {
                     message: "Video file not found on filesystem",
@@ -426,7 +433,7 @@ export class StorageController {
             const { fileId } = input;
 
             const result = await this.storageService.getVideoByFileId(fileId);
-            if (!result) {
+            if (!result?.videoMetadata) {
                 throw new ORPCError("NOT_FOUND", {
                     message: "Video not found",
                 });
@@ -453,7 +460,7 @@ export class StorageController {
 
             // Get current video processing state
             const result = await storageService.getVideoByFileId(fileId);
-            if (!result?.file) {
+            if (!result?.file || !result.videoMetadata) {
                 throw new ORPCError("NOT_FOUND", {
                     message: "Video not found",
                 });

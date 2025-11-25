@@ -72,6 +72,10 @@ export class FileService {
       size: file.size,
       uploadedBy,
     });
+    
+    if (!fileRecord) {
+      throw new Error('Failed to create file record in database');
+    }
 
     // Step 2: Save file using the generated fileId as the filename
     // Normalize extension to lowercase to avoid case-sensitivity issues
@@ -312,7 +316,7 @@ export class FileService {
   async fileExists(fileId: string): Promise<boolean> {
     try {
       const file = await this.fileUploadRepository.getFileById(fileId);
-      if (!file.namespace || !file.storedFilename) {
+      if (!file?.namespace || !file.storedFilename) {
         return false;
       }
       const filePath = this.buildRelativePath(file.namespace, file.storedFilename);
@@ -329,7 +333,7 @@ export class FileService {
    */
   async deleteFile(fileId: string): Promise<void> {
     const file = await this.fileUploadRepository.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
     const filePath = this.buildRelativePath(file.namespace, file.storedFilename);
@@ -345,7 +349,7 @@ export class FileService {
    */
   async getAbsoluteFilePath(fileId: string): Promise<string> {
     const file = await this.fileUploadRepository.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
     const filePath = this.buildRelativePath(file.namespace, file.storedFilename);
@@ -365,7 +369,7 @@ export class FileService {
     size: number;
   }> {
     const file = await this.fileUploadRepository.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
 
@@ -393,7 +397,7 @@ export class FileService {
     size: number;
   }> {
     const file = await this.fileUploadRepository.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
 
@@ -429,7 +433,7 @@ export class FileService {
   ): Promise<ReadStream> {
     // Get file metadata
     const file = await this.fileUploadRepository.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
 
@@ -454,7 +458,7 @@ export class FileService {
   ): Promise<LazyFile> {
     // Get file metadata
     const file = await this.fileUploadRepository.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
 
@@ -495,7 +499,7 @@ export class FileService {
   ): Promise<File> {
     // Get file metadata
     const file = await this.fileUploadRepository.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
 

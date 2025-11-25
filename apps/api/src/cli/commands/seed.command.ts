@@ -15,7 +15,11 @@ const SEED_VERSION = '1.9.0';
 
 // Helper function to format date as YYYY-MM-DD
 function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const dateStr = date.toISOString().split('T')[0];
+  if (!dateStr) {
+    throw new Error('Failed to format date');
+  }
+  return dateStr;
 }
 
 // Helper function to add days to a date
@@ -121,9 +125,12 @@ export class SeedCommand extends CommandRunner {
         .limit(1);
 
       if (existingSeed.length > 0) {
-        console.log(`✅ Seed version ${SEED_VERSION} already applied at ${existingSeed[0].appliedAt.toISOString()}`);
-        console.log('   Skipping seeding. To re-seed, increment SEED_VERSION in seed.command.ts');
-        return;
+        const seedRecord = existingSeed[0];
+        if (seedRecord) {
+          console.log(`✅ Seed version ${SEED_VERSION} already applied at ${seedRecord.appliedAt.toISOString()}`);
+          console.log('   Skipping seeding. To re-seed, increment SEED_VERSION in seed.command.ts');
+          return;
+        }
       }
 
       console.log(`📦 Applying seed version ${SEED_VERSION}...`);

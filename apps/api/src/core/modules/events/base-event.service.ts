@@ -142,17 +142,20 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
    * @param input - Input parameters for the event (validated against contract)
    * @returns Async iterator yielding event data
    */
-  subscribe<K extends keyof TContracts & string>(
+  subscribe<K extends keyof TContracts>(
     eventName: K,
     input: EventInput<TContracts[K]>
   ): EventSubscription<TContracts[K]> {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      throw new Error(`Unknown event: ${String(eventName)}`);
+    }
 
     // Validate input
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
 
     // Build full event name using fileId from input
-    const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
+    const fullEventName = this.buildFullEventName(String(eventName), validatedInput as Record<string, unknown>);
 
     this.logger.debug(`New subscription to event: ${fullEventName}`);
 
@@ -203,19 +206,22 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
    * @param input - Input parameters for the event (used to build event name)
    * @param output - Event data to emit (validated against contract)
    */
-  emit<K extends keyof TContracts & string>(
+  emit<K extends keyof TContracts>(
     eventName: K,
     input: EventInput<TContracts[K]>,
     output: EventOutput<TContracts[K]>
   ): void {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      throw new Error(`Unknown event: ${String(eventName)}`);
+    }
 
     // Validate input and output
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const validatedOutput = contract.output.parse(output) as EventOutput<TContracts[K]>;
 
     // Build full event name using fileId from input
-    const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
+    const fullEventName = this.buildFullEventName(String(eventName), validatedInput as Record<string, unknown>);
 
     const subscription = this.events.get(fullEventName);
     if (!subscription) {
@@ -251,6 +257,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     }) => void | Promise<void>
   ): Promise<void> {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      throw new Error(`Unknown event: ${eventName}`);
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
     
@@ -360,6 +369,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): boolean {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return false;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 
@@ -378,6 +390,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): number {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return 0;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 
@@ -396,6 +411,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): boolean {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return false;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 
@@ -414,6 +432,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): number {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return 0;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 
@@ -448,6 +469,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): void {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 

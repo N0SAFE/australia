@@ -84,6 +84,7 @@ export class UserService {
     }
 
     // Update user info (excluding password as it's handled by Better Auth)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userDataWithoutPassword } = input;
     return await this.userRepository.update(id, userDataWithoutPassword);
   }

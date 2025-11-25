@@ -99,7 +99,7 @@ export class PresentationController {
                 }
 
                 // Get Range header (case-insensitive)
-                const rangeHeader = headers.range || headers.Range;
+                const rangeHeader = headers.range ?? headers.Range;
                 
                 console.log('[PresentationController] Range header:', rangeHeader);
                 console.log('[PresentationController] All headers:', JSON.stringify(headers));

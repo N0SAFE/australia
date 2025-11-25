@@ -59,6 +59,9 @@ export class FileRangeService {
     
     // Get file metadata from FileService
     const file = await this.fileService.getFileById(fileId);
+    if (!file) {
+      throw new Error(`File not found: ${fileId}`);
+    }
     const fileSize = file.size;
     
     // Fix empty MIME type - detect from filename or use default
@@ -80,7 +83,7 @@ export class FileRangeService {
         'gif': 'image/gif',
         'pdf': 'application/pdf',
       };
-      mimeType = ext ? (mimeTypeMap[ext] || 'application/octet-stream') : 'application/octet-stream';
+      mimeType = ext ? (mimeTypeMap[ext] ?? 'application/octet-stream') : 'application/octet-stream';
       console.log('[FileRangeService] Empty MIME type detected, using fallback:', mimeType);
     }
 
@@ -183,7 +186,7 @@ export class FileRangeService {
   ): RangeResult | null {
     // Parse "bytes=start-end" format
     const match = /^bytes=(\d+)-(\d*)$/.exec(rangeHeader);
-    if (!match) {
+    if (!match?.[1]) {
       return null;
     }
 

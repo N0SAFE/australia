@@ -41,13 +41,18 @@ export class PresentationRepository {
     await db.delete(presentationVideo).where(eq(presentationVideo.id, 'singleton'));
 
     // Insert new video with fileId reference
-    const [video] = await db
+    const result = await db
       .insert(presentationVideo)
       .values({
         id: 'singleton',
         fileId: data.fileId,
       })
       .returning();
+
+    const video = result[0];
+    if (!video) {
+      throw new Error('Failed to create presentation video');
+    }
 
     return video;
   }
@@ -71,7 +76,7 @@ export class PresentationRepository {
       .where(eq(presentationVideo.id, 'singleton'))
       .limit(1);
 
-    return result[0] || null;
+    return result[0] ?? null;
   }
 
   /**
@@ -87,7 +92,7 @@ export class PresentationRepository {
       .where(eq(presentationVideo.id, 'singleton'))
       .limit(1);
 
-    return result[0] || null;
+    return result[0] ?? null;
   }
 
   /**

@@ -54,28 +54,6 @@ describe.skip('FfmpegService Integration Tests', () => {
     });
   });
 
-  describe('convertToH264', () => {
-    it('should convert a video to H.264 format', async () => {
-      // This test requires source and output paths
-      const inputPath = '/path/to/test/input.mov';
-      const outputPath = '/tmp/test-output.mp4';
-
-      if (existsSync(inputPath)) {
-        await service.convertToH264(inputPath, outputPath);
-        
-        expect(existsSync(outputPath)).toBe(true);
-        
-        // Verify the output is actually H.264
-        const metadata = await service.getVideoMetadata(outputPath);
-        expect(metadata.codec).toBe('h264');
-        expect(metadata.format).toContain('mp4');
-        
-        // Cleanup
-        unlinkSync(outputPath);
-      }
-    }, 30000); // 30 second timeout for conversion
-  });
-
   describe('convertVideoToH264AndReplace', () => {
     it('should convert and replace a video file', async () => {
       // This test requires a test video file that can be replaced

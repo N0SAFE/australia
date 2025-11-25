@@ -235,6 +235,7 @@ export class CapsuleService {
 
         for (let i = 0; i < media.added.length; i++) {
           const mediaItem = media.added[i];
+          if (!mediaItem) continue;
           
           // Emit progress for current file
           if (operationId) {
@@ -454,6 +455,7 @@ export class CapsuleService {
           
           for (let i = 0; i < media.added.length; i++) {
             const mediaItem = media.added[i];
+            if (!mediaItem) continue;
             
             // Emit progress for current file
             if (operationId) {

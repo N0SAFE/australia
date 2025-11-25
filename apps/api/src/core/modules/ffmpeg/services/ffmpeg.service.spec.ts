@@ -1,5 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, type TestingModule } from '@nestjs/testing';
 import { FfmpegService } from './ffmpeg.service';
+import { HardwareAccelerationService } from './hardware-acceleration.service';
 import { describe, it, expect, beforeEach } from 'vitest';
 
 describe('FfmpegService', () => {
@@ -7,7 +8,7 @@ describe('FfmpegService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [FfmpegService],
+      providers: [FfmpegService, HardwareAccelerationService],
     }).compile();
 
     service = module.get<FfmpegService>(FfmpegService);
@@ -15,11 +16,6 @@ describe('FfmpegService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
-  });
-
-  it('should have convertToH264 method', () => {
-    expect(service.convertToH264).toBeDefined();
-    expect(typeof service.convertToH264).toBe('function');
   });
 
   it('should have getVideoMetadata method', () => {

@@ -35,7 +35,7 @@ export class FileStreamService {
   ): Promise<ReadStream> {
     // Get file metadata from FileService
     const file = await this.fileService.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
 
@@ -58,7 +58,7 @@ export class FileStreamService {
   ): Promise<LazyFile> {
     // Get file metadata from FileService
     const file = await this.fileService.getFileById(fileId);
-    if (!file.namespace || !file.storedFilename) {
+    if (!file?.namespace || !file.storedFilename) {
       throw new Error(`File not found or incomplete: ${fileId}`);
     }
 

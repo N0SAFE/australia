@@ -20,7 +20,7 @@ export class LoggerMiddleware implements NestMiddleware {
                 contentType: req.get('content-type'),
                 contentLength: req.get('content-length'),
                 hasBody: !!req.body,
-                bodyKeys: req.body ? Object.keys(req.body) : [],
+                bodyKeys: req.body ? Object.keys(req.body as object) : [],
             });
         }
         

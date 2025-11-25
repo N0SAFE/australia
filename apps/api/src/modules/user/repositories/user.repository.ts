@@ -38,10 +38,12 @@ export class UserRepository {
     /**
      * Transform multiple users for API response
      */
-    private transformUsers<T extends {
-      createdAt: Date,
-      updatedAt: Date
-    }>(users: T[]) {
+    private transformUsers<
+        T extends {
+            createdAt: Date;
+            updatedAt: Date;
+        }
+    >(users: T[]) {
         return users.map((user) => this.transformUser(user));
     }
 
@@ -53,7 +55,7 @@ export class UserRepository {
             .insert(user)
             .values({
                 id: randomUUID(),
-                name: input.name,
+                name: input.name || '',
                 email: input.email,
                 image: input.image ?? null,
                 emailVerified: false,
@@ -61,6 +63,10 @@ export class UserRepository {
                 updatedAt: new Date(),
             })
             .returning();
+
+        if (!newUser[0]) {
+            throw new Error("Failed to create user");
+        }
 
         return this.transformUser(newUser[0]);
     }
@@ -71,7 +77,7 @@ export class UserRepository {
     async findById(id: string) {
         const foundUser = await this.databaseService.db.select().from(user).where(eq(user.id, id)).limit(1);
 
-        return this.transformUser(foundUser[0] || null);
+        return this.transformUser(foundUser[0] ?? null);
     }
 
     /**
@@ -80,7 +86,7 @@ export class UserRepository {
     async findByEmail(email: string) {
         const foundUser = await this.databaseService.db.select().from(user).where(eq(user.email, email)).limit(1);
 
-        return this.transformUser(foundUser[0] || null);
+        return this.transformUser(foundUser[0] ?? null);
     }
 
     /**
@@ -163,19 +169,17 @@ export class UserRepository {
                         WHEN ${user.emailVerified} = TRUE THEN 'accepted'
                         ELSE NULL
                     END
-                `.as('invitation_status'),
+                `.as("invitation_status"),
                 invitationToken: invite.token,
             })
             .from(user)
             .leftJoin(invite, eq(user.email, invite.email))
             .orderBy(orderByCondition);
 
-        const existingUsers = userWhereCondition
-            ? await existingUsersQuery.where(userWhereCondition)
-            : await existingUsersQuery;
+        const existingUsers = userWhereCondition ? await existingUsersQuery.where(userWhereCondition) : await existingUsersQuery;
 
         // Get all invite emails that have users (to exclude them from pending invitations)
-        const existingUserEmails = new Set(existingUsers.map(u => u.email));
+        const existingUserEmails = new Set(existingUsers.map((u) => u.email));
 
         // Second, get pending invitations for emails that don't have user accounts yet
         const pendingInvitationsQuery = this.databaseService.db
@@ -189,26 +193,24 @@ export class UserRepository {
             })
             .from(invite);
 
-        const allInvitations = invitationWhereCondition
-            ? await pendingInvitationsQuery.where(invitationWhereCondition)
-            : await pendingInvitationsQuery;
+        const allInvitations = invitationWhereCondition ? await pendingInvitationsQuery.where(invitationWhereCondition) : await pendingInvitationsQuery;
 
         // Filter out invitations for emails that already have user accounts
         const pendingInvitations = allInvitations
-            .filter(inv => !existingUserEmails.has(inv.email))
-            .map(inv => {
+            .filter((inv) => !existingUserEmails.has(inv.email))
+            .map((inv) => {
                 const now = new Date();
-                let status: 'pending' | 'expired' | 'accepted' = 'pending';
-                
+                let status: "pending" | "expired" | "accepted" = "pending";
+
                 if (inv.usedAt) {
-                    status = 'accepted';
+                    status = "accepted";
                 } else if (inv.expiresAt < now) {
-                    status = 'expired';
+                    status = "expired";
                 }
 
                 return {
                     id: inv.id, // Use invite ID for pending invitations
-                    name: inv.email.split('@')[0], // Generate name from email
+                    name: inv.email.split("@")[0], // Generate name from email
                     email: inv.email,
                     emailVerified: false,
                     image: null,
@@ -224,24 +226,21 @@ export class UserRepository {
         const allRecords = [...existingUsers, ...pendingInvitations];
 
         // Apply pagination
-        const paginatedRecords = allRecords.slice(
-            input.pagination.offset,
-            input.pagination.offset + input.pagination.limit
-        );
+        const paginatedRecords = allRecords.slice(input.pagination.offset, input.pagination.offset + input.pagination.limit);
 
         const total = allRecords.length;
 
         return {
-            users: paginatedRecords.map(u => ({
+            users: paginatedRecords.map((u) => ({
                 id: u.id,
-                name: u.name,
+                name: u.name ?? null,
                 email: u.email,
                 emailVerified: u.emailVerified,
                 image: u.image,
                 createdAt: u.createdAt.toISOString(),
                 updatedAt: u.updatedAt.toISOString(),
                 role: u.role,
-                invitationStatus: u.invitationStatus as 'pending' | 'accepted' | 'expired' | null,
+                invitationStatus: u.invitationStatus as "pending" | "accepted" | "expired" | null,
                 invitationToken: u.invitationToken,
             })),
             meta: {
@@ -263,13 +262,14 @@ export class UserRepository {
             .update(user)
             .set({
                 ...input,
+                name: input.name ?? undefined,
                 createdAt: new Date(input.createdAt ?? Date.now()),
                 updatedAt: new Date(),
             })
             .where(eq(user.id, id))
             .returning();
 
-        return this.transformUser(updatedUser[0] || null);
+        return this.transformUser(updatedUser[0] ?? null);
     }
 
     /**
@@ -278,7 +278,7 @@ export class UserRepository {
     async delete(id: string) {
         const deletedUser = await this.databaseService.db.delete(user).where(eq(user.id, id)).returning();
 
-        return this.transformUser(deletedUser[0] || null);
+        return this.transformUser(deletedUser[0] ?? null);
     }
 
     /**
@@ -296,6 +296,6 @@ export class UserRepository {
     async getCount(): Promise<number> {
         const result = await this.databaseService.db.select({ count: count() }).from(user);
 
-        return result[0]?.count || 0;
+        return result[0]?.count ?? 0;
     }
 }

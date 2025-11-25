@@ -56,6 +56,10 @@ export class CapsuleRepository {
                 }
 
                 const f = fileRecord[0];
+                if (!f) {
+                    this.logger.warn(`File record empty for capsuleMedia record: ${mediaRecord.id}`);
+                    return null;
+                }
 
                 // Base media object
                 const baseMedia = {
@@ -77,8 +81,8 @@ export class CapsuleRepository {
                         .where(eq(imageFile.id, f.contentId))
                         .limit(1);
 
-                    if (imageRecord.length > 0) {
-                        const img = imageRecord[0];
+                    const img = imageRecord[0];
+                    if (img) {
                         return {
                             ...baseMedia,
                             width: img.width,
@@ -93,8 +97,8 @@ export class CapsuleRepository {
                         .where(eq(videoFile.id, f.contentId))
                         .limit(1);
 
-                    if (videoRecord.length > 0) {
-                        const vid = videoRecord[0];
+                    const vid = videoRecord[0];
+                    if (vid) {
                         return {
                             ...baseMedia,
                             width: vid.width,
@@ -110,8 +114,8 @@ export class CapsuleRepository {
                         .where(eq(audioFile.id, f.contentId))
                         .limit(1);
 
-                    if (audioRecord.length > 0) {
-                        const aud = audioRecord[0];
+                    const aud = audioRecord[0];
+                    if (aud) {
                         return {
                             ...baseMedia,
                             duration: aud.duration,
@@ -375,7 +379,11 @@ export class CapsuleRepository {
             })
             .returning();
 
-        return await this.transformCapsule(newCapsule[0]);
+        const created = newCapsule[0];
+        if (!created) {
+            throw new Error('Failed to create capsule');
+        }
+        return await this.transformCapsule(created);
     }
 
     /**
@@ -480,6 +488,9 @@ export class CapsuleRepository {
         // Add one day to end date for lt comparison
         const nextDay = new Date(endOfMonth.getTime() + 24 * 60 * 60 * 1000);
         const nextDayStr = nextDay.toISOString().split('T')[0];
+        if (!nextDayStr) {
+            throw new Error('Failed to format next day date');
+        }
 
         const capsules = await this.databaseService.db
             .select()
@@ -508,6 +519,9 @@ export class CapsuleRepository {
         const now = new Date();
         const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const todayStr = now.toISOString().split('T')[0];
+        if (!todayStr) {
+            throw new Error('Failed to format today date');
+        }
 
         // Get all capsules with opening date in the past (up to today)
         const capsules = await this.databaseService.db

@@ -54,7 +54,7 @@ server {
 
     # Temporary proxy to app
     location / {
-        proxy_pass http://localhost:3010;
+        proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         
         # WebSocket support

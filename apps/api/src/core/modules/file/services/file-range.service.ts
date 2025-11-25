@@ -99,11 +99,15 @@ export class FileRangeService {
       
       console.log('[FileRangeService] Parsed range:', { start, end, contentLength });
       
-      // Create stream with range
-      const lazyFile = await this.fileService.createLazyFile(fileId, {
-        start,
-        end,
-      });
+      // Create stream with range, passing corrected MIME type
+      const lazyFile = await this.fileService.createLazyFile(
+        fileId,
+        {
+          start,
+          end,
+        },
+        mimeType, // Pass corrected MIME type to LazyFile
+      );
 
       // Build Range response headers
       const headers = this.buildRangeHeaders(start, end, fileSize, mimeType, contentLength);
@@ -119,7 +123,7 @@ export class FileRangeService {
 
     // No Range header - return full file
     console.log('[FileRangeService] No range header, returning full file');
-    const lazyFile = await this.fileService.createLazyFile(fileId);
+    const lazyFile = await this.fileService.createLazyFile(fileId, undefined, mimeType);
     const headers = this.buildFullFileHeaders(fileSize, mimeType);
 
     return {

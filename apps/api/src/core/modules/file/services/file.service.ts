@@ -413,10 +413,12 @@ export class FileService {
    * 
    * @param fileId - The file ID
    * @param options - Stream options (start/end for range requests)
+   * @param mimeType - Optional MIME type override (useful when database MIME is empty/incorrect)
    */
   async createLazyFile(
     fileId: string,
     options?: StreamOptions,
+    mimeType?: string,
   ): Promise<LazyFile> {
     // Get file metadata
     const file = await this.fileUploadRepository.getFileById(fileId);
@@ -437,8 +439,10 @@ export class FileService {
         : fileSize;
     
     const lazyContent = this.createLazyContent(stream, contentLength);
+    // Use provided mimeType override, fallback to file.mimeType
+    const finalMimeType = mimeType ?? file.mimeType;
     return new LazyFile(lazyContent, file.filename, {
-      type: file.mimeType,
+      type: finalMimeType,
     });
   }
 

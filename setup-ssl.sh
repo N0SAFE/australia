@@ -45,17 +45,39 @@ server {
         root /var/www/certbot;
     }
 
+    # Client max body size (for uploads - supports very large files)
+    client_max_body_size 500M;
+    
+    # Upload optimization settings
+    client_body_buffer_size 1M;
+    client_body_timeout 600s;
+
     # Temporary proxy to app
     location / {
         proxy_pass http://localhost:3010;
         proxy_http_version 1.1;
+        
+        # WebSocket support
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
+        
+        # Headers
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+
+        # Timeouts (increased for very large file uploads - 10 minutes)
+        proxy_connect_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+        
+        # Disable buffering for uploads (stream directly)
+        proxy_request_buffering off;
+        proxy_buffering off;
     }
 }
 
@@ -69,14 +91,51 @@ server {
         root /var/www/certbot;
     }
 
+    # Client max body size (for uploads - supports very large files)
+    client_max_body_size 500M;
+    
+    # Upload optimization settings
+    client_body_buffer_size 1M;
+    client_body_timeout 600s;
+
     # Temporary proxy to API
     location / {
         proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
+        
+        # Headers
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+        
+        # CRITICAL: Forward cookies for authentication
+        proxy_set_header Cookie $http_cookie;
+        proxy_pass_header Set-Cookie;
+        
+        # CRITICAL: Forward Range header for video streaming
+        proxy_set_header Range $http_range;
+
+        # Timeouts (increased for very large file uploads - 10 minutes)
+        proxy_connect_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+        
+        # Disable buffering for uploads/streaming (stream directly)
+        proxy_request_buffering off;
+        proxy_buffering off;
+        
+        # CRITICAL: Explicitly pass through response headers from backend
+        proxy_pass_header Content-Type;
+        proxy_pass_header Content-Length;
+        proxy_pass_header Accept-Ranges;
+        proxy_pass_header Content-Range;
+        
+        # HTTP/2 specific: Don't buffer responses for range requests
+        proxy_force_ranges on;
+        proxy_ignore_headers X-Accel-Buffering;
     }
 }
 EOF

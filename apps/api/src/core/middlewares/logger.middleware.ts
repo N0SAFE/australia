@@ -29,7 +29,8 @@ export class LoggerMiddleware implements NestMiddleware {
             const contentLength = res.get("content-length");
             // Enhanced debug logging with structured data
             this.logger.debug(`[${hostname}] "${method} ${url}" ${String(statusCode)} ${statusMessage} ${String(contentLength)} "${referer}" "${userAgent}" "${String(ip)}" Headers: ${JSON.stringify(responseHeaders)}`);
-            res.end();
+            // NOTE: Do NOT call res.end() here - it interrupts streaming responses
+            // and causes HTTP/2 protocol errors (ERR_HTTP2_PROTOCOL_ERROR)
         });
         next();
     }

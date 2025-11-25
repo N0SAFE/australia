@@ -1,5 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import type { ReadStream } from 'fs';
+import { promises as fsPromises } from 'fs';
 import { LazyFile } from '@mjackson/lazy-file';
 import { lookup } from 'mime-types';
 import type { IStorageProvider, StreamOptions } from '../interfaces/storage-provider.interface';
@@ -444,6 +445,64 @@ export class FileService {
     return new LazyFile(lazyContent, file.filename, {
       type: finalMimeType,
     });
+  }
+
+  /**
+   * Create a standard File object with exact bytes for HTTP Range requests
+   * This method reads the exact byte range into memory and returns a File object
+   * Use this instead of createLazyFile when HTTP/2 Content-Length precision is critical
+   * 
+   * @param fileId - The file ID
+   * @param options - Stream options (start/end for range requests)
+   * @param mimeType - Optional MIME type override
+   * @returns Standard File object containing exactly the requested bytes
+   */
+  async createRangeFile(
+    fileId: string,
+    options?: StreamOptions,
+    mimeType?: string,
+  ): Promise<File> {
+    // Get file metadata
+    const file = await this.fileUploadRepository.getFileById(fileId);
+    if (!file.namespace || !file.storedFilename) {
+      throw new Error(`File not found or incomplete: ${fileId}`);
+    }
+
+    // Build relative path and get absolute path
+    const relativePath = this.buildRelativePath(file.namespace, file.storedFilename);
+    const absolutePath = this.storageProvider.getAbsolutePath(relativePath);
+    const fileSize = await this.storageProvider.getSize(relativePath);
+
+    // Determine byte range
+    const start = options?.start ?? 0;
+    const end = options?.end ?? (fileSize - 1);
+    const contentLength = end - start + 1;
+
+    // Open file and read exact bytes
+    const fileHandle = await fsPromises.open(absolutePath, 'r');
+    try {
+      const buffer = Buffer.alloc(contentLength);
+      const { bytesRead } = await fileHandle.read(buffer, 0, contentLength, start);
+      
+      // Verify we read the expected number of bytes
+      if (bytesRead !== contentLength) {
+        console.warn(`[FileService] createRangeFile: Expected ${String(contentLength)} bytes, read ${String(bytesRead)}`);
+      }
+
+      // Create a standard File object with exact bytes
+      const finalMimeType = mimeType ?? (file.mimeType || 'application/octet-stream');
+      const rangeFile = new File(
+        [buffer.subarray(0, bytesRead)], // Use only bytes actually read
+        file.filename,
+        { type: finalMimeType }
+      );
+
+      console.log(`[FileService] createRangeFile: Created file with ${String(rangeFile.size)} bytes, type: ${rangeFile.type}`);
+      
+      return rangeFile;
+    } finally {
+      await fileHandle.close();
+    }
   }
 
   /**

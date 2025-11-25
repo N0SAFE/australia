@@ -14,11 +14,13 @@ interface RangeResult {
 
 /**
  * File streaming response structure
+ * Note: body can be either LazyFile (for full file streaming) or File (for Range requests)
+ * Using File for Range requests ensures exact Content-Length match with HTTP/2
  */
 export interface FileRangeResponse {
   status?: number;
   headers: Record<string, string>;
-  body: LazyFile;
+  body: LazyFile | File;
 }
 
 /**
@@ -99,14 +101,15 @@ export class FileRangeService {
       
       console.log('[FileRangeService] Parsed range:', { start, end, contentLength });
       
-      // Create stream with range, passing corrected MIME type
-      const lazyFile = await this.fileService.createLazyFile(
+      // Use createRangeFile to read exact bytes into a standard File object
+      // This ensures Content-Length matches exactly for HTTP/2 compatibility
+      const rangeFile = await this.fileService.createRangeFile(
         fileId,
         {
           start,
           end,
         },
-        mimeType, // Pass corrected MIME type to LazyFile
+        mimeType, // Pass corrected MIME type
       );
 
       // Build Range response headers
@@ -117,7 +120,7 @@ export class FileRangeService {
       return {
         status: 206, // Partial Content
         headers,
-        body: lazyFile,
+        body: rangeFile,
       };
     }
 

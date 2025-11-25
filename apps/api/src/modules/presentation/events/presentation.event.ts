@@ -29,11 +29,7 @@ const presentationVideoProcessingContract = contractBuilder()
             timestamp: z.string().describe("Event timestamp"),
         })
     )
-    .strategy(ProcessingStrategy.ABORT, {
-        onAbort: (input) => {
-            console.log(`[PresentationEvent] Aborting previous video processing for: ${input.videoId}`);
-        },
-    })
+    .strategy(ProcessingStrategy.ABORT)
     .build();
 
 const presentationContracts = {

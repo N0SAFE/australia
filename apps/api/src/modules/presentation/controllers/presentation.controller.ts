@@ -100,9 +100,6 @@ export class PresentationController {
 
                 // Get Range header (case-insensitive)
                 const rangeHeader = headers.range ?? headers.Range;
-                
-                console.log('[PresentationController] Range header:', rangeHeader);
-                console.log('[PresentationController] All headers:', JSON.stringify(headers));
 
                 // Stream video using FileRangeService (all Range logic handled there)
                 // Pass fileId directly - FileRangeService handles file retrieval
@@ -111,9 +108,6 @@ export class PresentationController {
                     rangeHeader,
                     { maxChunkSize: 5 * 1024 * 1024 }, // 5MB chunks
                 );
-                
-                console.log('[PresentationController] Response status:', result.status);
-                console.log('[PresentationController] Response headers:', JSON.stringify(result.headers));
                 
                 return result;
             } catch (error) {
@@ -185,8 +179,6 @@ export class PresentationController {
                     message: error instanceof Error ? error.message : "Failed to subscribe to processing progress",
                 });
             }
-
-            console.log("[PresentationController] subscribeProcessingProgress completed");
         });
     }
 }

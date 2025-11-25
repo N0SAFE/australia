@@ -4,6 +4,7 @@ import type { User } from '@repo/auth';
 import { FileService } from '@/core/modules/file/services/file.service';
 import { StorageEventService } from '@/modules/storage/events/storage.event';
 import { VideoProcessingService } from '@/core/modules/video-processing/services/video-processing.service';
+import { FfmpegService } from '@/core/modules/ffmpeg/services/ffmpeg.service';
 import { DatabaseService } from '@/core/modules/database/services/database.service';
 import { capsuleMedia } from '@/config/drizzle/schema/capsule-media';
 import { capsule as capsuleTable } from '@/config/drizzle/schema/capsule';
@@ -11,10 +12,17 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { capsuleCreateInput, capsuleUpdateInput } from '@repo/api-contracts';
 import { CapsuleEventService } from '../events/capsule.event';
+import { CAPSULE_VIDEO_NAMESPACE } from '../constants';
 
 // Service input types include media field (from API contract)
 type CreateCapsuleInput = z.infer<typeof capsuleCreateInput>;
 type UpdateCapsuleInput = z.infer<typeof capsuleUpdateInput>;
+
+// Minimal type for findByFileId return
+interface CapsuleWithFileId {
+  id: string;
+  fileId: string;
+}
 
 @Injectable()
 export class CapsuleService {
@@ -25,6 +33,7 @@ export class CapsuleService {
     private readonly fileService: FileService,
     private readonly storageEventService: StorageEventService,
     private readonly videoProcessingService: VideoProcessingService,
+    private readonly ffmpegService: FfmpegService,
     private readonly databaseService: DatabaseService,
     private readonly capsuleEventService: CapsuleEventService,
   ) {}
@@ -72,7 +81,6 @@ export class CapsuleService {
     }
 
     const fileId = result.fileId;
-    const absolutePath = result.absolutePath;
 
     // Create capsuleMedia junction record
     await this.databaseService.db
@@ -97,14 +105,23 @@ export class CapsuleService {
       }
 
       const videoMetadataId = videoResult.videoMetadata.id;
+      const namespace = [...CAPSULE_VIDEO_NAMESPACE];
 
       // Start async video processing in background (non-blocking)
-      // This is the same pattern used in StorageController.uploadVideo
       this.storageEventService
-        .startProcessing("videoProcessing", { fileId }, ({ abortSignal, emit }) => {
-          return this.videoProcessingService
-            .processVideo(
-              absolutePath,
+        .startProcessing("videoProcessing", { fileId }, async ({ abortSignal, emit }) => {
+          try {
+            // 1. Get the file as a Web File from storage provider
+            const webFile = await this.fileService.getFileAsWebFile(fileId);
+            if (!webFile) {
+              throw new Error(`Failed to retrieve file ${fileId} from storage provider`);
+            }
+            const input = { id: fileId, file: webFile };
+
+            // 2. Process the video with FFmpeg (namespace-based temp storage)
+            const result = await this.videoProcessingService.processVideoFromFile(
+              input,
+              namespace,
               (progress, message) => {
                 emit({
                   progress,
@@ -113,61 +130,96 @@ export class CapsuleService {
                 });
               },
               abortSignal
-            )
-            .then(async (metadata) => {
-              // SUCCESS: Update database to mark as processed
-              await this.fileService.updateVideoProcessingStatus(
-                videoMetadataId,
-                {
-                  isProcessed: true,
-                  processingProgress: 100,
-                  processingError: undefined,
-                }
-              );
+            );
 
-              // Emit final completion event
-              emit({
-                progress: 100,
-                message: "Processing complete",
-                metadata: {
-                  duration: metadata.duration,
-                  width: metadata.width,
-                  height: metadata.height,
-                  codec: metadata.codec,
-                },
-                timestamp: new Date().toISOString(),
-              });
-              
-              this.logger.log(`Video processing completed for capsule ${capsuleId}, fileId: ${fileId}`);
-            })
-            .catch(async (error: unknown) => {
-              const err = error instanceof Error ? error : new Error(String(error));
+            // 3. Get the processed file stream from temp storage
+            const processedFileContent = await this.ffmpegService.getProcessedFile(fileId, namespace);
 
-              // Check if this was an abort
-              if (abortSignal?.aborted || err.message.includes("aborted")) {
-                this.logger.warn(`Video processing aborted for capsule ${capsuleId}, fileId: ${fileId}`);
-                return; // Don't mark as error in DB for aborts
-              }
-
-              // FAILURE: Update database with error
-              this.logger.error(`Video processing failed for capsule ${capsuleId}, fileId: ${fileId}: ${err.message}`);
-              
-              await this.fileService.updateVideoProcessingStatus(
-                videoMetadataId,
-                {
-                  isProcessed: false,
-                  processingProgress: 0,
-                  processingError: err.message,
-                }
-              );
-
-              // Emit final completion event with error (without 'error' property)
-              emit({
-                progress: 0,
-                message: `Processing failed: ${err.message}`,
-                timestamp: new Date().toISOString(),
-              });
+            // 4. Convert stream to Web File
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of processedFileContent.stream) {
+              chunks.push(chunk as Uint8Array);
+            }
+            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            const buffer = new Uint8Array(totalLength);
+            let chunkOffset = 0;
+            for (const chunk of chunks) {
+              buffer.set(chunk, chunkOffset);
+              chunkOffset += chunk.length;
+            }
+            const processedWebFile = new File([buffer], webFile.name, {
+              type: 'video/mp4',
             });
+
+            // 5. Replace the original file content in storage provider
+            await this.fileService.replaceFileContent(fileId, processedWebFile);
+
+            // 6. Update file metadata (size, mimeType) in database
+            await this.fileService.updateFileMetadata(fileId, {
+              size: processedWebFile.size,
+              mimeType: 'video/mp4',
+            });
+
+            // 7. Cleanup temp files
+            await this.ffmpegService.cleanup(fileId, namespace);
+
+            // 8. Update video processing status in database
+            await this.fileService.updateVideoProcessingStatus(
+              videoMetadataId,
+              {
+                isProcessed: true,
+                processingProgress: 100,
+                processingError: undefined,
+              }
+            );
+
+            // Emit final completion event
+            emit({
+              progress: 100,
+              message: "Processing complete",
+              metadata: {
+                duration: result.metadata.duration,
+                width: result.metadata.width,
+                height: result.metadata.height,
+                codec: result.metadata.codec,
+              },
+              timestamp: new Date().toISOString(),
+            });
+            
+            this.logger.log(`Video processing completed for capsule ${capsuleId}, fileId: ${fileId}`);
+          } catch (error: unknown) {
+            const err = error instanceof Error ? error : new Error(String(error));
+
+            // Always cleanup temp files on error
+            await this.ffmpegService.cleanup(fileId, namespace).catch((cleanupErr: unknown) => {
+              this.logger.warn(`Failed to cleanup temp files for fileId ${fileId}: ${String(cleanupErr)}`);
+            });
+
+            // Check if this was an abort
+            if (abortSignal?.aborted || err.message.includes("aborted")) {
+              this.logger.warn(`Video processing aborted for capsule ${capsuleId}, fileId: ${fileId}`);
+              return; // Don't mark as error in DB for aborts
+            }
+
+            // FAILURE: Update database with error
+            this.logger.error(`Video processing failed for capsule ${capsuleId}, fileId: ${fileId}: ${err.message}`);
+            
+            await this.fileService.updateVideoProcessingStatus(
+              videoMetadataId,
+              {
+                isProcessed: false,
+                processingProgress: 0,
+                processingError: err.message,
+              }
+            );
+
+            // Emit final completion event with error
+            emit({
+              progress: 0,
+              message: `Processing failed: ${err.message}`,
+              timestamp: new Date().toISOString(),
+            });
+          }
         })
         .catch((error: unknown) => {
           // If startProcessing itself fails, log it but don't block the upload
@@ -344,6 +396,30 @@ export class CapsuleService {
    */
   async findCapsuleById(id: string) {
     return await this.capsuleRepository.findById(id);
+  }
+
+  /**
+   * Find capsule by fileId (for crash recovery)
+   * Checks if any capsule references this fileId through capsuleMedia
+   */
+  async findByFileId(fileId: string): Promise<CapsuleWithFileId | null> {
+    const [mediaRecord] = await this.databaseService.db
+      .select({
+        capsuleId: capsuleMedia.capsuleId,
+        fileId: capsuleMedia.fileId,
+      })
+      .from(capsuleMedia)
+      .where(eq(capsuleMedia.fileId, fileId))
+      .limit(1);
+
+    if (!mediaRecord) {
+      return null;
+    }
+
+    return {
+      id: mediaRecord.capsuleId,
+      fileId: mediaRecord.fileId,
+    };
   }
 
   /**

@@ -84,11 +84,7 @@ export class FileRangeService {
         'pdf': 'application/pdf',
       };
       mimeType = ext ? (mimeTypeMap[ext] ?? 'application/octet-stream') : 'application/octet-stream';
-      console.log('[FileRangeService] Empty MIME type detected, using fallback:', mimeType);
     }
-
-    console.log('[FileRangeService] File size:', fileSize, 'MIME:', mimeType);
-    console.log('[FileRangeService] Range header:', rangeHeader);
 
     // Handle Range requests
     if (rangeHeader) {
@@ -101,8 +97,6 @@ export class FileRangeService {
       }
 
       const { start, end, contentLength } = rangeResult;
-      
-      console.log('[FileRangeService] Parsed range:', { start, end, contentLength });
       
       // Use createRangeFile to read exact bytes into a standard File object
       // This ensures Content-Length matches exactly for HTTP/2 compatibility
@@ -117,8 +111,6 @@ export class FileRangeService {
 
       // Build Range response headers
       const headers = this.buildRangeHeaders(start, end, fileSize, mimeType, contentLength);
-      
-      console.log('[FileRangeService] Returning 206 with headers:', headers);
 
       return {
         status: 206, // Partial Content
@@ -128,7 +120,6 @@ export class FileRangeService {
     }
 
     // No Range header - return full file
-    console.log('[FileRangeService] No range header, returning full file');
     const lazyFile = await this.fileService.createLazyFile(fileId, undefined, mimeType);
     const headers = this.buildFullFileHeaders(fileSize, mimeType);
 

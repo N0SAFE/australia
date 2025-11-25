@@ -157,8 +157,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     // Build full event name using fileId from input
     const fullEventName = this.buildFullEventName(String(eventName), validatedInput as Record<string, unknown>);
 
-    this.logger.debug(`New subscription to event: ${fullEventName}`);
-
     // Get or create subscription data
     let subscription = this.events.get(fullEventName);
     if (!subscription) {
@@ -179,7 +177,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
         sub.asyncIterators.delete(controller as AsyncIteratorController<unknown>);
         if (sub.asyncIterators.size === 0) {
           this.events.delete(fullEventName);
-          this.logger.debug(`Event subscription cleaned up: ${fullEventName}`);
         }
       }
     };
@@ -225,11 +222,8 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
 
     const subscription = this.events.get(fullEventName);
     if (!subscription) {
-      this.logger.debug(`No subscribers for event: ${fullEventName}`);
       return;
     }
-
-    this.logger.debug(`Emitting event: ${fullEventName} to ${String(subscription.asyncIterators.size)} subscribers`);
 
     // Push to all subscribed iterators
     const typedIterators = subscription.asyncIterators as unknown as Set<AsyncIteratorController<EventOutput<TContracts[K]>>>;
@@ -289,7 +283,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     // IGNORE: Skip if already processing
     if (strategy === ProcessingStrategy.IGNORE) {
       if (state.isProcessing) {
-        this.logger.debug(`Ignoring new request for ${fullEventName} (already processing)`);
         contract.options?.onIgnore?.(validatedInput);
         return;
       }
@@ -298,7 +291,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     // ABORT: Kill previous operation and start new one
     if (strategy === ProcessingStrategy.ABORT) {
       if (state.isProcessing && state.abortController) {
-        this.logger.debug(`Aborting previous operation for ${fullEventName}`);
         const context: AbortContext = {
           signal: state.abortController.signal,
           abortController: state.abortController,
@@ -344,7 +336,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
       if (state.isProcessing) {
         // Add to queue
         const position = state.queue.length + 1;
-        this.logger.debug(`Queueing request for ${fullEventName} (position: ${String(position)})`);
         contract.options?.onQueue?.(validatedInput, position);
         state.queue.push({
           input: validatedInput,
@@ -481,7 +472,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
         (iterator as AsyncIteratorController<EventOutput<TContracts[K]>>).end();
       }
       this.events.delete(fullEventName);
-      this.logger.debug(`All subscribers removed for event: ${fullEventName}`);
     }
   }
 

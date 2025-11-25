@@ -3,10 +3,12 @@ import { Implement, implement } from "@orpc/nest";
 import { ORPCError } from "@orpc/server";
 import { StorageService } from "../services/storage.service";
 import { VideoProcessingService } from "@/core/modules/video-processing";
+import { FfmpegService } from "@/core/modules/ffmpeg/services/ffmpeg.service";
 import { StorageEventService } from "../events/storage.event";
 import { FileService } from "@/core/modules/file/services/file.service";
 import { storageContract } from "@repo/api-contracts";
 import { FileRangeService } from "@/core/modules/file/index";
+import { STORAGE_VIDEO_NAMESPACE } from "../constants";
 
 @Controller()
 export class StorageController {
@@ -15,6 +17,7 @@ export class StorageController {
     constructor(
         private readonly storageService: StorageService,
         private readonly videoProcessingService: VideoProcessingService,
+        private readonly ffmpegService: FfmpegService,
         private readonly storageEventService: StorageEventService,
         private readonly fileRangeService: FileRangeService,
         private readonly fileService: FileService
@@ -78,24 +81,37 @@ export class StorageController {
 
             // Use StorageService which delegates to core FileService
             const result = await this.storageService.uploadVideo(file, uploadedBy);
+            const fileId = result.fileId;
 
             // Get video metadata for processing
-            const videoResult = await this.storageService.getVideoByFileId(result.fileId);
+            const videoResult = await this.storageService.getVideoByFileId(fileId);
             if (!videoResult?.videoMetadata) {
                 throw new Error("Failed to retrieve video metadata after upload");
             }
 
-            await this.storageService.updateVideoProcessingStatus(videoResult.videoMetadata.id, {
+            const videoMetadataId = videoResult.videoMetadata.id;
+            const namespace = [...STORAGE_VIDEO_NAMESPACE];
+
+            await this.storageService.updateVideoProcessingStatus(videoMetadataId, {
                 isProcessed: false,
                 processingProgress: 0,
             });
 
             // Start async video processing in background (non-blocking)
             this.storageEventService
-                .startProcessing("videoProcessing", { fileId: result.fileId }, ({ abortSignal, emit }) => {
-                    return this.videoProcessingService
-                        .processVideo(
-                            result.absolutePath,
+                .startProcessing("videoProcessing", { fileId }, async ({ abortSignal, emit }) => {
+                    try {
+                        // 1. Get the file as a Web File from storage provider
+                        const webFile = await this.fileService.getFileAsWebFile(fileId);
+                        if (!webFile) {
+                            throw new Error(`Failed to retrieve file ${fileId} from storage provider`);
+                        }
+                        const processingInput = { id: fileId, file: webFile };
+
+                        // 2. Process the video with FFmpeg (namespace-based temp storage)
+                        const processingResult = await this.videoProcessingService.processVideoFromFile(
+                            processingInput,
+                            namespace,
                             (progress, message) => {
                                 emit({
                                     progress,
@@ -104,54 +120,79 @@ export class StorageController {
                                 });
                             },
                             abortSignal
-                        )
-                        .then(async (metadata) => {
-                            if (!videoResult.videoMetadata) {
-                                throw new Error("Video processing returned no metadata");
-                            }
-                            // SUCCESS: Update database to mark as processed
-                            await this.storageService.updateVideoProcessingStatus(videoResult.videoMetadata.id, {
-                                isProcessed: true,
-                                processingProgress: 100,
-                                processingError: undefined,
-                            });
+                        );
 
-                            // Emit final completion event with metadata
-                            emit({
-                                progress: 100,
-                                message: "Processing complete",
-                                metadata: {
-                                    duration: metadata.duration,
-                                    width: metadata.width,
-                                    height: metadata.height,
-                                    codec: metadata.codec,
-                                },
-                                timestamp: new Date().toISOString(),
-                            });
-                        })
-                        .catch(async (error: unknown) => {
-                            if (!videoResult.videoMetadata) {
-                                throw new Error("Video processing failed and no video metadata available");
-                            }
-                            
-                            const err = error instanceof Error ? error : new Error(String(error));
+                        // 3. Get the processed file stream from temp storage
+                        const processedFileContent = await this.ffmpegService.getProcessedFile(fileId, namespace);
 
-                            // Check if this was an abort
-                            if (abortSignal?.aborted || err.message.includes("aborted")) {
-                                this.logger.warn(`Video processing aborted for video ${videoResult.videoMetadata.id} with fileId: ${result.fileId}: ${err.message}`);
-                                return; // Don't mark as error in DB for aborts
-                            }
-
-                            await this.storageService.updateVideoProcessingStatus(videoResult.videoMetadata.id, {
-                                isProcessed: false,
-                                processingError: err.message,
-                            });
-
-                            this.logger.error(`Video processing failed for video ${videoResult.videoMetadata.id} with fileId: ${result.fileId}: ${err.message}`);
-
-                            // Throw error to propagate to subscriber
-                            throw err;
+                        // 4. Convert stream to Web File
+                        const chunks: Uint8Array[] = [];
+                        for await (const chunk of processedFileContent.stream) {
+                            chunks.push(chunk as Uint8Array);
+                        }
+                        const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+                        const buffer = new Uint8Array(totalLength);
+                        let chunkOffset = 0;
+                        for (const chunk of chunks) {
+                            buffer.set(chunk, chunkOffset);
+                            chunkOffset += chunk.length;
+                        }
+                        const processedWebFile = new File([buffer], webFile.name, {
+                            type: 'video/mp4',
                         });
+
+                        // 5. Replace the original file content in storage provider
+                        await this.fileService.replaceFileContent(fileId, processedWebFile);
+
+                        // 6. Update file metadata (size, mimeType) in database
+                        await this.fileService.updateFileMetadata(fileId, {
+                            size: processedWebFile.size,
+                            mimeType: 'video/mp4',
+                        });
+
+                        // 7. Cleanup temp files
+                        await this.ffmpegService.cleanup(fileId, namespace);
+
+                        // 8. Update video processing status in database
+                        await this.storageService.updateVideoProcessingStatus(videoMetadataId, {
+                            isProcessed: true,
+                            processingProgress: 100,
+                            processingError: undefined,
+                        });
+
+                        // Emit final completion event with metadata
+                        emit({
+                            progress: 100,
+                            message: "Processing complete",
+                            metadata: {
+                                duration: processingResult.metadata.duration,
+                                width: processingResult.metadata.width,
+                                height: processingResult.metadata.height,
+                                codec: processingResult.metadata.codec,
+                            },
+                            timestamp: new Date().toISOString(),
+                        });
+                    } catch (error: unknown) {
+                        const err = error instanceof Error ? error : new Error(String(error));
+
+                        // Always cleanup temp files on error
+                        await this.ffmpegService.cleanup(fileId, namespace).catch((cleanupErr: unknown) => {
+                            this.logger.warn(`Failed to cleanup temp files for fileId ${fileId}: ${String(cleanupErr)}`);
+                        });
+
+                        // Check if this was an abort
+                        if (abortSignal?.aborted || err.message.includes("aborted")) {
+                            this.logger.warn(`Video processing aborted for video ${videoMetadataId} with fileId: ${fileId}: ${err.message}`);
+                            return; // Don't mark as error in DB for aborts
+                        }
+
+                        await this.storageService.updateVideoProcessingStatus(videoMetadataId, {
+                            isProcessed: false,
+                            processingError: err.message,
+                        });
+
+                        this.logger.error(`Video processing failed for video ${videoMetadataId} with fileId: ${fileId}: ${err.message}`);
+                    }
                 })
                 .catch((error: unknown) => {
                     const err = error instanceof Error ? error : new Error(String(error));

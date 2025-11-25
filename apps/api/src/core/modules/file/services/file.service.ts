@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import type { ReadStream } from 'fs';
 import { promises as fsPromises } from 'fs';
 import { LazyFile } from '@mjackson/lazy-file';
@@ -26,6 +26,8 @@ import { FileUploadRepository } from '../repositories/file-upload.repository';
  */
 @Injectable()
 export class FileService {
+  private readonly logger = new Logger(FileService.name);
+
   constructor(
     @Inject('STORAGE_PROVIDER')
     private readonly storageProvider: IStorageProvider,
@@ -206,8 +208,6 @@ export class FileService {
 
     // Update database with actual size
     await this.fileUploadRepository.updateFileSize(fileId, actualSize);
-
-    console.log(`[FileService] refreshFileSizeFromDisk: Updated file ${fileId} size from ${String(fileRecord.size)} to ${String(actualSize)}`);
 
     return actualSize;
   }
@@ -531,8 +531,6 @@ export class FileService {
         file.filename,
         { type: finalMimeType }
       );
-
-      console.log(`[FileService] createRangeFile: Created file with ${String(rangeFile.size)} bytes, type: ${rangeFile.type}`);
       
       return rangeFile;
     } finally {
@@ -580,6 +578,66 @@ export class FileService {
   closeStream(stream: ReadStream): void {
     if (!stream.destroyed) {
       stream.destroy();
+    }
+  }
+
+  /**
+   * Replace the content of an existing file with new content.
+   * Used after video processing to replace original with processed version.
+   *
+   * @param fileId - The file ID to replace content for
+   * @param newFile - The new file content (Web File object)
+   */
+  async replaceFileContent(fileId: string, newFile: File): Promise<void> {
+    const file = await this.fileUploadRepository.getFileById(fileId);
+    if (!file?.namespace || !file.storedFilename) {
+      throw new Error(`File not found or incomplete: ${fileId}`);
+    }
+
+    // Build the relative path
+    const relativePath = this.buildRelativePath(file.namespace, file.storedFilename);
+
+    // Save new content (overwrites existing file)
+    await this.storageProvider.save(newFile, relativePath);
+  }
+
+  /**
+   * Update file metadata in the database.
+   * Used after video processing to update size and mimeType.
+   *
+   * @param fileId - The file ID to update
+   * @param metadata - Metadata to update (size, mimeType)
+   */
+  async updateFileMetadata(
+    fileId: string,
+    metadata: { size?: number; mimeType?: string }
+  ): Promise<void> {
+    // Use existing method for size update
+    if (metadata.size !== undefined) {
+      await this.fileUploadRepository.updateFileSize(fileId, metadata.size);
+    }
+    // TODO: Add mimeType update to repository if needed
+  }
+
+  /**
+   * Get a file as a Web File object.
+   * Reads the file from storage and returns it as a standard File object.
+   *
+   * @param fileId - The file ID
+   * @returns Web File object or null if not found
+   */
+  async getFileAsWebFile(fileId: string): Promise<File | null> {
+    const file = await this.fileUploadRepository.getFileById(fileId);
+    if (!file?.namespace || !file.storedFilename) {
+      return null;
+    }
+
+    try {
+      const { buffer, filename, mimeType } = await this.getFileBuffer(fileId);
+      return new File([buffer], filename, { type: mimeType });
+    } catch (error) {
+      this.logger.error(`Failed to get file as Web File: ${fileId}`, error);
+      return null;
     }
   }
 }

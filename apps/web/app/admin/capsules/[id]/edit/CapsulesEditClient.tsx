@@ -51,7 +51,7 @@ export const CapsulesEditClient: FC<{
         mode="edit"
         capsule={capsule}
         onSuccess={() => {
-          router.push(`/admin/capsules/${capsuleId}`);
+          router.push(`/admin/capsules`);
         }}
       />
     </div>

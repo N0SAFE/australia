@@ -5,7 +5,6 @@ import { ReactNode } from "react";
 import { Toaster } from "@repo/ui/components/shadcn/sonner";
 import ReactQueryProviders from "@/utils/providers/ReactQueryProviders";
 import { DynamicTanstackDevTools } from "@/components/devtools/DynamicTanstackDevTools";
-import ThemeProvider from '@repo/ui/components/theme-provider';
 
 const PontanoSansFont = localFont({
   src: "../public/fonts/Pontano_Sans/PontanoSans-VariableFont_wght.ttf",
@@ -97,23 +96,16 @@ export default async function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="fr">
+    <html lang="fr" className="dark" style={{ colorScheme: 'dark' }}>
       <body
         className={`${PontanoSansFont.variable} ${PinyonScriptFont.variable} antialiased`}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          <ReactQueryProviders>
-            {children}
+        <ReactQueryProviders>
+          {children}
 
-            <DynamicTanstackDevTools />
-          </ReactQueryProviders>
-          <Toaster theme="light" richColors position="top-center" />
-        </ThemeProvider>
+          <DynamicTanstackDevTools />
+        </ReactQueryProviders>
+        <Toaster theme="dark" richColors position="top-center" />
       </body>
     </html>
   );

@@ -1,9 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { EnvModule } from '../config/env/env.module';
 import { DatabaseModule } from '../core/modules/database/database.module';
 import { AuthModule } from '../core/modules/auth/auth.module';
 import { FileModule } from '../core/modules/file/file.module';
 import { StorageModule } from '../modules/storage/storage.module';
+import { MigrationModule } from '../core/migration/migration.module';
+import { MigrationRegistry } from '../core/migration/migration.registry';
+import { MIGRATIONS } from '../core/migration/migrations';
 import { DATABASE_CONNECTION } from '../core/modules/database/database-connection';
 import { SeedCommand } from './commands/seed.command';
 import { MigrateCommand } from './commands/migrate.command';
@@ -18,6 +21,7 @@ import { EnvService } from '@/config/env/env.service';
     DatabaseModule,
     FileModule,
     StorageModule,
+    MigrationModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, EnvModule],
       useFactory: createBetterAuth,
@@ -31,4 +35,15 @@ import { EnvService } from '@/config/env/env.service';
     CreateDefaultAdminCommand,
   ],
 })
-export class CLIModule {}
+export class CLIModule implements OnModuleInit {
+  constructor(private readonly migrationRegistry: MigrationRegistry) {}
+
+  /**
+   * Register all TypeScript migrations when the module initializes
+   */
+  onModuleInit() {
+    for (const migration of MIGRATIONS) {
+      this.migrationRegistry.register(migration);
+    }
+  }
+}

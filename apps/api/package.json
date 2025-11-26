@@ -26,7 +26,8 @@
     "db:reset": "bun src/cli.ts reset",
     "db:push": "drizzle-kit push",
     "cli": "bun src/cli.ts",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "bun scripts/generate-migration.ts",
+    "db:generate:sql-only": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "auth:generate": "bun x @better-auth/cli generate --config src/auth.ts --output src/config/drizzle/schema/auth.ts --y && bun run db:generate",
     "download:assets": "./seed/download-assets.sh"

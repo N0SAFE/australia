@@ -141,6 +141,20 @@
       "when": 1763991386704,
       "tag": "0019_bent_ultragirl",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1764005034368,
+      "tag": "0020_fearless_gressill",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1764091055504,
+      "tag": "0021_deep_kat_farrell",
+      "breakpoints": true
     }
   ]
 }

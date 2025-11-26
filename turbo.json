@@ -25,9 +25,6 @@
         "CORS_ORIGIN",
         "LOG_LEVEL",
         "CHOKIDAR_USEPOLLING",
-        "PASSKEY_RPID",
-        "PASSKEY_RPNAME",
-        "PASSKEY_ORIGIN",
         "UPLOADS_DIR",
         "TRUSTED_ORIGINS",
         "AUTH_BASE_DOMAIN"

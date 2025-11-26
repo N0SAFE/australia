@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Gift } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function UpdateNotification() {
   const [showUpdate, setShowUpdate] = useState(false);
@@ -49,31 +50,35 @@ export function UpdateNotification() {
   if (!showUpdate) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md animate-slide-up">
-      <div className="rounded-lg border bg-card p-4 shadow-lg">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0">
-            <RefreshCw className="h-6 w-6 text-primary" />
+    <div className="fixed top-4 left-4 right-4 z-50 mx-auto max-w-sm animate-in slide-in-from-top-4 duration-300">
+      <div className="rounded-xl border border-pink-medium/30 bg-card p-4 shadow-lg">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-light">
+            <Gift className="h-5 w-5 text-pink-dark" />
           </div>
-          <div className="flex-1 space-y-2">
-            <h3 className="font-semibold">Update Available</h3>
-            <p className="text-sm text-muted-foreground">
-              A new version of Gossip Club is available. Refresh to get the
-              latest features and improvements.
-            </p>
+          <div className="flex-1 space-y-3">
+            <div>
+              <h3 className="font-script text-xl text-pink-dark">Nouveautés !</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Une nouvelle version est disponible avec des améliorations.
+              </p>
+            </div>
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={updateServiceWorker}
-                className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex-1 bg-pink-dark text-white hover:bg-pink-dark/90"
+                size="sm"
               >
-                Refresh Now
-              </button>
-              <button
+                <RefreshCw className="mr-1.5 h-4 w-4" />
+                Actualiser
+              </Button>
+              <Button
                 onClick={() => setShowUpdate(false)}
-                className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                variant="outline"
+                size="sm"
               >
-                Later
-              </button>
+                Plus tard
+              </Button>
             </div>
           </div>
         </div>

@@ -1,6 +1,5 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { passkey } from "better-auth/plugins/passkey";
 import { openAPI } from "better-auth/plugins";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { masterTokenPlugin } from "./plugins/masterTokenAuth";
@@ -12,9 +11,6 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
     database: unknown,
     env: {
         DEV_AUTH_KEY: string | undefined;
-        PASSKEY_RPID?: string | undefined;
-        PASSKEY_RPNAME?: string | undefined;
-        PASSKEY_ORIGIN?: string | undefined;
         NODE_ENV: string;
         BETTER_AUTH_SECRET?: string;
         BASE_URL?: string;
@@ -28,9 +24,6 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
 
     const {
         DEV_AUTH_KEY,
-        PASSKEY_RPID,
-        PASSKEY_RPNAME,
-        PASSKEY_ORIGIN,
         NODE_ENV,
         BETTER_AUTH_SECRET,
         BASE_URL,
@@ -96,11 +89,6 @@ export const betterAuthFactory = <TSchema extends Record<string, unknown> = Reco
                 },
             },
             plugins: [
-                passkey({
-                    rpID: PASSKEY_RPID,
-                    rpName: PASSKEY_RPNAME,
-                    origin: PASSKEY_ORIGIN,
-                }),
                 useAdmin(),
                 masterTokenPlugin({
                     devAuthKey: DEV_AUTH_KEY ?? "",

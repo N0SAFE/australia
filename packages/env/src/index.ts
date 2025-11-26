@@ -4,8 +4,6 @@ import {
     LOCAL_APP_FALLBACK,
     LOCAL_API_FALLBACK,
     DEFAULT_API_PORT,
-    DEFAULT_PASSKEY_RPID,
-    DEFAULT_PASSKEY_RPNAME,
 } from './constants'
 
 // ============================================================================
@@ -45,11 +43,6 @@ export const apiEnvSchema = zod.object({
     AUTH_BASE_DOMAIN: zod.string().optional(),
     DEV_AUTH_KEY: zod.string().optional(),
     TRUSTED_ORIGINS: zod.string().optional(),
-    
-    // Passkey
-    PASSKEY_RPID: zod.string().default(DEFAULT_PASSKEY_RPID).optional(),
-    PASSKEY_RPNAME: zod.string().default(DEFAULT_PASSKEY_RPNAME).optional(),
-    PASSKEY_ORIGIN: zod.string().default(LOCAL_APP_FALLBACK).optional(),
     
     // Uploads
     UPLOADS_DIR: zod.string().default('/app/apps/api/uploads'),

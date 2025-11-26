@@ -5,7 +5,7 @@ import { ReactNode, Suspense } from "react";
 import { Toaster } from "@repo/ui/components/shadcn/sonner";
 import ReactQueryProviders from "@/utils/providers/ReactQueryProviders";
 import { DynamicTanstackDevTools } from "@/components/devtools/DynamicTanstackDevTools";
-import { ServiceWorkerProvider } from "@/components/pwa/ServiceWorkerProvider";
+import { SerwistProvider } from "@/lib/serwist-client";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { UpdateNotification } from "@/components/pwa/UpdateNotification";
 
@@ -116,7 +116,7 @@ export default async function RootLayout({
       <body
         className={`${PontanoSansFont.variable} ${PinyonScriptFont.variable} antialiased`}
       >
-        <ServiceWorkerProvider>
+        <SerwistProvider swUrl="/serwist/sw.js">
           <ReactQueryProviders>
             {children}
 
@@ -125,7 +125,7 @@ export default async function RootLayout({
           <Toaster richColors position="top-center" />
           <InstallPrompt />
           <UpdateNotification />
-        </ServiceWorkerProvider>
+        </SerwistProvider>
       </body>
     </html>
   );

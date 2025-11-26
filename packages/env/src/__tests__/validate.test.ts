@@ -23,9 +23,6 @@ describe('API Environment Validation', () => {
     DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
     API_PORT: 3001,
     AUTH_SECRET: 'test-secret-key-at-least-32-chars-long',
-    PASSKEY_RPID: 'localhost',
-    PASSKEY_RPNAME: 'Test App',
-    PASSKEY_ORIGIN: 'http://localhost:3000',
   }
 
   describe('validateApiEnv', () => {
@@ -66,14 +63,6 @@ describe('API Environment Validation', () => {
       const result = validateApiEnv(withStringPort)
       expect(result.API_PORT).toBe(3002)
       expect(typeof result.API_PORT).toBe('number')
-    })
-
-    it('should apply default PASSKEY values', () => {
-      const { PASSKEY_RPID, PASSKEY_RPNAME, PASSKEY_ORIGIN, ...minimal } = validApiEnv
-      const result = validateApiEnv(minimal)
-      expect(result.PASSKEY_RPID).toBe('localhost')
-      expect(result.PASSKEY_RPNAME).toBe('NestJS Directus Turborepo Template')
-      expect(result.PASSKEY_ORIGIN).toBe('http://localhost:3000')
     })
 
     it('should accept optional DEV_AUTH_KEY', () => {
@@ -358,9 +347,6 @@ describe('All Apps Environment Validation', () => {
       DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
       API_PORT: 3001,
       AUTH_SECRET: 'test-secret-key-at-least-32-chars-long',
-      PASSKEY_RPID: 'localhost',
-      PASSKEY_RPNAME: 'Test App',
-      PASSKEY_ORIGIN: 'http://localhost:3000',
     },
     web: {
       NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
@@ -435,9 +421,6 @@ describe('Edge Cases and Error Handling', () => {
         DATABASE_URL: 'postgresql://localhost:5432/db',
         API_PORT: 0,
         AUTH_SECRET: 'test-secret',
-        PASSKEY_RPID: 'localhost',
-        PASSKEY_RPNAME: 'Test',
-        PASSKEY_ORIGIN: 'http://localhost:3000',
       }
       expect(() => validateApiEnv(env)).toThrow()
     })
@@ -449,9 +432,6 @@ describe('Edge Cases and Error Handling', () => {
         DATABASE_URL: 'postgresql://localhost:5432/db',
         API_PORT: 70000,
         AUTH_SECRET: 'test-secret',
-        PASSKEY_RPID: 'localhost',
-        PASSKEY_RPNAME: 'Test',
-        PASSKEY_ORIGIN: 'http://localhost:3000',
       }
       expect(() => validateApiEnv(env)).toThrow()
     })
@@ -463,9 +443,6 @@ describe('Edge Cases and Error Handling', () => {
         DATABASE_URL: 'postgresql://localhost:5432/db',
         API_PORT: 1,
         AUTH_SECRET: 'test-secret',
-        PASSKEY_RPID: 'localhost',
-        PASSKEY_RPNAME: 'Test',
-        PASSKEY_ORIGIN: 'http://localhost:3000',
       }
       const result = validateApiEnv(env)
       expect(result.API_PORT).toBe(1)
@@ -478,9 +455,6 @@ describe('Edge Cases and Error Handling', () => {
         DATABASE_URL: 'postgresql://localhost:5432/db',
         API_PORT: 65535,
         AUTH_SECRET: 'test-secret',
-        PASSKEY_RPID: 'localhost',
-        PASSKEY_RPNAME: 'Test',
-        PASSKEY_ORIGIN: 'http://localhost:3000',
       }
       const result = validateApiEnv(env)
       expect(result.API_PORT).toBe(65535)

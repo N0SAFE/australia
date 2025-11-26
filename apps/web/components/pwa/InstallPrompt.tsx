@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { X, Download, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -77,34 +78,41 @@ export function InstallPrompt() {
   if (!showInstallPrompt || !deferredPrompt) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md animate-slide-up">
-      <div className="rounded-lg border bg-card p-4 shadow-lg">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 space-y-2">
-            <h3 className="font-semibold">Install Gossip Club</h3>
-            <p className="text-sm text-muted-foreground">
-              Install this app on your device for quick access and a better
-              experience.
-            </p>
+    <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-sm animate-in slide-in-from-bottom-4 duration-300">
+      <div className="rounded-xl border border-pink-medium/30 bg-card p-4 shadow-lg">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pink-light">
+            <Sparkles className="h-5 w-5 text-pink-dark" />
+          </div>
+          <div className="flex-1 space-y-3">
+            <div>
+              <h3 className="font-script text-xl text-pink-dark">Installer l&apos;app</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Installez l&apos;application pour un accès rapide et une meilleure expérience.
+              </p>
+            </div>
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={handleInstallClick}
-                className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex-1 bg-pink-dark text-white hover:bg-pink-dark/90"
+                size="sm"
               >
-                Install
-              </button>
-              <button
+                <Download className="mr-1.5 h-4 w-4" />
+                Installer
+              </Button>
+              <Button
                 onClick={handleDismiss}
-                className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                variant="outline"
+                size="sm"
               >
-                Not now
-              </button>
+                Plus tard
+              </Button>
             </div>
           </div>
           <button
             onClick={handleDismiss}
-            className="ml-4 inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted"
-            aria-label="Dismiss"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            aria-label="Fermer"
           >
             <X className="h-4 w-4" />
           </button>

@@ -1,6 +1,5 @@
 import { createAuthClient } from 'better-auth/react'
 import type { BetterAuthClientOptions, BetterAuthClientPlugin } from 'better-auth/client'
-import { passkeyClient } from 'better-auth/client/plugins'
 import masterTokenClient from './plugins/masterToken'
 import { loginAsClientPlugin } from './plugins/loginAs'
 import { inviteClient } from './plugins/invite'
@@ -45,7 +44,6 @@ export const createAuthClientFactory = (options: CreateAuthClientFactoryOptions)
     baseURL,
     fetchOptions,
     plugins: [
-      passkeyClient(),
       masterTokenClient(),
       loginAsClientPlugin(),
       inviteClient(),

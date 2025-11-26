@@ -52,7 +52,6 @@ const env = validateDocEnv(process.env)
 - `API_PORT` (default: 3001): API server port
 - `AUTH_SECRET` (required): Authentication secret key
 - `DEV_AUTH_KEY` (optional): Development auth token
-- `PASSKEY_RPID`, `PASSKEY_RPNAME`, `PASSKEY_ORIGIN`: Passkey configuration
 - `NODE_ENV` (default: 'development'): Environment mode
 - `NEXT_PUBLIC_APP_URL` (required): Web app URL for CORS
 

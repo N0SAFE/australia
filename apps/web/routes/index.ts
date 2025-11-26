@@ -16,6 +16,7 @@ import * as UserLoginRoute from "@/app/(user)/login/page.info";
 import * as UserPresentationRoute from "@/app/(user)/presentation/page.info";
 import * as UserRegisterRoute from "@/app/(user)/register/page.info";
 import * as UnlockRoute from "@/app/(user)/unlock/page.info";
+import * as OfflineRoute from "@/app/~offline/page.info";
 import * as AdminRoute from "@/app/admin/page.info";
 import * as AdminCapsulesRoute from "@/app/admin/capsules/page.info";
 import * as AdminCapsulesIdRoute from "@/app/admin/capsules/[id]/page.info";
@@ -28,6 +29,7 @@ import * as ApiHealthRoute from "@/app/api/health/route.info";
 import * as InviteCodeRoute from "@/app/invite/[code]/page.info";
 import * as MiddlewareErrorEnvRoute from "@/app/middleware/error/env/page.info";
 import * as MiddlewareErrorHealthCheckRoute from "@/app/middleware/error/healthCheck/page.info";
+import * as SerwistPathRoute from "@/app/serwist/[path]/route.info";
 
 export const User = makeRoute(
   "/(user)",
@@ -97,6 +99,13 @@ export const Unlock = makeRoute(
   {
     ...defaultInfo,
     ...UnlockRoute.Route
+  }
+);
+export const Offline = makeRoute(
+  "/~offline",
+  {
+    ...defaultInfo,
+    ...OfflineRoute.Route
   }
 );
 export const Admin = makeRoute(
@@ -174,6 +183,13 @@ export const MiddlewareErrorHealthCheck = makeRoute(
   {
     ...defaultInfo,
     ...MiddlewareErrorHealthCheckRoute.Route
+  }
+);
+export const SerwistPath = makeRoute(
+  "/serwist/[path]",
+  {
+    ...defaultInfo,
+    ...SerwistPathRoute.Route
   }
 );
 

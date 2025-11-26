@@ -82,7 +82,7 @@ export const CapsuleCard: FC<{
           )} 
           {...props}
         >
-          <div className="bg-white w-full flex py-3 px-4 gap-3 justify-center rounded-lg">
+          <div className="bg-white w-full flex py-3 px-4 gap-3 justify-center rounded-lg text-pink-dark">
             <LockKeyhole />
             <span>{capsuleDate.format('DD/MM/YYYY')}</span>
           </div>
@@ -93,7 +93,7 @@ export const CapsuleCard: FC<{
             <DialogHeader>
               <DialogTitle className="text-center">PAS DISPO POUR LE MOMENT...</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4"> {/**create a customizable and accessible modal for unavailable capsules using funny messages registered in the database from the admin panel */}
               <p className="text-center text-muted-foreground">
                 Ce portefolio n'a pas encore été enchainé.
               </p>

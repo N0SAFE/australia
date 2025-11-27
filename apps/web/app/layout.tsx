@@ -74,14 +74,16 @@ export const metadata: Metadata = {
       { url: "/favicon_web.svg", type: "image/svg+xml", sizes: "16x16" },
       { url: "/favicon_web-2.svg", type: "image/svg+xml", sizes: "32x32" },
       { url: "/favicon_google.svg", type: "image/svg+xml", sizes: "48x48" },
-      { url: "/favicon_google-2.svg", type: "image/svg+xml", sizes: "192x192" },
+      { url: "/icon-192x192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512x512.png", type: "image/png", sizes: "512x512" },
     ],
-    // Apple Touch Icons (for iOS devices)
+    // Apple Touch Icons (for iOS devices) - PNG required for iOS
     apple: [
       { url: "/favicon_apple.svg", type: "image/svg+xml", sizes: "60x60" },
       { url: "/favicon_apple-2.svg", type: "image/svg+xml", sizes: "180x180" },
       { url: "/favicon_ipad.svg", type: "image/svg+xml", sizes: "84x84" },
       { url: "/favicon_ipad-2.svg", type: "image/svg+xml", sizes: "167x167" },
+      { url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" },
     ],
   },
   manifest: "/site.webmanifest",

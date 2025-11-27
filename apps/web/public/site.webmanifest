@@ -9,31 +9,34 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/favicon_web.svg",
-      "sizes": "16x16",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "/favicon_web-2.svg",
-      "sizes": "32x32",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "/favicon_google.svg",
-      "sizes": "48x48",
-      "type": "image/svg+xml"
-    },
-    {
-      "src": "/favicon_google-2.svg",
+      "src": "/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/favicon_apple-2.svg",
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
       "sizes": "180x180",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "categories": ["social", "photo", "utilities"],

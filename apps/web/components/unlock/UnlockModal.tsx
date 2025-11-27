@@ -10,7 +10,7 @@ import { TimeBasedUnlock } from './TimeBasedUnlock';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/lib/auth';
 import { Shield } from 'lucide-react';
-import { useUnlockCapsule } from '@/hooks/useCapsules';
+import { useUnlockCapsule } from '@/hooks/capsules/hooks';
 
 export const UnlockModal: FC<{
   capsule: Capsule;

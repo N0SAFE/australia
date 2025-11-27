@@ -14,9 +14,8 @@ import {
 import { flexRender, useReactTable } from "@tanstack/react-table";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { useCapsules, useDeleteCapsule } from "@/hooks/useCapsules";
+import { useCapsules, useDeleteCapsule, useCapsuleVideoProcessing } from "@/hooks/capsules/hooks";
 import { Capsule } from "@/types/capsule";
-import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -50,17 +49,14 @@ import {
   Pencil,
   Search,
   Filter,
-  MessageSquare,
-  Lock,
-  Unlock,
   Sparkles,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -77,103 +73,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@repo/ui/components/shadcn/alert-dialog";
-import { Label } from "@/components/ui/label";
-import { Plus, CalendarIcon } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
-import { useCreateCapsule } from "@/hooks/useCapsules";
-import type { Value } from "platejs";
+import { Plus } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Toggle } from "@/components/ui/toggle";
-import { CapsuleContent } from "@/components/pages/capsule-details";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import { SimpleEditor } from "@/components/tiptap/editor/index";
-import { JSONContent } from "@repo/ui/tiptap-exports/react";
-import { useStorage } from "@/hooks/useStorage";
-
-
-/**
- * Sanitize filename to ASCII-safe characters for HTTP headers
- * Replaces accented characters and special chars with ASCII equivalents
- */
-function sanitizeFilename(filename: string): string {
-  // Get extension
-  const lastDotIndex = filename.lastIndexOf(".");
-  const name =
-    lastDotIndex >= 0 ? filename.substring(0, lastDotIndex) : filename;
-  const ext = lastDotIndex >= 0 ? filename.substring(lastDotIndex) : "";
-
-  // Normalize to NFD (decomposed form) and remove diacritics
-  const normalized = name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
-    .replace(/[^a-zA-Z0-9_-]/g, "_") // Replace non-ASCII with underscore
-    .replace(/_+/g, "_") // Collapse multiple underscores
-    .replace(/^_|_$/g, ""); // Remove leading/trailing underscores
-
-  return normalized + ext;
-}
+import { CapsuleForm } from "@/components/capsule/form";
+import { CapsuleContent } from "@/components/capsule/view";
 
 // Create Capsule Dialog Component
 function CreateCapsuleDialog() {
   const [open, setOpen] = useState(false);
-  const [editorValue, setEditorValue] = useState<JSONContent>([
-    { type: "paragraph", content: [{ type: "text", text: "" }] }
-  ]);
-  const [date, setDate] = useState<Date>();
-  const [formData, setFormData] = useState({
-    openingMessage: "",
-    isLocked: true,
-  });
-  const storage = useStorage();
-
-  const { mutate: createCapsule, isPending } = useCreateCapsule();
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate content
-    if (!editorValue || editorValue.length === 0) {
-      toast.error("Content is required");
-      return;
-    }
-
-    if (!date) {
-      toast.error("Opening date is required");
-      return;
-    }
-
-    // Create capsule with editor content as JSON string
-    // Note: openingMessage is optional and can be empty
-    createCapsule(
-      {
-        ...formData,
-        openingDate: date.toISOString(),
-        content: JSON.stringify(editorValue),
-        // Only include openingMessage if it's not empty
-        openingMessage: formData.openingMessage || undefined,
-      },
-      {
-        onSuccess: () => {
-          // Toast notification is handled by the hook
-          setOpen(false);
-          // Reset form
-          setEditorValue([{ type: "p", children: [{ text: "" }] }]);
-          setDate(undefined);
-          setFormData({
-            openingMessage: "",
-            isLocked: true,
-          });
-        },
-        // Error notification is handled by the hook
-      },
-    );
-  };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -191,7 +98,7 @@ function CreateCapsuleDialog() {
         side="right"
         className="w-full sm:w-[90vw] sm:max-w-4xl p-0 gap-0 overflow-y-auto"
       >
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+        <div className="flex flex-col h-full">
           <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4 space-y-2 sm:space-y-3">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -212,263 +119,12 @@ function CreateCapsuleDialog() {
           <Separator />
 
           <div className="flex-1 overflow-auto px-4 py-4 sm:px-6 sm:py-6">
-            <div className="space-y-4 sm:space-y-6 max-w-full">
-              {/* Content Editor Section */}
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-muted">
-                    <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <Label
-                      htmlFor="content"
-                      className="text-sm sm:text-base font-semibold"
-                    >
-                      Capsule Content
-                    </Label>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      Add text, images, videos, audio, and more
-                    </p>
-                  </div>
-                </div>
-                <div className="border rounded-lg shadow-sm bg-background">
-                  <SimpleEditor
-                  value={editorValue}
-                  onChange={(newValue) => {
-                    console.log(
-                      "📝 [SimpleEditor] Content changed:",
-                      JSON.stringify(newValue, null, 2),
-                    );
-                    setEditorValue(newValue);
-                  }}
-                  editable={true}
-                  placeholder="Écrivez le contenu de votre capsule temporelle..."
-                  injectMediaUrl={{
-                    api: (src) => {
-                      console.log(
-                        `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`,
-                      );
-                      return `${process.env.NEXT_PUBLIC_API_URL || ""}${src}`;
-                    },
-                  }}
-                  uploadFunctions={{
-                    image: async (file, onProgress, signal) => {
-                      // Sanitize filename to ASCII-safe characters for HTTP headers
-                      const sanitizedFile = new File(
-                        [file],
-                        sanitizeFilename(file.name),
-                        { type: file.type },
-                      );
-                      const result = await storage.uploadImageAsync(
-                        sanitizedFile,
-                        onProgress,
-                      );
-                      return result.url!;
-                    },
-                    video: async (file, onProgress, signal) => {
-                      // Sanitize filename to ASCII-safe characters for HTTP headers
-                      const sanitizedFile = new File(
-                        [file],
-                        sanitizeFilename(file.name),
-                        { type: file.type },
-                      );
-                      const result = await storage.uploadVideoAsync(
-                        sanitizedFile,
-                        onProgress,
-                      );
-                      return result.url!;
-                    },
-                    audio: async (file, onProgress, signal) => {
-                      // Sanitize filename to ASCII-safe characters for HTTP headers
-                      const sanitizedFile = new File(
-                        [file],
-                        sanitizeFilename(file.name),
-                        { type: file.type },
-                      );
-                      const result = await storage.uploadAudioAsync(
-                        sanitizedFile,
-                        onProgress,
-                      );
-                      return result.url!;
-                    },
-                  }}
-                />
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Opening Date Section */}
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <Label
-                      htmlFor="openingDate"
-                      className="text-sm sm:text-base font-semibold"
-                    >
-                      Opening Date
-                    </Label>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      When should this capsule be revealed?
-                    </p>
-                  </div>
-                </div>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      data-empty={!date}
-                      className="data-[empty=true]:text-muted-foreground w-[280px] justify-start text-left font-normal"
-                    >
-                      <CalendarIcon />
-                      {date ? format(date, "PPP") : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto overflow-hidden p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      captionLayout="dropdown"
-                      onSelect={setDate}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <Separator />
-
-              {/* Opening Message Section */}
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-muted">
-                    <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1">
-                    <Label
-                      htmlFor="openingMessage"
-                      className="text-sm sm:text-base font-semibold"
-                    >
-                      Opening Message
-                      <span className="text-[10px] sm:text-xs text-muted-foreground font-normal ml-2">
-                        (Optional)
-                      </span>
-                    </Label>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      A special greeting when the capsule opens
-                    </p>
-                  </div>
-                </div>
-                <Textarea
-                  id="openingMessage"
-                  placeholder="Welcome to this moment from the past..."
-                  value={formData.openingMessage}
-                  onChange={(e) =>
-                    setFormData({ ...formData, openingMessage: e.target.value })
-                  }
-                  className="min-h-16 sm:min-h-20 resize-none shadow-sm text-sm"
-                />
-              </div>
-
-              <Separator />
-
-              {/* Lock Status Section */}
-              <div className="space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-muted">
-                    {formData.isLocked ? (
-                      <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                    ) : (
-                      <Unlock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <Label className="text-sm sm:text-base font-semibold">
-                      Security Settings
-                    </Label>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      Control when this capsule can be accessed
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between rounded-lg border p-3 sm:p-4 shadow-sm bg-muted/30 gap-2">
-                  <div className="flex items-start gap-2 sm:gap-3 flex-1 min-w-0">
-                    <div
-                      className={cn(
-                        "flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full shrink-0",
-                        formData.isLocked ? "bg-primary/10" : "bg-muted",
-                      )}
-                    >
-                      {formData.isLocked ? (
-                        <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-                      ) : (
-                        <Unlock className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 space-y-0.5 sm:space-y-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium leading-none">
-                        {formData.isLocked
-                          ? "Locked until opening date"
-                          : "Accessible anytime"}
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2">
-                        {formData.isLocked
-                          ? "Capsule will remain sealed until the scheduled opening date"
-                          : "Capsule can be viewed immediately after creation"}
-                      </p>
-                    </div>
-                  </div>
-                  <Toggle
-                    pressed={formData.isLocked}
-                    onPressedChange={(pressed) =>
-                      setFormData({ ...formData, isLocked: pressed })
-                    }
-                    aria-label="Toggle lock status"
-                    className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground shrink-0 h-8 w-8 sm:h-9 sm:w-9"
-                  >
-                    {formData.isLocked ? (
-                      <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    ) : (
-                      <Unlock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    )}
-                  </Toggle>
-                </div>
-              </div>
-            </div>
+            <CapsuleForm
+              mode="create"
+              onSuccess={() => setOpen(false)}
+            />
           </div>
-
-          <Separator />
-
-          <SheetFooter className="px-4 py-3 sm:px-6 sm:py-4 bg-muted/30">
-            <div className="flex w-full gap-2 sm:gap-3 sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                disabled={isPending}
-                className="flex-1 sm:flex-none h-9 sm:h-10 text-sm"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isPending}
-                className="flex-1 sm:flex-none gap-2 shadow-sm h-9 sm:h-10 text-sm"
-              >
-                {isPending ? (
-                  <>
-                    <span className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Create Capsule
-                  </>
-                )}
-              </Button>
-            </div>
-          </SheetFooter>
-        </form>
+        </div>
       </SheetContent>
     </Sheet>
   );
@@ -548,6 +204,56 @@ const columns = [
     },
     enableSorting: true,
   }),
+  columnHelper.display({
+    id: "hasProcessingVideos",
+    header: "Processing",
+    cell: (info) => {
+      const capsule = info.row.original as Capsule & { 
+        hasProcessingVideos?: boolean;
+        processingProgress?: number; 
+        processingVideoCount?: number;
+      };
+      
+      // Check if capsule has videos
+      const hasVideos = capsule.attachedMedia?.some(media => media.type === 'video') ?? false;
+      
+      // If no videos at all, show "No videos"
+      if (!hasVideos) {
+        return (
+          <span className="text-muted-foreground text-xs italic">
+            No videos
+          </span>
+        );
+      }
+      
+      // If has videos but not processing, show success badge
+      if (!capsule.hasProcessingVideos) {
+        return (
+          <span
+            className="py-1 px-2.5 text-xs rounded-md font-semibold inline-flex items-center gap-1.5 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200"
+            title="All videos processed"
+          >
+            <span>✓</span>
+            <span>Processed</span>
+          </span>
+        );
+      }
+      
+      const progress = capsule.processingProgress ?? 0;
+      const videoCount = capsule.processingVideoCount ?? 0;
+      
+      return (
+        <span
+          className="py-1 px-2.5 text-xs rounded-md font-semibold inline-flex items-center gap-1.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+          title={`Processing ${videoCount} video${videoCount !== 1 ? 's' : ''}`}
+        >
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>{progress}%</span>
+        </span>
+      );
+    },
+    enableSorting: false,
+  }),
   columnHelper.accessor("createdAt", {
     header: "Created At",
     cell: (info) => {
@@ -611,13 +317,6 @@ const RowActions = ({ row }: { row: Row<Capsule> }) => {
         </SheetContent>
       </Sheet>
       <Link
-        href={`/admin/capsules/${capsuleId}`}
-        className="p-2 hover:bg-accent rounded-md transition-colors"
-        title="View details"
-      >
-        <Eye className="h-4 w-4" />
-      </Link>
-      <Link
         href={`/admin/capsules/${capsuleId}/edit`}
         className="p-2 hover:bg-accent rounded-md transition-colors"
         title="Edit capsule"
@@ -660,6 +359,51 @@ const RowActions = ({ row }: { row: Row<Capsule> }) => {
     </div>
   );
 };
+
+/**
+ * Wrapper component that subscribes to video processing events for a capsule
+ */
+function CapsuleRowWithProcessing({ row }: { row: Row<Capsule> }) {
+  const capsule = row.original as Capsule & { hasProcessingVideos?: boolean };
+  
+  // Extract video file IDs from attached media
+  const videoFileIds = useMemo(() => {
+    return capsule.attachedMedia
+      ?.filter(media => media.type === 'video')
+      ?.map(media => media.fileId) || [];
+  }, [capsule.attachedMedia]);
+  
+  // Always subscribe if capsule has videos (not just when hasProcessingVideos is true)
+  // This allows us to catch processing that starts after initial load
+  const { isProcessing, overallProgress, processingCount } = useCapsuleVideoProcessing(
+    capsule.id,
+    videoFileIds,
+    {
+      enabled: videoFileIds.length > 0,
+    }
+  );
+  
+  // Show processing indicator with progress if processing
+  const displayCapsule = {
+    ...capsule,
+    // Override hasProcessingVideos with real-time status
+    hasProcessingVideos: isProcessing,
+    // Add progress info for display
+    processingProgress: overallProgress,
+    processingVideoCount: processingCount,
+  };
+  
+  return (
+    <TableRow key={row.id}>
+      {row.getVisibleCells().map((cell) => (
+        <TableCell key={cell.id}>
+          {flexRender(cell.column.columnDef.cell, { ...cell.getContext(), row: { ...row, original: displayCapsule } })}
+        </TableCell>
+      ))}
+    </TableRow>
+  );
+}
+
 export function AdminCapsulesPageClient() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -686,6 +430,9 @@ export function AdminCapsulesPageClient() {
           direction: sorting[0].desc ? "desc" : "asc",
         }
       : undefined,
+    // No polling needed - using SSE subscriptions for real-time updates
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const rawData = response?.capsules || [];
@@ -863,17 +610,9 @@ export function AdminCapsulesPageClient() {
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.map((row) => {
-            return (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            );
-          })}
+          {table.getRowModel().rows.map((row) => (
+            <CapsuleRowWithProcessing key={row.id} row={row} />
+          ))}
         </TableBody>
         <TableFooter>
           {table.getFooterGroups().map((footerGroup) => {

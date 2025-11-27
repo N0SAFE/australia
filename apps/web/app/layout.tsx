@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import localFont from "next/font/local";
-import { ReactNode, Suspense } from "react";
+import { ReactNode } from "react";
 import { Toaster } from "@repo/ui/components/shadcn/sonner";
 import ReactQueryProviders from "@/utils/providers/ReactQueryProviders";
 import { DynamicTanstackDevTools } from "@/components/devtools/DynamicTanstackDevTools";
@@ -112,7 +112,7 @@ export default async function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="fr">
+    <html lang="fr" className="dark" style={{ colorScheme: 'dark' }}>
       <body
         className={`${PontanoSansFont.variable} ${PinyonScriptFont.variable} antialiased`}
       >
@@ -126,6 +126,7 @@ export default async function RootLayout({
           <InstallPrompt />
           <UpdateNotification />
         </SerwistProvider>
+        <Toaster theme="dark" richColors position="top-center" />
       </body>
     </html>
   );

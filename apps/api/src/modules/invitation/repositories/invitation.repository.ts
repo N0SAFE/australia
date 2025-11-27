@@ -79,7 +79,7 @@ export class InvitationRepository {
   async isValid(token: string): Promise<boolean> {
     const inv = await this.findByToken(token);
     
-    if (!inv as boolean) {
+    if (!inv) {
       return false;
     }
 

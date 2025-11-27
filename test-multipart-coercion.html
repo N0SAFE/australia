@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test ORPC Multipart Coercion</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        input, select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test ORPC Multipart Type Coercion</h1>
+    <p>This form tests ORPC's native multipart/form-data parsing with automatic type coercion.</p>
+    
+    <form id="testForm">
+        <label>
+            <strong>Name (string):</strong>
+            <input type="text" name="name" value="Test User" required>
+        </label>
+
+        <label>
+            <strong>Is Enabled (boolean):</strong>
+            <select name="isEnabled">
+                <option value="false">false</option>
+                <option value="true">true</option>
+            </select>
+            <small>Will be sent as string "true" or "false", should be coerced to boolean</small>
+        </label>
+
+        <label>
+            <strong>Priority (number, 0-10):</strong>
+            <input type="number" name="priority" value="7" min="0" max="10" required>
+            <small>Will be sent as string "7", should be coerced to number</small>
+        </label>
+
+        <label>
+            <strong>File (optional):</strong>
+            <input type="file" name="file">
+        </label>
+
+        <fieldset>
+            <legend>Config (nested object with coercion)</legend>
+            
+            <label>
+                <strong>Config Active (boolean):</strong>
+                <select name="config[active]">
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                </select>
+                <small>Nested boolean coercion test</small>
+            </label>
+
+            <label>
+                <strong>Config Threshold (number):</strong>
+                <input type="number" name="config[threshold]" value="100">
+                <small>Nested number coercion test</small>
+            </label>
+
+            <label>
+                <strong>Config Tags (array):</strong>
+                <input type="text" name="config[tags]" value="tag1,tag2,tag3">
+                <small>Comma-separated values</small>
+            </label>
+        </fieldset>
+
+        <button type="submit">Test Multipart Coercion</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+        const form = document.getElementById('testForm');
+        const resultDiv = document.getElementById('result');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            
+            // Handle comma-separated tags
+            const tags = formData.get('config[tags]');
+            if (tags) {
+                formData.delete('config[tags]');
+                tags.split(',').forEach(tag => {
+                    formData.append('config[tags][]', tag.trim());
+                });
+            }
+
+            resultDiv.textContent = 'Sending request...';
+            resultDiv.className = '';
+
+            try {
+                const response = await fetch('http://localhost:3001/test/multipart-coercion', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.textContent = 'SUCCESS! Response:\n\n' + JSON.stringify(data, null, 2);
+                    resultDiv.className = 'success';
+                    
+                    // Verify types
+                    console.log('Verification:');
+                    console.log('isEnabled type:', data.received.isEnabledType, '(expected: boolean)');
+                    console.log('priority type:', data.received.priorityType, '(expected: number)');
+                    if (data.received.config) {
+                        console.log('config.active type:', data.received.config.activeType, '(expected: boolean)');
+                        console.log('config.threshold type:', data.received.config.thresholdType, '(expected: number)');
+                    }
+                } else {
+                    resultDiv.textContent = 'ERROR:\n\n' + JSON.stringify(data, null, 2);
+                    resultDiv.className = 'error';
+                }
+            } catch (error) {
+                resultDiv.textContent = 'ERROR:\n\n' + error.message;
+                resultDiv.className = 'error';
+            }
+        });
+    </script>
+</body>
+</html>

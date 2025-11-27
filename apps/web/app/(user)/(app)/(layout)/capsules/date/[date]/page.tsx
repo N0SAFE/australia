@@ -1,7 +1,7 @@
 import { CapsuleDatePage } from '@/components/pages/capsule-date';
 import { Capsule } from '@/types/capsule';
 import { randomUUID } from 'node:crypto';
-import { getCapsulesByDay } from '@/hooks/useCapsules';
+import { getCapsulesByDay } from '@/hooks/capsules/queries';
 
 export default async function Date({
   params

@@ -2,29 +2,24 @@ import {
   pgTable,
   text,
   timestamp,
-  integer,
-  boolean,
-  real,
+  uuid,
 } from "drizzle-orm/pg-core";
+import { file } from "./file";
 
 /**
- * Presentation video table - stores a single presentation video
+ * Presentation video table - stores a reference to the presentation video file
  * Only one row should exist in this table at a time
+ * 
+ * This table acts as a singleton pointer to the current presentation video.
+ * All file metadata is stored in the file table and its related type-specific tables.
  */
 export const presentationVideo = pgTable("presentation_video", {
   id: text("id").primaryKey().default('singleton'), // Single row constraint
-  filePath: text("file_path").notNull(),
-  filename: text("filename").notNull(),
-  mimeType: text("mime_type").notNull(),
-  size: integer("size").notNull(),
-  duration: integer("duration"), // in seconds
-  width: integer("width"),
-  height: integer("height"),
-  thumbnailPath: text("thumbnail_path"),
-  // Video processing fields
-  isProcessed: boolean("is_processed").notNull().default(false),
-  processingProgress: real("processing_progress").default(0),
-  processingError: text("processing_error"),
+  
+  // Foreign key to file table
+  fileId: uuid("file_id").notNull().references(() => file.id, { onDelete: 'cascade' }),
+  
+  // Timestamps
   uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at")
     .notNull()

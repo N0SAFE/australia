@@ -13,26 +13,31 @@ import {
   ContextMenuTrigger,
 } from "@/components/shadcn/context-menu"
 import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize } from "lucide-react"
-import { resolveMediaUrl } from "@/lib/media-url-resolver"
+import { resolveMediaUrl, type AudioStrategyResolver } from "../../../lib/media-url-resolver"
 
 export function AudioNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
-  const { src, srcUrlId, title, controls = true, width, align = "center" } = node.attrs
+  const { meta, title, controls = true, width, align = "center" } = node.attrs
   
   // State for resolved URL
-  const [resolvedSrc, setResolvedSrc] = useState<string>(src as string)
+  const [resolvedSrc, setResolvedSrc] = useState<string>("")
   
-  // Get injected media URL resolvers from extension options
-  const injectMediaUrl = editor.extensionManager.extensions.find(ext => ext.name === 'audio')?.options.injectMediaUrl
+  // Get audioStrategy from extension options
+  const extension = editor.extensionManager.extensions.find(ext => ext.name === 'audio')
+  const audioStrategy = extension?.options.audioStrategy as AudioStrategyResolver | undefined
   
-  // Resolve the final URL asynchronously
+  // Resolve the final URL asynchronously using strategy with meta only
   useEffect(() => {
     const resolve = async () => {
-      const resolved = await resolveMediaUrl(src as string, srcUrlId as string | null, injectMediaUrl)
+      if (!audioStrategy || !meta) {
+        setResolvedSrc("")
+        return
+      }
+      const resolved = await resolveMediaUrl(meta, audioStrategy)
       setResolvedSrc(resolved)
     }
     void resolve()
-  }, [src, srcUrlId, injectMediaUrl])
+  }, [meta, audioStrategy])
 
   const alignmentStyles = {
     left: "flex justify-start",
@@ -54,7 +59,7 @@ export function AudioNodeView(props: NodeViewProps) {
       }
     }
   }
-
+  
   const audioElement = (
     <div 
       className="audio-node group relative inline-block"
@@ -63,19 +68,30 @@ export function AudioNodeView(props: NodeViewProps) {
         maxWidth: "100%",
       }}
     >
-      <audio
-        src={resolvedSrc}
-        title={(title as string | undefined) ?? "Audio"}
-        controls={controls as boolean}
-        style={{
-          width: "100%",
-          display: "block",
-        }}
-        className="rounded"
-      >
-        <track kind="captions" />
-        Your browser does not support the audio tag.
-      </audio>
+      {resolvedSrc ? (
+        <audio
+          {...(resolvedSrc ? { src: resolvedSrc } : {})}
+          title={(title as string | undefined) ?? "Audio"}
+          controls={controls as boolean}
+          style={{
+            width: "100%",
+            display: "block",
+          }}
+          className="rounded"
+        >
+          <track kind="captions" />
+          Your browser does not support the audio tag.
+        </audio>
+      ) : (
+        <div
+          className="bg-muted rounded flex items-center justify-center py-8"
+          style={{
+            width: "100%",
+          }}
+        >
+          <span className="text-muted-foreground text-sm">Loading audio...</span>
+        </div>
+      )}
     </div>
   )
 

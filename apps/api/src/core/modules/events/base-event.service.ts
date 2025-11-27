@@ -142,19 +142,20 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
    * @param input - Input parameters for the event (validated against contract)
    * @returns Async iterator yielding event data
    */
-  subscribe<K extends keyof TContracts & string>(
+  subscribe<K extends keyof TContracts>(
     eventName: K,
     input: EventInput<TContracts[K]>
   ): EventSubscription<TContracts[K]> {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      throw new Error(`Unknown event: ${String(eventName)}`);
+    }
 
     // Validate input
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
 
     // Build full event name using fileId from input
-    const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
-
-    this.logger.debug(`New subscription to event: ${fullEventName}`);
+    const fullEventName = this.buildFullEventName(String(eventName), validatedInput as Record<string, unknown>);
 
     // Get or create subscription data
     let subscription = this.events.get(fullEventName);
@@ -176,7 +177,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
         sub.asyncIterators.delete(controller as AsyncIteratorController<unknown>);
         if (sub.asyncIterators.size === 0) {
           this.events.delete(fullEventName);
-          this.logger.debug(`Event subscription cleaned up: ${fullEventName}`);
         }
       }
     };
@@ -203,27 +203,27 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
    * @param input - Input parameters for the event (used to build event name)
    * @param output - Event data to emit (validated against contract)
    */
-  emit<K extends keyof TContracts & string>(
+  emit<K extends keyof TContracts>(
     eventName: K,
     input: EventInput<TContracts[K]>,
     output: EventOutput<TContracts[K]>
   ): void {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      throw new Error(`Unknown event: ${String(eventName)}`);
+    }
 
     // Validate input and output
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const validatedOutput = contract.output.parse(output) as EventOutput<TContracts[K]>;
 
     // Build full event name using fileId from input
-    const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
+    const fullEventName = this.buildFullEventName(String(eventName), validatedInput as Record<string, unknown>);
 
     const subscription = this.events.get(fullEventName);
     if (!subscription) {
-      this.logger.debug(`No subscribers for event: ${fullEventName}`);
       return;
     }
-
-    this.logger.debug(`Emitting event: ${fullEventName} to ${String(subscription.asyncIterators.size)} subscribers`);
 
     // Push to all subscribed iterators
     const typedIterators = subscription.asyncIterators as unknown as Set<AsyncIteratorController<EventOutput<TContracts[K]>>>;
@@ -251,6 +251,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     }) => void | Promise<void>
   ): Promise<void> {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      throw new Error(`Unknown event: ${eventName}`);
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
     
@@ -280,7 +283,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     // IGNORE: Skip if already processing
     if (strategy === ProcessingStrategy.IGNORE) {
       if (state.isProcessing) {
-        this.logger.debug(`Ignoring new request for ${fullEventName} (already processing)`);
         contract.options?.onIgnore?.(validatedInput);
         return;
       }
@@ -289,7 +291,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     // ABORT: Kill previous operation and start new one
     if (strategy === ProcessingStrategy.ABORT) {
       if (state.isProcessing && state.abortController) {
-        this.logger.debug(`Aborting previous operation for ${fullEventName}`);
         const context: AbortContext = {
           signal: state.abortController.signal,
           abortController: state.abortController,
@@ -335,7 +336,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
       if (state.isProcessing) {
         // Add to queue
         const position = state.queue.length + 1;
-        this.logger.debug(`Queueing request for ${fullEventName} (position: ${String(position)})`);
         contract.options?.onQueue?.(validatedInput, position);
         state.queue.push({
           input: validatedInput,
@@ -360,6 +360,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): boolean {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return false;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 
@@ -378,6 +381,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): number {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return 0;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 
@@ -396,6 +402,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): boolean {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return false;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 
@@ -414,6 +423,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): number {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return 0;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 
@@ -448,6 +460,9 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
     input: EventInput<TContracts[K]>
   ): void {
     const contract = this.contracts[eventName];
+    if (!contract) {
+      return;
+    }
     const validatedInput = contract.input.parse(input) as EventInput<TContracts[K]>;
     const fullEventName = this.buildFullEventName(eventName, validatedInput as Record<string, unknown>);
 
@@ -457,7 +472,6 @@ export abstract class BaseEventService<TContracts extends EventContracts = Event
         (iterator as AsyncIteratorController<EventOutput<TContracts[K]>>).end();
       }
       this.events.delete(fullEventName);
-      this.logger.debug(`All subscribers removed for event: ${fullEventName}`);
     }
   }
 

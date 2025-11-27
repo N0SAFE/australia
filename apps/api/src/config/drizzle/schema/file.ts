@@ -17,13 +17,14 @@ export const file = pgTable("file", {
   id: uuid("id").primaryKey().defaultRandom(),
   
   // Discriminator fields
-  type: text("type", { enum: ['image', 'video', 'audio', 'text'] }).notNull(),
+  type: text("type", { enum: ['image', 'video', 'audio', 'raw'] }).notNull(),
   contentId: uuid("content_id").notNull(), // References the specific type table (imageFile.id, videoFile.id, etc.)
   
   // File system information
-  filePath: text("file_path").notNull().unique(), // Relative path from uploads directory
+  // NOTE: filePath is computed from namespace + storedFilename via storage provider
+  namespace: text("namespace").notNull(), // Namespace path (e.g., 'capsule/video', 'storage')
   filename: text("filename").notNull(), // Original filename
-  storedFilename: text("stored_filename").notNull(), // Filename on disk (may be different from original)
+  storedFilename: text("stored_filename").notNull(), // Filename on disk (fileId.ext)
   
   // Generic file metadata
   mimeType: text("mime_type").notNull(),
@@ -135,14 +136,14 @@ export const imageFile = pgTable("image_file", {
   thumbnailLargePath: text("thumbnail_large_path"),
   
   // Image variants (different sizes/formats)
-  variants: jsonb("variants").$type<Array<{
+  variants: jsonb("variants").$type<{
     size: string; // e.g., 'small', 'medium', 'large', '1920x1080'
     path: string;
     width: number;
     height: number;
     format: string;
     fileSize: number;
-  }>>(),
+  }[]>(),
   
   // Accessibility
   altText: text("alt_text"),
@@ -394,14 +395,14 @@ export const audioFile = pgTable("audio_file", {
 });
 
 /**
- * Text file metadata table
- * Contains detailed information specific to text files
+ * Raw file metadata table
+ * Contains detailed information specific to raw/generic files (documents, archives, etc.)
  */
-export const textFile = pgTable("text_file", {
+export const rawFile = pgTable("raw_file", {
   id: uuid("id").primaryKey().defaultRandom(),
   
   // File format
-  format: text("format"), // txt, md, json, xml, html, csv, etc.
+  format: text("format"), // txt, md, json, xml, html, csv, pdf, doc, zip, etc.
   
   // Character encoding
   encoding: text("encoding").notNull().default('utf-8'), // UTF-8, ASCII, ISO-8859-1, etc.

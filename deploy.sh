@@ -281,18 +281,6 @@ print_info "  Database URL: postgresql://$DB_USER:****@host.docker.internal:5432
 # Set proper ownership for project files
 chown -R "$ACTUAL_USER:$ACTUAL_USER" "$PROJECT_DIR"
 
-# Install project dependencies
-print_header "📦 Installing Project Dependencies"
-cd "$PROJECT_DIR"
-
-if [ -f "package.json" ]; then
-    print_info "Installing dependencies with Bun..."
-    su - "$ACTUAL_USER" -c "cd $PROJECT_DIR && $ACTUAL_HOME/.bun/bin/bun ci"
-    print_success "Dependencies installed"
-else
-    print_warning "No package.json found, skipping dependency installation"
-fi
-
 # Configure Nginx (HTTP-only first, SSL later)
 print_header "🌐 Configuring Nginx"
 
@@ -322,17 +310,39 @@ server {
         root /var/www/certbot;
     }
 
+    # Client max body size (for uploads - supports very large files)
+    client_max_body_size 500M;
+    
+    # Upload optimization settings
+    client_body_buffer_size 1M;
+    client_body_timeout 600s;
+
     # Temporary proxy to app (will redirect to HTTPS after SSL setup)
     location / {
         proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
+        
+        # WebSocket support
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;
+        
+        # Headers
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+
+        # Timeouts (increased for very large file uploads - 10 minutes)
+        proxy_connect_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+        
+        # Disable buffering for uploads (stream directly)
+        proxy_request_buffering off;
+        proxy_buffering off;
     }
 }
 
@@ -346,14 +356,45 @@ server {
         root /var/www/certbot;
     }
 
+    # Client max body size (for uploads - supports very large files)
+    client_max_body_size 500M;
+    
+    # Upload optimization settings
+    client_body_buffer_size 1M;
+    client_body_timeout 600s;
+
     # Temporary proxy to API (will redirect to HTTPS after SSL setup)
     location / {
         proxy_pass http://localhost:3001;
         proxy_http_version 1.1;
+        
+        # Headers
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-Port $server_port;
+        
+        # CRITICAL: Forward cookies for authentication
+        proxy_set_header Cookie $http_cookie;
+        proxy_pass_header Set-Cookie;
+        
+        # CRITICAL: Forward Range header for video streaming
+        proxy_set_header Range $http_range;
+
+        # Timeouts (increased for very large file uploads - 10 minutes)
+        proxy_connect_timeout 600s;
+        proxy_send_timeout 600s;
+        proxy_read_timeout 600s;
+        
+        # Disable buffering for uploads/streaming (stream directly)
+        proxy_request_buffering off;
+        proxy_buffering off;
+        
+        # HTTP/2 specific: Don't buffer responses for range requests
+        proxy_force_ranges on;
+        proxy_ignore_headers X-Accel-Buffering;
     }
 }
 EOF
@@ -380,59 +421,156 @@ fi
 # SSL Certificate setup
 print_header "🔒 SSL Certificate Setup"
 
-print_info "Do you want to obtain SSL certificates now? (y/n)"
-read -r OBTAIN_SSL
+# Check if certificates already exist
+APP_CERT_EXISTS=false
+API_CERT_EXISTS=false
+DETECTED_EMAIL=""
+
+if [ -d "/etc/letsencrypt/live/app.gossip-club.sebille.net" ]; then
+    APP_CERT_EXISTS=true
+    print_success "SSL certificate already exists for app.gossip-club.sebille.net"
+fi
+
+if [ -d "/etc/letsencrypt/live/api.gossip-club.sebille.net" ]; then
+    API_CERT_EXISTS=true
+    print_success "SSL certificate already exists for api.gossip-club.sebille.net"
+fi
+
+# Try to detect email from existing certificates
+if [ "$APP_CERT_EXISTS" = true ] || [ "$API_CERT_EXISTS" = true ]; then
+    # Try to extract email from certbot config
+    if [ -f "/etc/letsencrypt/renewal/app.gossip-club.sebille.net.conf" ]; then
+        DETECTED_EMAIL=$(grep "account =" /etc/letsencrypt/renewal/app.gossip-club.sebille.net.conf | sed 's/.*\/accounts\/acme-v02.api.letsencrypt.org\/directory\///' | sed 's/\/.*//')
+    elif [ -f "/etc/letsencrypt/renewal/api.gossip-club.sebille.net.conf" ]; then
+        DETECTED_EMAIL=$(grep "account =" /etc/letsencrypt/renewal/api.gossip-club.sebille.net.conf | sed 's/.*\/accounts\/acme-v02.api.letsencrypt.org\/directory\///' | sed 's/\/.*//')
+    fi
+    
+    # Alternative: try to get email from certbot accounts
+    if [ -z "$DETECTED_EMAIL" ] && [ -d "/etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory" ]; then
+        # Get the most recent account directory
+        ACCOUNT_DIR=$(ls -t /etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory/ | head -1)
+        if [ -f "/etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory/$ACCOUNT_DIR/meta.json" ]; then
+            DETECTED_EMAIL=$(grep -o '"contact":\s*\["mailto:[^"]*"' "/etc/letsencrypt/accounts/acme-v02.api.letsencrypt.org/directory/$ACCOUNT_DIR/meta.json" | sed 's/.*mailto:\([^"]*\).*/\1/')
+        fi
+    fi
+    
+    if [ -n "$DETECTED_EMAIL" ]; then
+        print_info "Detected email from existing certificates: $DETECTED_EMAIL"
+    fi
+fi
+
+# Prompt for SSL certificate action
+if [ "$APP_CERT_EXISTS" = true ] && [ "$API_CERT_EXISTS" = true ]; then
+    print_info "All SSL certificates already exist. Do you want to renew/update them? (y/n)"
+    read -r OBTAIN_SSL
+elif [ "$APP_CERT_EXISTS" = true ] || [ "$API_CERT_EXISTS" = true ]; then
+    print_info "Some SSL certificates exist. Do you want to obtain missing ones? (y/n)"
+    read -r OBTAIN_SSL
+else
+    print_info "Do you want to obtain SSL certificates now? (y/n)"
+    read -r OBTAIN_SSL
+fi
 
 if [[ "$OBTAIN_SSL" =~ ^[Yy]$ ]]; then
-    print_info "Enter your email address for Let's Encrypt notifications:"
-    read -r EMAIL
+    # Use detected email or prompt for new one
+    if [ -n "$DETECTED_EMAIL" ]; then
+        print_info "Enter your email address for Let's Encrypt notifications (press Enter to use: $DETECTED_EMAIL):"
+        read -r EMAIL
+        # If no email entered, use the detected one
+        if [ -z "$EMAIL" ]; then
+            EMAIL="$DETECTED_EMAIL"
+            print_info "Using detected email: $EMAIL"
+        fi
+    else
+        print_info "Enter your email address for Let's Encrypt notifications:"
+        read -r EMAIL
+    fi
     
     if [ -z "$EMAIL" ]; then
         print_warning "No email provided, skipping SSL certificate setup"
         print_info "You can run ./setup-ssl.sh later to obtain certificates"
     else
-        print_info "Obtaining SSL certificates..."
+        print_info "Obtaining SSL certificates with email: $EMAIL..."
         
-        # Obtain certificate for Australia app
-        if certbot certonly --webroot -w /var/www/certbot \
-            -d app.gossip-club.sebille.net \
-            --email "$EMAIL" \
-            --agree-tos \
-            --non-interactive; then
-            print_success "Certificate obtained for app.gossip-club.sebille.net"
+        # Obtain or renew certificate for Australia app
+        if [ "$APP_CERT_EXISTS" = false ]; then
+            print_info "Obtaining certificate for app.gossip-club.sebille.net..."
+            if certbot certonly --webroot -w /var/www/certbot \
+                -d app.gossip-club.sebille.net \
+                --email "$EMAIL" \
+                --agree-tos \
+                --non-interactive; then
+                print_success "Certificate obtained for app.gossip-club.sebille.net"
+                APP_CERT_EXISTS=true
+            else
+                print_warning "Failed to obtain certificate for app.gossip-club.sebille.net"
+                print_info "Make sure DNS is properly configured and ports 80/443 are open"
+            fi
         else
-            print_warning "Failed to obtain certificate for app.gossip-club.sebille.net"
-            print_info "Make sure DNS is properly configured and ports 80/443 are open"
+            print_info "Renewing certificate for app.gossip-club.sebille.net..."
+            if certbot certonly --webroot -w /var/www/certbot \
+                -d app.gossip-club.sebille.net \
+                --email "$EMAIL" \
+                --agree-tos \
+                --non-interactive \
+                --force-renewal; then
+                print_success "Certificate renewed for app.gossip-club.sebille.net"
+            else
+                print_warning "Failed to renew certificate for app.gossip-club.sebille.net"
+                print_info "The existing certificate will continue to work until it expires"
+            fi
         fi
         
-        # Obtain certificate for API
-        if certbot certonly --webroot -w /var/www/certbot \
-            -d api.gossip-club.sebille.net \
-            --email "$EMAIL" \
-            --agree-tos \
-            --non-interactive; then
-            print_success "Certificate obtained for api.gossip-club.sebille.net"
+        # Obtain or renew certificate for API
+        if [ "$API_CERT_EXISTS" = false ]; then
+            print_info "Obtaining certificate for api.gossip-club.sebille.net..."
+            if certbot certonly --webroot -w /var/www/certbot \
+                -d api.gossip-club.sebille.net \
+                --email "$EMAIL" \
+                --agree-tos \
+                --non-interactive; then
+                print_success "Certificate obtained for api.gossip-club.sebille.net"
+                API_CERT_EXISTS=true
+            else
+                print_warning "Failed to obtain certificate for api.gossip-club.sebille.net"
+                print_info "Make sure DNS is properly configured and ports 80/443 are open"
+            fi
         else
-            print_warning "Failed to obtain certificate for api.gossip-club.sebille.net"
-            print_info "Make sure DNS is properly configured and ports 80/443 are open"
+            print_info "Renewing certificate for api.gossip-club.sebille.net..."
+            if certbot certonly --webroot -w /var/www/certbot \
+                -d api.gossip-club.sebille.net \
+                --email "$EMAIL" \
+                --agree-tos \
+                --non-interactive \
+                --force-renewal; then
+                print_success "Certificate renewed for api.gossip-club.sebille.net"
+            else
+                print_warning "Failed to renew certificate for api.gossip-club.sebille.net"
+                print_info "The existing certificate will continue to work until it expires"
+            fi
         fi
         
         # Enable auto-renewal
         systemctl enable certbot.timer
         systemctl start certbot.timer
         
-        # Install full SSL Nginx configuration
-        print_info "Installing full SSL Nginx configuration..."
-        if [ -f "$PROJECT_DIR/nginx.conf" ]; then
-            cp "$PROJECT_DIR/nginx.conf" /etc/nginx/sites-available/gossip-club
-            
-            if nginx -t; then
-                systemctl reload nginx
-                print_success "Full SSL Nginx configuration installed and activated"
-            else
-                print_warning "Full SSL configuration test failed, keeping temporary HTTP configuration"
-                print_info "You may need to manually update the configuration later"
+        # Install full SSL Nginx configuration (only if both certificates exist)
+        if [ "$APP_CERT_EXISTS" = true ] && [ "$API_CERT_EXISTS" = true ]; then
+            print_info "Installing full SSL Nginx configuration..."
+            if [ -f "$PROJECT_DIR/nginx.conf" ]; then
+                cp "$PROJECT_DIR/nginx.conf" /etc/nginx/sites-available/gossip-club
+                
+                if nginx -t; then
+                    systemctl reload nginx
+                    print_success "Full SSL Nginx configuration installed and activated"
+                else
+                    print_warning "Full SSL configuration test failed, keeping temporary HTTP configuration"
+                    print_info "You may need to manually update the configuration later"
+                fi
             fi
+        else
+            print_warning "Not all certificates obtained, keeping HTTP-only configuration"
+            print_info "Run ./setup-ssl.sh after obtaining all certificates to enable HTTPS"
         fi
         
         print_success "SSL certificates configured"

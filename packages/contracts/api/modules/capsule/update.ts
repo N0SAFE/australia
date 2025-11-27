@@ -2,15 +2,30 @@ import { oc } from "@orpc/contract";
 import { z } from "zod/v4";
 import { capsuleSchema, lockTypeSchema, lockConfigSchema } from "@repo/api-contracts/common/capsule";
 
+// Media schema for capsule updates
+const addedMediaSchema = z.object({
+  file: z.file(), // The actual file to upload
+  contentMediaId: z.string(), // UUID generated on client, embedded in content nodes
+  type: z.enum(['image', 'video', 'audio']), // Media type
+});
+
+const mediaSchema = z.object({
+  kept: z.array(z.string()).optional().default([]), // Array of contentMediaIds to keep from existing content
+  added: z.array(addedMediaSchema).optional().default([]), // New files with contentMediaIds to upload
+});
+
 // Define the input for updating a capsule
 export const capsuleUpdateInput = z.object({
   id: z.string(),
   openingDate: z.string().optional(), // YYYY-MM-DD format
   content: z.string().optional(),
   openingMessage: z.string().optional(),
-  isLocked: z.boolean().optional(),
+  isLocked: z.coerce.boolean().optional(),
   lockType: lockTypeSchema.nullable().optional(),
   lockConfig: lockConfigSchema.nullable().optional(),
+  
+  // Media field for handling file uploads (optional for updates)
+  media: mediaSchema.optional(),
 });
 
 // Define the output

@@ -1,6 +1,7 @@
 import { mergeAttributes, Node } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { ImageNodeView } from "./image-node"
+import type { ImageStrategyResolver } from "../../../lib/media-url-resolver"
 
 export interface ImageNodeOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,9 +17,9 @@ export interface ImageNodeOptions {
    */
   inline?: boolean
   /**
-   * Media URL resolver callbacks by ID
+   * Image URL strategy resolver that receives meta only
    */
-  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+  imageStrategy?: ImageStrategyResolver
 }
 
 declare module "@tiptap/core" {
@@ -50,17 +51,24 @@ export const ImageNode = Node.create<ImageNodeOptions>({
       HTMLAttributes: {},
       allowBase64: false,
       inline: false,
-      injectMediaUrl: {},
+      imageStrategy: undefined,
     }
   },
 
   addAttributes() {
     return {
-      src: {
+      meta: {
         default: null,
       },
-      srcUrlId: {
-        default: null,
+      contentMediaId: {
+        default: null, // UUID linking content node to capsule media record
+      },
+      strategy: {
+        default: 'api', // 'local' for blob URLs, 'api' for server files, 'contentMediaId' for pending/uploaded
+      },
+      fileRef: {
+        default: null, // Store File reference for local strategy (not serialized)
+        rendered: false,
       },
       alt: {
         default: null,

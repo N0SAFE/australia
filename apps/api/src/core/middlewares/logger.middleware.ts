@@ -10,6 +10,7 @@ export class LoggerMiddleware implements NestMiddleware {
         const hostname = (require("os") as typeof os).hostname();
         const userAgent = req.get("user-agent") ?? "";
         const referer = req.get("referer") ?? "";
+        const responseHeaders = res.getHeaders();
         
         // Log request details for debugging
         if (url.includes('/storage/upload')) {
@@ -19,7 +20,7 @@ export class LoggerMiddleware implements NestMiddleware {
                 contentType: req.get('content-type'),
                 contentLength: req.get('content-length'),
                 hasBody: !!req.body,
-                bodyKeys: req.body ? Object.keys(req.body) : [],
+                bodyKeys: req.body ? Object.keys(req.body as object) : [],
             });
         }
         
@@ -27,9 +28,9 @@ export class LoggerMiddleware implements NestMiddleware {
             const { statusCode, statusMessage } = res;
             const contentLength = res.get("content-length");
             // Enhanced debug logging with structured data
-            this.logger.debug(`[${hostname}] "${method} ${url}" ${String(statusCode)} ${statusMessage} ${String(contentLength)} "${referer}" "${userAgent}" "${String(ip)}"`);
-            console.log("response: ", res.statusCode, res.statusMessage, contentLength, referer, userAgent, ip);
-            res.end();
+            this.logger.debug(`[${hostname}] "${method} ${url}" ${String(statusCode)} ${statusMessage} ${String(contentLength)} "${referer}" "${userAgent}" "${String(ip)}" Headers: ${JSON.stringify(responseHeaders)}`);
+            // NOTE: Do NOT call res.end() here - it interrupts streaming responses
+            // and causes HTTP/2 protocol errors (ERR_HTTP2_PROTOCOL_ERROR)
         });
         next();
     }

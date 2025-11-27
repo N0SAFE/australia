@@ -10,8 +10,8 @@ import { z } from "zod";
 import {
   useCheckInvitation,
   useValidateInvitation,
-} from "@/hooks/useInvitation";
-import { useSignInEmailMutation, useSignOutMutation } from "@/hooks/useAuth";
+} from "@/hooks/invitation/hooks";
+import { useSignInEmailMutation, useSignOutMutation } from "@/hooks/auth/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

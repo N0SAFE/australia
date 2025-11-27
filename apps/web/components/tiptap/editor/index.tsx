@@ -3,18 +3,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { EditorContent, EditorContext, useEditor, type Editor, type JSONContent } from "@repo/ui/tiptap-exports/react"
 
-// --- Tiptap Core Extensions ---
-import { StarterKit } from "@repo/ui/tiptap-exports/starter-kit"
-import { TaskItem, TaskList } from "@repo/ui/tiptap-exports/extension-list"
-import { TextAlign } from "@repo/ui/tiptap-exports/extension-text-align"
-import { Typography } from "@repo/ui/tiptap-exports/extension-typography"
-import { Highlight } from "@repo/ui/tiptap-exports/extension-highlight"
-import { Subscript } from "@repo/ui/tiptap-exports/extension-subscript"
-import { Superscript } from "@repo/ui/tiptap-exports/extension-superscript"
+// --- Tiptap Core Extensions (editor-specific) ---
 import { Selection } from "@repo/ui/tiptap-exports/extensions"
 import { Placeholder } from "@repo/ui/tiptap-exports/extension-placeholder"
-import { TextStyle } from '@repo/ui/tiptap-exports/extension-text-style'
-import { Color } from '@repo/ui/tiptap-exports/extension-color'
+import { useSharedTipTapExtensions } from "../common"
 
 // --- UI Primitives ---
 import { Button } from "@repo/ui/components/tiptap-ui-primitive/button/index"
@@ -25,16 +17,13 @@ import {
   ToolbarSeparator,
 } from "@repo/ui/components/tiptap-ui-primitive/toolbar/index"
 
-// --- Tiptap Node ---
-import { ImageUploadNode } from "@repo/ui/components/tiptap-node/image-upload-node/image-upload-node-extension"
-import { VideoUploadExtension } from "@repo/ui/components/tiptap-node/video-upload-node/video-upload-node-extension"
-import { AudioUploadExtension } from "@repo/ui/components/tiptap-node/audio-upload-node/audio-upload-node-extension"
-import { FileUploadExtension } from "@repo/ui/components/tiptap-node/file-upload-node/file-upload-node-extension"
-import { HorizontalRule } from "@repo/ui/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension"
-import { ImageNode } from "@repo/ui/components/tiptap-node/image-node/image-node-extension"
-import { VideoNode } from "@repo/ui/components/tiptap-node/video-node/video-node-extension"
-import { AudioNode } from "@repo/ui/components/tiptap-node/audio-node/audio-node-extension"
-import { FileNode } from "@repo/ui/components/tiptap-node/file-node/file-node-extension"
+// --- Tiptap Node (editor-specific upload nodes) ---
+import {
+  ImageUploadNodeExtension as ImageUploadNode,
+  VideoUploadNodeExtension as VideoUploadExtension,
+  AudioUploadNodeExtension as AudioUploadExtension,
+  FileUploadNodeExtension as FileUploadExtension,
+} from "@repo/ui/components/tiptap-node/index"
 import "@repo/ui/components/tiptap-node/blockquote-node/blockquote-node.scss"
 import "@repo/ui/components/tiptap-node/code-block-node/code-block-node.scss"
 import "@repo/ui/components/tiptap-node/horizontal-rule-node/horizontal-rule-node.scss"
@@ -77,11 +66,12 @@ import { useCursorVisibility } from "@repo/ui/hooks/use-cursor-visibility"
 
 // --- Lib ---
 import { MAX_FILE_SIZE } from "@repo/ui/lib/tiptap-utils"
-import type { UploadFunction } from "@repo/ui/components/tiptap-node/image-upload-node/image-upload-node-extension"
+import type { UploadFunction } from "@repo/ui/components/tiptap-node/media-nodes/image/upload-node/image-upload-node-extension"
 
 // --- Styles ---
 import "./style.scss"
-import { NodeBackground } from "@repo/ui/components/tiptap-extension/node-background-extension"
+
+// --- Editor-specific extensions ---
 import { DragContextMenu } from "@repo/ui/components/tiptap-ui/drag-context-menu/drag-context-menu"
 import { UiState } from "@repo/ui/components/tiptap-extension/ui-state-extension"
 import { SlashDropdownMenu } from "@repo/ui/components/tiptap-ui/slash-dropdown-menu/slash-dropdown-menu"
@@ -158,7 +148,11 @@ const MainToolbarContent = ({
         <MarkButton type="code" />
         <MarkButton type="underline" />
         {!isMobile ? (
-          <ColorHighlightPopover />
+          <ColorHighlightPopover
+            editor={editor}
+            hideWhenUnavailable={false}
+            onApplied={() => {}}
+          />
         ) : (
           <ColorHighlightPopoverButton onClick={onHighlighterClick} />
         )}
@@ -256,6 +250,10 @@ export interface SimpleEditorProps {
   editable?: boolean
   placeholder?: string
   /**
+   * Callback fired when editor is fully initialized and ready
+   */
+  onEditorReady?: () => void
+  /**
    * Upload functions for different media types
    * These should be provided by the parent app (e.g., using useStorage hook)
    */
@@ -266,11 +264,18 @@ export interface SimpleEditorProps {
     file?: UploadFunction
   }
   /**
-   * Map of media source URL IDs to resolver callbacks
-   * Used to resolve media URLs based on srcUrlId attribute
-   * Example: { api: (src) => `https://api.example.com${src}` }
+   * Strategy resolvers for media URL resolution
+   * Used to resolve media URLs based on meta.srcResolveStrategy
    */
-  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+  videoStrategy?: (meta: unknown) => Promise<string> | string
+  imageStrategy?: (meta: unknown) => Promise<string> | string
+  audioStrategy?: (meta: unknown) => Promise<string> | string
+  fileStrategy?: (meta: unknown) => Promise<string> | string
+  /**
+   * Video processing progress component for Tiptap video nodes
+   * Component that handles fetching and rendering video processing progress
+   */
+  VideoProgressComponent?: import("react").ComponentType<any>
 }
 
 export function SimpleEditor({
@@ -278,8 +283,13 @@ export function SimpleEditor({
   onChange,
   editable = true,
   placeholder = "Start typing...",
+  onEditorReady,
   uploadFunctions,
-  injectMediaUrl,
+  videoStrategy,
+  imageStrategy,
+  audioStrategy,
+  fileStrategy,
+  VideoProgressComponent,
 }: SimpleEditorProps) {
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()
@@ -295,52 +305,28 @@ export function SimpleEditor({
     }
   }, [])
 
-  const editor = useEditor({
-    immediatelyRender: false,
-    editable,
-    editorProps: {
-      attributes: {
-        autocomplete: "off",
-        autocorrect: "off",
-        autocapitalize: "off",
-        "aria-label": "Main content area, start typing to enter text.",
-        class: "simple-editor prose",
-      },
-    },
-    extensions: [
-      StarterKit.configure({
-        horizontalRule: false,
-        link: {
-          openOnClick: false,
-          enableClickSelection: true,
-        },
-      }),
-      HorizontalRule,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Highlight.configure({ multicolor: true }),
-      Typography,
-      Superscript,
-      Subscript,
+  // Get shared base extensions (used by both editor and viewer)
+  const sharedExtensions = useSharedTipTapExtensions({
+    placeholder,
+    openLinksOnClick: false, // Disable link clicks in edit mode
+    imageStrategy,
+    videoStrategy,
+    audioStrategy,
+    fileStrategy,
+    VideoProgressComponent,
+  })
+
+  // Build extensions array: shared base + editor-specific extensions
+  const extensionsArray = [
+      ...sharedExtensions,
+      
+      // Editor-specific extensions
       Selection,
       Placeholder.configure({
         placeholder,
       }),
-      // Display nodes for media (required for upload nodes to transform to)
-      ImageNode.configure({
-        injectMediaUrl,
-      }),
-      VideoNode.configure({
-        injectMediaUrl,
-      }),
-      AudioNode.configure({
-        injectMediaUrl,
-      }),
-      FileNode.configure({
-        injectMediaUrl,
-      }),
-      // Image upload extension
+      
+      // Upload extensions (editor-only)
       ...(uploadFunctions?.image
         ? [
             ImageUploadNode.configure({
@@ -355,7 +341,6 @@ export function SimpleEditor({
             }),
           ]
         : []),
-      // Video upload extension
       ...(uploadFunctions?.video
         ? [
             VideoUploadExtension.configure({
@@ -367,7 +352,6 @@ export function SimpleEditor({
             }),
           ]
         : []),
-      // Audio upload extension
       ...(uploadFunctions?.audio
         ? [
             AudioUploadExtension.configure({
@@ -379,7 +363,6 @@ export function SimpleEditor({
             }),
           ]
         : []),
-      // File upload extension
       ...(uploadFunctions?.file
         ? [
             FileUploadExtension.configure({
@@ -392,14 +375,40 @@ export function SimpleEditor({
           ]
         : []),
       
-      // Text styling extensions which handle the "Colors" menu
-      TextStyle,
-      Color,
-      NodeBackground,
-      
+      // UI state management (editor-only)
       UiState
-    ],
-    content: value ?? [{ type: "paragraph", children: [{ text: "" }] }],
+    ]
+
+  // DEBUG: Log undefined extensions
+  useEffect(() => {
+    const undefinedExts = extensionsArray
+      .map((ext, idx) => ({ ext, idx }))
+      .filter(({ ext }) => !ext)
+    if (undefinedExts.length > 0) {
+      console.error('TipTap Editor: Found undefined extensions:', undefinedExts.map(e => e.idx))
+    }
+  }, [])
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    editable,
+    editorProps: {
+      attributes: {
+        autocomplete: "off",
+        autocorrect: "off",
+        autocapitalize: "off",
+        "aria-label": "Main content area, start typing to enter text.",
+        class: "simple-editor prose",
+      },
+    },
+    extensions: extensionsArray,
+    content: value ?? { type: "doc", content: [{ type: "paragraph" }] },
+    onCreate: ({ editor }) => {
+      // Editor is ready
+      if (onEditorReady) {
+        onEditorReady()
+      }
+    },
     onUpdate: ({ editor }) => {
       if (onChange) {
         onChange(editor.getJSON())

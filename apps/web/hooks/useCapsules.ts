@@ -1,6 +1,12 @@
+'use client'
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { orpc } from '@/lib/orpc'
+import { withFileUploads } from '@/lib/orpc/withFileUploads'
 import { toast } from 'sonner'
+import type { CapsuleUploadProgressEvent } from '@repo/api-contracts'
+import type { Capsule } from '@/types/capsule'
 
 /**
  * Query hook to fetch all capsules with pagination and sorting
@@ -290,48 +296,258 @@ export function useCapsuleActions() {
   }
 }
 
+
 /**
- * Direct async function for fetching capsules (for server components)
+ * Hook to track capsule upload progress via SSE
+ * Automatically subscribes to progress updates for a given operation
  */
-export async function getCapsules(params: {
-  pagination?: { page?: number; pageSize?: number }
-  sort?: { field?: 'openingDate' | 'createdAt'; direction?: 'asc' | 'desc' }
-} = {}) {
-  const pageSize = params.pagination?.pageSize || 20
-  const page = params.pagination?.page || 1
-  
-  return orpc.capsule.list.call({
-    pagination: { limit: pageSize, offset: (page - 1) * pageSize },
-    sort: { field: params.sort?.field || 'openingDate', direction: params.sort?.direction || 'asc' },
+export function useCapsuleUploadProgress(operationId: string | null, options?: {
+  onProgress?: (event: CapsuleUploadProgressEvent) => void
+  onComplete?: (event: CapsuleUploadProgressEvent) => void
+  onError?: (error: Error) => void
+  enabled?: boolean
+}) {
+  return useQuery(
+    orpc.capsule.subscribeUploadProgress.experimental_liveOptions({
+      input: { operationId: operationId ?? '' },
+      enabled: (options?.enabled ?? true) && !!operationId,
+      onData: (event: CapsuleUploadProgressEvent) => {
+        options?.onProgress?.(event)
+        
+        if (event.stage === 'completed') {
+          options?.onComplete?.(event)
+        }
+        
+        if (event.stage === 'failed') {
+          options?.onError?.(new Error(event.message))
+        }
+      },
+    })
+  )
+}
+
+/**
+ * Hook to create a capsule with background upload and progress tracking
+ * Returns upload state and progress information
+ */
+export function useCreateCapsuleWithProgress(options?: {
+  onUploadStart?: (operationId: string) => void
+  onUploadProgress?: (event: CapsuleUploadProgressEvent) => void
+  onUploadComplete?: (capsule: Capsule) => void
+  onUploadError?: (error: Error) => void
+}) {
+  const queryClient = useQueryClient()
+  const [operationId, setOperationId] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStage, setUploadStage] = useState<string | null>(null)
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null)
+  const [capsuleId, setCapsuleId] = useState<string | null>(null)
+
+  // Subscribe to upload progress
+  const progressQuery = useCapsuleUploadProgress(operationId, {
+    enabled: !!operationId,
+    onProgress: (event) => {
+      setUploadProgress(event.progress)
+      setUploadStage(event.stage)
+      setUploadMessage(event.message)
+      
+      if (event.capsuleId) {
+        setCapsuleId(event.capsuleId)
+      }
+      
+      options?.onUploadProgress?.(event)
+    },
+    onComplete: (event) => {
+      setUploadProgress(100)
+      setUploadStage('completed')
+      
+      // Invalidate all queries after completion
+      queryClient.invalidateQueries({ queryKey: orpc.capsule.list.key() })
+      queryClient.invalidateQueries({ queryKey: orpc.capsule.findByMonth.key() })
+      queryClient.invalidateQueries({ queryKey: orpc.capsule.findByDay.key() })
+      queryClient.invalidateQueries({ queryKey: orpc.capsule.getRecent.key() })
+      
+      if (event.capsuleId) {
+        queryClient.invalidateQueries({ 
+          queryKey: orpc.capsule.findById.key({ input: { id: event.capsuleId } }) 
+        })
+      }
+      
+      toast.success('Capsule created and processed successfully')
+      
+      // Fetch the completed capsule and call callback
+      if (event.capsuleId) {
+        orpc.capsule.findById.call({ id: event.capsuleId }).then((capsule) => {
+          if (capsule) {
+            options?.onUploadComplete?.(capsule)
+          }
+        })
+      }
+    },
+    onError: (error) => {
+      setUploadStage('failed')
+      toast.error(`Upload failed: ${error.message}`)
+      options?.onUploadError?.(error)
+    },
   })
+
+  // Create mutation (initiates background upload)
+  const uploadMutation = useMutation({
+    mutationFn: async (variables: Parameters<typeof orpc.capsule.create.call>[0]) => {
+      // Generate unique operation ID
+      const opId = `capsule-${Date.now()}-${Math.random().toString(36).substring(7)}`
+      setOperationId(opId)
+      setUploadProgress(0)
+      setUploadStage('creating_capsule')
+      
+      options?.onUploadStart?.(opId)
+      
+      // Call with operation ID to enable background processing
+      return await orpc.capsule.create.call({
+        ...variables,
+        operationId: opId,
+      } as any)
+    },
+    onError: (error: Error) => {
+      setUploadStage('failed')
+      toast.error(`Failed to start upload: ${error.message}`)
+      options?.onUploadError?.(error)
+    },
+  })
+
+  return {
+    // Mutation functions
+    upload: uploadMutation.mutate,
+    uploadAsync: uploadMutation.mutateAsync,
+    
+    // Upload state
+    isUploading: uploadMutation.isPending || (uploadStage !== null && uploadStage !== 'completed' && uploadStage !== 'failed'),
+    uploadProgress,
+    uploadStage,
+    uploadMessage,
+    
+    // Result state
+    capsuleId,
+    operationId,
+    
+    // Error state
+    uploadError: uploadMutation.error || progressQuery.error,
+    
+    // Combined busy state
+    isBusy: uploadMutation.isPending || progressQuery.isFetching,
+  }
 }
 
 /**
- * Direct async function for fetching a single capsule (for server components)
+ * Hook to update a capsule with background upload and progress tracking
+ * Similar to create but for updates
  */
-export async function getCapsule(capsuleId: string) {
-  return orpc.capsule.findById.call({ id: capsuleId })
-}
+export function useUpdateCapsuleWithProgress(options?: {
+  onUploadStart?: (operationId: string) => void
+  onUploadProgress?: (event: CapsuleUploadProgressEvent) => void
+  onUploadComplete?: (capsule: Capsule) => void
+  onUploadError?: (error: Error) => void
+}) {
+  const queryClient = useQueryClient()
+  const [operationId, setOperationId] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStage, setUploadStage] = useState<string | null>(null)
+  const [uploadMessage, setUploadMessage] = useState<string | null>(null)
+  const [capsuleId, setCapsuleId] = useState<string | null>(null)
 
-/**
- * Direct async function for fetching capsules by day (for server components)
- */
-export async function getCapsulesByDay(day: string) {
-  return orpc.capsule.findByDay.call({ day })
-}
+  // Subscribe to upload progress
+  const progressQuery = useCapsuleUploadProgress(operationId, {
+    enabled: !!operationId,
+    onProgress: (event) => {
+      setUploadProgress(event.progress)
+      setUploadStage(event.stage)
+      setUploadMessage(event.message)
+      
+      if (event.capsuleId) {
+        setCapsuleId(event.capsuleId)
+      }
+      
+      options?.onUploadProgress?.(event)
+    },
+    onComplete: (event) => {
+      setUploadProgress(100)
+      setUploadStage('completed')
+      
+      // Invalidate all queries after completion
+      queryClient.invalidateQueries({ queryKey: orpc.capsule.list.key() })
+      queryClient.invalidateQueries({ queryKey: orpc.capsule.findByMonth.key() })
+      queryClient.invalidateQueries({ queryKey: orpc.capsule.findByDay.key() })
+      queryClient.invalidateQueries({ queryKey: orpc.capsule.getRecent.key() })
+      
+      if (event.capsuleId) {
+        queryClient.invalidateQueries({ 
+          queryKey: orpc.capsule.findById.key({ input: { id: event.capsuleId } }) 
+        })
+      }
+      
+      toast.success('Capsule updated and processed successfully')
+      
+      // Fetch the completed capsule and call callback
+      if (event.capsuleId) {
+        orpc.capsule.findById.call({ id: event.capsuleId }).then((capsule) => {
+          if (capsule) {
+            options?.onUploadComplete?.(capsule)
+          }
+        })
+      }
+    },
+    onError: (error) => {
+      setUploadStage('failed')
+      toast.error(`Update failed: ${error.message}`)
+      options?.onUploadError?.(error)
+    },
+  })
 
-/**
- * Direct async function for fetching capsules by month (for server components)
- */
-export async function getCapsulesByMonth(month: string) {
-  console.log(month)
-  return orpc.capsule.findByMonth.call({ month })
-}
+  // Update mutation (initiates background upload)
+  const uploadMutation = useMutation({
+    mutationFn: async (variables: Parameters<typeof orpc.capsule.update.call>[0]) => {
+      // Generate unique operation ID
+      const opId = `capsule-update-${Date.now()}-${Math.random().toString(36).substring(7)}`
+      setOperationId(opId)
+      setUploadProgress(0)
+      setUploadStage('creating_capsule')
+      setCapsuleId(variables.id)
+      
+      options?.onUploadStart?.(opId)
+      
+      // Call with operation ID to enable background processing
+      return await orpc.capsule.update.call({
+        ...variables,
+        operationId: opId,
+      } as any)
+    },
+    onError: (error: unknown) => {
+      setUploadStage('failed')
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      toast.error(`Failed to start update: ${message}`)
+      options?.onUploadError?.(error instanceof Error ? error : new Error(String(error)))
+    },
+  })
 
-/**
- * Direct async function for fetching recent capsules (for server components)
- * Returns capsules from past week + all locked + all unread from past
- */
-export async function getRecentCapsules() {
-  return orpc.capsule.getRecent.call({})
+  return {
+    // Mutation functions
+    update: uploadMutation.mutate,
+    updateAsync: uploadMutation.mutateAsync,
+    
+    // Upload state
+    isUpdating: uploadMutation.isPending || (uploadStage !== null && uploadStage !== 'completed' && uploadStage !== 'failed'),
+    uploadProgress,
+    uploadStage,
+    uploadMessage,
+    
+    // Result state
+    capsuleId,
+    operationId,
+    
+    // Error state
+    uploadError: uploadMutation.error || progressQuery.error,
+    
+    // Combined busy state
+    isBusy: uploadMutation.isPending || progressQuery.isFetching,
+  }
 }

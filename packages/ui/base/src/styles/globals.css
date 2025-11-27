@@ -5,7 +5,9 @@
 /*
   ---break---
 */
-@custom-variant dark (&:is(.dark *));
+/* Add class-based dark mode variant (unused, but keeps Tailwind happy) */
+/* Media query-based dark mode is removed via PostCSS plugin */
+@custom-variant dark (&:where(.dark, .dark *));
 
 /*
   The default border color has changed to `currentColor` in Tailwind CSS v4,

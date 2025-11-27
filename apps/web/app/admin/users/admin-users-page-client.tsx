@@ -6,7 +6,7 @@ import { flexRender, useReactTable } from '@tanstack/react-table';
 import { useState, useMemo } from 'react';
 import { User, UserListResponse } from '@/types/user';
 import { cn } from '@/lib/utils';
-import { useUsers } from '@/hooks/useUsers';
+import { useUsers } from '@/hooks/users/hooks';
 import {
   Table,
   TableBody,
@@ -52,7 +52,7 @@ import {
 import { authClient } from '@/lib/auth';
 import { toast } from 'sonner';
 import { orpc } from '@/lib/orpc';
-import { useDeleteUser } from '@/hooks/useUsers';
+import { useDeleteUser } from '@/hooks/users/hooks';
 
 const columnHelper = createColumnHelper<User>()
 
@@ -244,24 +244,21 @@ const columns = [
     enableSorting: true,
     enableColumnFilter: true,
   }),
-  columnHelper.accessor('roles', {
-    header: 'Roles',
+  columnHelper.accessor('role', {
+    header: 'Role',
     cell: info => {
-      const roles = info.getValue();
-      if (!roles || roles.length === 0) {
-        return <span className="text-muted-foreground italic text-xs">No roles</span>;
+      const role = info.getValue();
+      if (!role) {
+        return <span className="text-muted-foreground italic text-xs">No role</span>;
       }
-      return <span className="flex gap-1.5 flex-wrap">
-        {roles.map(r => {
-          return <span key={r} className={cn(
-            "py-1 px-2.5 text-xs rounded-md font-semibold",
-            r === 'admin' && 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200',
-            r === 'user' && 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200',
-            r === 'content' && 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200',
-          )}>
-            {r}
-          </span>
-        })}
+      return <span className={cn(
+        "py-1 px-2.5 text-xs rounded-md font-semibold",
+        role === 'admin' && 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200',
+        role === 'sarah' && 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200',
+        role === 'user' && 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200',
+        role === 'content' && 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200',
+      )}>
+        {role}
       </span>;
     },
     enableSorting: false,

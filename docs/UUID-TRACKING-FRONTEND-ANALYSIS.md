@@ -19,7 +19,7 @@
 ```typescript
 .input(
   z.object({
-    videoId: z.string().uuid(),
+    videoId: z.uuid(),
   })
 )
 .output(
@@ -43,8 +43,8 @@
 ```typescript
 .input(
   z.object({
-    videoId: z.string().uuid(),
-    operationId: z.string().uuid().optional(), // NEW: Target specific operation
+    videoId: z.uuid(),
+    operationId: z.uuid().optional(), // NEW: Target specific operation
   })
 )
 .output(
@@ -177,9 +177,9 @@ export const uploadVideoOutput = z.object({
   path: z.string(),
   size: z.number(),
   mimeType: z.string(),
-  fileId: z.string().uuid(), // Add fileId
-  videoId: z.string().uuid(), // Add videoId
-  operationId: z.string().uuid().optional(), // NEW: Operation tracking
+  fileId: z.uuid(), // Add fileId
+  videoId: z.uuid(), // Add videoId
+  operationId: z.uuid().optional(), // NEW: Operation tracking
   isProcessed: z.boolean(), // Add processing status
   message: z.string().optional(), // Add message
 });

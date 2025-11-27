@@ -46,6 +46,22 @@ export type ContentMetadata = {
   thumbnail?: string;
 };
 
+// Attached media structure from API
+export type AttachedMedia = {
+  contentMediaId: string;
+  type: 'image' | 'video' | 'audio';
+  fileId: string;
+  filePath: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
+  thumbnailPath?: string | null;
+  createdAt: string;
+};
+
 export type Capsule = {
   id: string;
   openingDate: string;
@@ -62,6 +78,12 @@ export type Capsule = {
   unlockedAt: string | null;
   openedAt: string | null;
   isOpened: boolean; // Derived from openedAt: true if openedAt is not null
+  
+  // Attached media linked via contentMediaId in TipTap JSON
+  attachedMedia?: AttachedMedia[];
+  
+  // Video processing status (from backend query)
+  hasProcessingVideos?: boolean;
   
   createdAt: string;
   updatedAt: string;

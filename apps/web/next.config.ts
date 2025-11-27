@@ -68,6 +68,8 @@ const nextConfig: NextConfig = {
     // Increase middleware body size limit for proxied requests (uploads)
     // This affects middleware like rewrites that proxy to the API
     middlewareClientMaxBodySize: '1000mb',
+    // Enable global-not-found.tsx for application-wide 404 page
+    globalNotFound: true,
   },
   
   typescript: {

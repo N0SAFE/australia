@@ -4,11 +4,10 @@ import { userSchema } from '@repo/api-contracts/common/user'
 
 export type User = z.infer<typeof userSchema> & {
   /**
-   * Legacy role information added by the auth layer or mock API.
-   * The real API currently exposes only `name`, `email`, etc.,
-   * so this remains optional and should be feature-gated at usage sites.
+   * Roles array computed from the role field for backward compatibility
+   * with components expecting an array format.
    */
-  roles?: Array<'admin' | 'user' | 'content'>
+  roles?: Array<'admin' | 'user' | 'content' | 'sarah'>
 }
 
 export type UserListResponse = z.infer<typeof userListOutput>

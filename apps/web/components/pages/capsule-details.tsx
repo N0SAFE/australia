@@ -7,7 +7,7 @@ import { ContentRenderer } from '@/components/content/ContentRenderer';
 import { UnlockModal } from '@/components/unlock/UnlockModal';
 import { useSession } from '@/lib/auth';
 import { Shield } from 'lucide-react';
-import { useMarkCapsuleAsOpened } from '@/hooks/useCapsules';
+import { useMarkCapsuleAsOpened } from '@/hooks/capsules/hooks';
 
 /**
  * CapsuleContent - Pure content display without interactions
@@ -20,7 +20,7 @@ export function CapsuleContent({
 }) {
   return (
     <div className="m-5">
-      <ContentRenderer capsule={data} />
+      <ContentRenderer capsule={data} attachedMedia={data.attachedMedia || []} />
     </div>
   );
 }
@@ -115,7 +115,7 @@ export function CapsuleDetails({
             <p className="text-xs mt-1">Ce contenu est normalement verrouillé pour les utilisateurs.</p>
           </div>
         )}
-        <ContentRenderer capsule={data} />
+        <ContentRenderer capsule={data} attachedMedia={(data as any).attachedMedia || []} />
       </div>
     )}
   </div>

@@ -1,38 +1,58 @@
 import { mergeAttributes, Node } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { VideoNodeView } from "./video-node"
+import type { ComponentType } from "react"
+import type { VideoStrategyResolver } from "../../../lib/media-url-resolver"
 
-interface ProcessingProgress {
+export interface ProcessingProgress {
   progress: number
   status: 'processing' | 'completed' | 'failed'
   message?: string
+  error?: string
 }
 
-type ProgressCallback = (progress: ProcessingProgress) => void
-type UnsubscribeFunction = () => void
+/**
+ * Video node attributes
+ */
+export interface VideoNodeAttributes {
+  meta?: unknown
+  title?: string | null
+  controls?: boolean
+  width?: string | number
+  height?: string | number | null
+  align?: string
+}
+
+/**
+ * Props passed to the VideoProgressComponent
+ */
+export interface VideoProgressComponentProps {
+  /**
+   * All video node attributes including fileId
+   */
+  attrs: VideoNodeAttributes
+  
+  /**
+   * Function to render the progress bar UI
+   * Called with the current progress state and visibility
+   */
+  renderProgress: (progress: ProcessingProgress | null, isVisible: boolean) => React.ReactNode
+}
 
 export interface VideoNodeOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HTMLAttributes: Record<string, any>
   /**
-   * Media URL resolver callbacks by ID
+   * Video URL strategy resolver function
+   * Called with meta only to resolve the final URL
    */
-  injectMediaUrl?: Record<string, (src: string) => Promise<string> | string>
+  videoStrategy?: VideoStrategyResolver
   /**
-   * Subscribe to processing progress updates for a specific video
-   * @param videoId - The video identifier (srcUrlId or src)
-   * @param callback - Function to call with progress updates
-   * @returns Unsubscribe function
+   * Component responsible for fetching/subscribing to video processing progress
+   * and rendering the progress bar. This component receives the video attrs with meta
+   * and a renderProgress function to display the progress UI.
    */
-  onProgressUpdate?: (videoId: string, callback: ProgressCallback) => UnsubscribeFunction
-  /**
-   * Enable progress bar display for a specific video
-   */
-  enableProgress?: (videoId: string) => void
-  /**
-   * Disable progress bar display for a specific video
-   */
-  disableProgress?: (videoId: string) => void
+  VideoProgressComponent?: ComponentType<VideoProgressComponentProps>
 }
 
 declare module "@tiptap/core" {
@@ -55,20 +75,25 @@ export const VideoNode = Node.create<VideoNodeOptions>({
   addOptions() {
     return {
       HTMLAttributes: {},
-      injectMediaUrl: {},
-      onProgressUpdate: undefined,
-      enableProgress: undefined,
-      disableProgress: undefined,
+      videoStrategy: undefined,
+      VideoProgressComponent: undefined,
     }
   },
 
   addAttributes() {
     return {
-      src: {
+      meta: {
         default: null,
       },
-      srcUrlId: {
-        default: null,
+      contentMediaId: {
+        default: null, // UUID linking content node to capsule media record
+      },
+      strategy: {
+        default: 'api', // 'local' for blob URLs, 'api' for server files, 'contentMediaId' for pending/uploaded
+      },
+      fileRef: {
+        default: null, // Store File reference for local strategy (not serialized)
+        rendered: false,
       },
       title: {
         default: null,

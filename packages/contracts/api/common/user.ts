@@ -2,12 +2,13 @@ import z from "zod/v4";
 
 export const userSchema = z.object({
   id: z.string(),
-  name: z.string(),
+  name: z.string().nullable(),
   email: z.email(),
-  emailVerified: z.boolean(),
+  emailVerified: z.coerce.boolean(),
   image: z.string().nullable(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+  role: z.string().nullable().optional(),
   invitationStatus: z.enum(['pending', 'accepted', 'expired']).nullable().optional(),
   invitationToken: z.string().nullable().optional(),
 });

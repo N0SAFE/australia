@@ -1,117 +1,223 @@
-import { Injectable } from '@nestjs/common';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { EnvService } from '@/config/env/env.service';
+import { Injectable, Logger } from '@nestjs/common';
+import { FileRangeService } from '@/core/modules/file/services/file-range.service';
+import { FileService } from '@/core/modules/file';
 
+/**
+ * Storage Service - Thin wrapper around core FileService
+ * This service delegates all file operations to the core FileService
+ * with 'storage' as the namespace for organization
+ */
 @Injectable()
 export class StorageService {
-  private readonly uploadDir: string;
+  private readonly logger = new Logger(StorageService.name);
+  private readonly STORAGE_NAMESPACE = 'storage';
 
-  constructor(private readonly envService: EnvService) {
-    this.uploadDir = this.envService.get('UPLOADS_DIR');
-    console.log('[StorageService] Upload directory configured:', this.uploadDir);
+  constructor(
+    private readonly fileRangeService: FileRangeService,
+    private readonly fileService: FileService,
+  ) {
+    this.logger.log('StorageService initialized with core FileService');
   }
 
   /**
-   * Get the full file path - checks subdirectories
+   * Upload an image file - Delegates to core FileService
+   * Uses 'storage' namespace for organization
    */
-  getFilePath(filename: string): string {
-    // Determine subdirectory based on filename prefix
-    let subdir = '';
-    if (filename.startsWith('image-')) {
-      subdir = 'images';
-    } else if (filename.startsWith('video-')) {
-      subdir = 'videos';
-    } else if (filename.startsWith('audio-')) {
-      subdir = 'audio';
-    }
-    
-    const filePath = subdir 
-      ? path.join(this.uploadDir, subdir, filename)
-      : path.join(this.uploadDir, filename);
-    
-    console.log('[StorageService] getFilePath:', { filename, uploadDir: this.uploadDir, subdir, filePath });
-    return filePath;
-  }
-
-  /**
-   * Check if file exists
-   */
-  async fileExists(filename: string): Promise<boolean> {
-    const filePath = this.getFilePath(filename);
-    try {
-      await fs.access(filePath);
-      console.log('[StorageService] fileExists: true -', filePath);
-      return true;
-    } catch (error) {
-      console.log('[StorageService] fileExists: false -', filePath, 'Error:', (error as Error).message);
-      return false;
-    }
-  }
-
-  /**
-   * Delete a file
-   */
-  async deleteFile(filename: string): Promise<void> {
-    const filePath = this.getFilePath(filename);
-    await fs.unlink(filePath);
-  }
-
-  /**
-   * Get file metadata
-   */
-  async getFileMetadata(filename: string): Promise<{ size: number; mimeType: string }> {
-    const filePath = this.getFilePath(filename);
-    const stats = await fs.stat(filePath);
-    const ext = path.extname(filename).toLowerCase();
-    
-    const mimeTypes: Record<string, string> = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.mp4': 'video/mp4',
-      '.webm': 'video/webm',
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav',
-      '.ogg': 'audio/ogg',
-    };
+  async uploadImage(
+    file: File,
+    uploadedBy?: string,
+  ): Promise<{
+    fileId: string;
+    filename: string;
+    size: number;
+    mimeType: string;
+    namespace: string;
+    storedFilename: string;
+  }> {
+    const result = await this.fileService.uploadImage(
+      file,
+      [this.STORAGE_NAMESPACE],
+      uploadedBy,
+    );
 
     return {
-      size: stats.size,
-      mimeType: mimeTypes[ext] || 'application/octet-stream',
+      fileId: result.fileId,
+      filename: result.filename,
+      size: result.size,
+      mimeType: result.mimeType,
+      namespace: result.namespace.join('/'),
+      storedFilename: result.storedFilename,
     };
   }
 
   /**
-   * Save a File object to disk
+   * Upload a video file - Delegates to core FileService
+   * Uses 'storage' namespace for organization
    */
-  async saveFile(file: File, filename: string): Promise<string> {
-    const filePath = this.getFilePath(filename);
-    
-    // Ensure directory exists
-    await fs.mkdir(this.uploadDir, { recursive: true });
-    
-    // Convert File to Buffer and save
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(filePath, buffer);
-    
-    console.log('[StorageService] File saved:', { filename, filePath, size: file.size });
-    return filePath;
+  async uploadVideo(
+    file: File,
+    uploadedBy?: string,
+  ): Promise<{
+    fileId: string;
+    filename: string;
+    size: number;
+    mimeType: string;
+    namespace: string;
+    storedFilename: string;
+    absolutePath: string;
+  }> {
+    const result = await this.fileService.uploadVideo(
+      file,
+      [this.STORAGE_NAMESPACE],
+      uploadedBy,
+    );
+
+    return {
+      fileId: result.fileId,
+      filename: result.filename,
+      size: result.size,
+      mimeType: result.mimeType,
+      namespace: result.namespace.join('/'),
+      storedFilename: result.storedFilename,
+      absolutePath: result.absolutePath,
+    };
   }
 
   /**
-   * Read file and return as File object
+   * Upload an audio file - Delegates to core FileService
+   * Uses 'storage' namespace for organization
    */
-  async readFile(filename: string): Promise<File> {
-    const filePath = this.getFilePath(filename);
-    const buffer = await fs.readFile(filePath);
-    const metadata = await this.getFileMetadata(filename);
-    
-    // Create a File object from buffer
-    const file = new File([buffer], filename, { type: metadata.mimeType });
-    console.log('[StorageService] File read:', { filename, filePath, size: file.size });
-    return file;
+  async uploadAudio(
+    file: File,
+    uploadedBy?: string,
+  ): Promise<{
+    fileId: string;
+    filename: string;
+    size: number;
+    mimeType: string;
+    namespace: string;
+    storedFilename: string;
+  }> {
+    const result = await this.fileService.uploadAudio(
+      file,
+      [this.STORAGE_NAMESPACE],
+      uploadedBy,
+    );
+
+    return {
+      fileId: result.fileId,
+      filename: result.filename,
+      size: result.size,
+      mimeType: result.mimeType,
+      namespace: result.namespace.join('/'),
+      storedFilename: result.storedFilename,
+    };
+  }
+
+  /**
+   * Get video with file metadata by file ID - Delegates to core FileService
+   * Returns null if not found or if file is not a video
+   */
+  async getVideoByFileId(fileId: string) {
+    return await this.fileService.getVideoByFileId(fileId);
+  }
+
+  /**
+   * Get image with file metadata by file ID - Delegates to core FileService
+   * Returns undefined if not found or if file is not an image
+   */
+  async getImageByFileId(fileId: string) {
+    return await this.fileService.getImageByFileId(fileId);
+  }
+
+  /**
+   * Get audio with file metadata by file ID - Delegates to core FileService
+   * Returns undefined if not found or if file is not an audio
+   */
+  async getAudioByFileId(fileId: string) {
+    return await this.fileService.getAudioByFileId(fileId);
+  }
+
+  /**
+   * Get raw file with file metadata by file ID - Delegates to core FileService
+   * Returns undefined if not found or if file is not a raw file
+   */
+  async getRawFileByFileId(fileId: string) {
+    return await this.fileService.getRawFileByFileId(fileId);
+  }
+
+  /**
+   * Update video processing status - Delegates to core FileService
+   * Called after video processing completes or fails
+   */
+  async updateVideoProcessingStatus(
+    videoId: string,
+    status: {
+      isProcessed: boolean;
+      processingProgress?: number;
+      processingError?: string;
+    }
+  ) {
+    await this.fileService.updateVideoProcessingStatus(videoId, status);
+  }
+
+  /**
+   * Stream a video file with Range support (same as presentation module)
+   * Uses FileRangeService for all streaming logic
+   * 
+   * @param fileId - The file ID
+   * @param rangeHeader - Optional Range header from request
+   */
+  async streamVideo(
+    fileId: string,
+    rangeHeader?: string,
+  ) {
+    // Use FileRangeService for streaming (same as presentation)
+    // FileRangeService handles file retrieval internally
+    return await this.fileRangeService.streamVideo(
+      fileId,
+      rangeHeader,
+      { maxChunkSize: 5 * 1024 * 1024 }, // 5MB chunks
+    );
+  }
+  
+  /**
+   * Stream an audio file with Range support
+   * Uses FileRangeService for all streaming logic
+   * 
+   * @param fileId - The file ID
+   * @param rangeHeader - Optional Range header from request
+   */
+  async streamAudio(
+    fileId: string,
+    rangeHeader?: string,
+  ) {
+    // Use FileRangeService for streaming
+    // FileRangeService handles file retrieval internally
+    return await this.fileRangeService.streamAudio(
+      fileId,
+      rangeHeader,
+      { maxChunkSize: 5 * 1024 * 1024 }, // 5MB chunks
+    );
+  }
+  
+  /**
+   * Stream any file with Range support (images, PDFs, etc.)
+   * Uses FileRangeService for all streaming logic
+   * 
+   * @param fileId - The file ID
+   * @param rangeHeader - Optional Range header from request
+   */
+  async streamFile(
+    fileId: string,
+    rangeHeader?: string,
+  ) {
+    // Use FileRangeService for streaming
+    // FileRangeService handles file retrieval internally and automatically sets correct MIME type
+    return await this.fileRangeService.streamFile(
+      fileId,
+      rangeHeader,
+      { maxChunkSize: 5 * 1024 * 1024 }, // 5MB chunks
+    );
   }
 }

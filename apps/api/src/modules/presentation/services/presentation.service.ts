@@ -1,9 +1,11 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { PresentationRepository, type PresentationVideoRecord } from "../repositories/presentation.repository";
-import { FileStorageService } from "@/core/modules/file-storage/file-storage.service";
-import { StorageService } from "@/modules/storage/services/storage.service";
+import type { ReadStream } from 'fs';
+import { PresentationRepository } from "../repositories/presentation.repository";
+import { FileService } from "@/core/modules/file";
 import { VideoProcessingService } from "@/core/modules/video-processing";
+import { FfmpegService } from "@/core/modules/ffmpeg/services/ffmpeg.service";
 import { PresentationEventService } from "../events/presentation.event";
+import { PRESENTATION_VIDEO_NAMESPACE } from "../constants";
 
 @Injectable()
 export class PresentationService {
@@ -11,56 +13,67 @@ export class PresentationService {
 
     constructor(
         private readonly presentationRepository: PresentationRepository,
-        private readonly fileStorageService: FileStorageService,
-        private readonly storageService: StorageService,
+        private readonly fileService: FileService,
         private readonly videoProcessingService: VideoProcessingService,
+        private readonly ffmpegService: FfmpegService,
         private readonly presentationEventService: PresentationEventService
     ) {}
 
     /**
      * Upload or replace presentation video
      */
-    async uploadVideo(file: Express.Multer.File): Promise<PresentationVideoRecord & { url: string }> {
-        // Process file upload
-        const fileData = this.fileStorageService.processUploadedFile(file);
+    async uploadVideo(file: File) {
+        // Upload file using FileService with namespace ['presentation', 'video']
+        const uploadResult = await this.fileService.uploadFile(
+            file,
+            ["presentation", "video"],
+            "video",
+            undefined // uploadedBy - presentation doesn't have user context
+        );
+
+        const fileId = uploadResult.fileId;
+        this.logger.log(`Video uploaded with fileId: ${fileId}`);
 
         // Get current video to delete old file
-        const currentVideo = await this.presentationRepository.findCurrent();
+        const currentVideo = await this.presentationRepository.findCurrentBasic();
 
         // Delete old file if exists
-        if (currentVideo?.filePath) {
+        if (currentVideo?.fileId) {
             try {
-                await this.storageService.deleteFile(currentVideo.filePath);
-            } catch (error) {
+                // Use FileService's deleteFile method (by fileId)
+                await this.fileService.deleteFile(currentVideo.fileId);
+                this.logger.log(`Deleted old video: ${currentVideo.fileId}`);
+            } catch (error: unknown) {
                 // Ignore deletion errors - continue with upload
-                console.warn("Failed to delete old presentation video:", error);
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                this.logger.warn(`Failed to delete old presentation video: ${errorMessage}`);
             }
         }
 
-        // Save to database (without processing - processing will be triggered but not awaited)
-        const video = await this.presentationRepository.upsert({
-            filePath: fileData.filePath,
-            filename: fileData.filename,
-            mimeType: fileData.mimetype,
-            size: fileData.size,
-            isProcessed: false,
-            processingProgress: 0,
-            processingError: null,
+        // Save to database - only store fileId reference
+        // All file metadata is in the file/videoFile tables
+        await this.presentationRepository.upsert({
+            fileId,
         });
 
-        // Trigger async video processing (non-blocking) - return immediately
-        // Get absolute file path
-        const absolutePath = this.fileStorageService.getAbsolutePath(fileData.filePath);
+        const namespace = [...PRESENTATION_VIDEO_NAMESPACE];
 
         // Start processing in background with abort strategy (don't await)
         this.presentationEventService
-            .startProcessing("videoProcessing", { videoId: "singleton" }, ({ abortSignal, emit }) => {
-                // Call video processing service and handle result with .then()
-                return this.videoProcessingService
-                    .processVideo(
-                        absolutePath,
+            .startProcessing("videoProcessing", { videoId: "singleton" }, async ({ abortSignal, emit }) => {
+                try {
+                    // 1. Get the file as a Web File from storage provider
+                    const webFile = await this.fileService.getFileAsWebFile(fileId);
+                    if (!webFile) {
+                        throw new Error(`Failed to retrieve file ${fileId} from storage provider`);
+                    }
+                    const input = { id: fileId, file: webFile };
+
+                    // 2. Process the video with FFmpeg (namespace-based temp storage)
+                    const result = await this.videoProcessingService.processVideoFromFile(
+                        input,
+                        namespace,
                         (progress, message) => {
-                            // Emit progress updates using the emit helper
                             emit({
                                 progress,
                                 message,
@@ -68,52 +81,82 @@ export class PresentationService {
                             });
                         },
                         abortSignal
-                    )
-                    .then(async (metadata) => {
-                        // SUCCESS: Update database to mark as processed
-                        await this.presentationRepository.updateVideoProcessingStatus("singleton", {
-                            isProcessed: true,
-                            processingProgress: 100,
-                            processingError: null,
-                        });
+                    );
 
-                        console.log("metadata", metadata);
+                    // 3. Get the processed file stream from temp storage
+                    const processedFileContent = await this.ffmpegService.getProcessedFile(fileId, namespace);
 
-                        // Emit final completion event with metadata
-                        emit({
-                            progress: 100,
-                            message: "Processing complete",
-                            metadata: {
-                                duration: metadata.duration,
-                                width: metadata.width,
-                                height: metadata.height,
-                                codec: metadata.codec,
-                            },
-                            timestamp: new Date().toISOString(),
-                        });
-
-                        return;
-                    })
-                    .catch(async (error: unknown) => {
-                        const err = error instanceof Error ? error : new Error(String(error));
-
-                        // Check if this was an abort
-                        if (abortSignal?.aborted || err.message.includes("aborted")) {
-                            this.logger.warn(`Video processing aborted for presentation video: ${err.message}`);
-                            return; // Don't mark as error in DB for aborts
-                        }
-
-                        // FAILURE: Update database with error
-                        await this.presentationRepository.updateVideoProcessingStatus("singleton", {
-                            isProcessed: false,
-                            processingError: err.message,
-                        });
-
-                        this.logger.error(`Video processing failed for presentation video: ${err.message}`);
-
-                        // Throw error to propagate to subscriber
-                        throw err;
+                    // 4. Convert stream to Web File
+                    const chunks: Uint8Array[] = [];
+                    for await (const chunk of processedFileContent.stream) {
+                        chunks.push(chunk as Uint8Array);
+                    }
+                    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+                    const buffer = new Uint8Array(totalLength);
+                    let chunkOffset = 0;
+                    for (const chunk of chunks) {
+                        buffer.set(chunk, chunkOffset);
+                        chunkOffset += chunk.length;
+                    }
+                    const processedWebFile = new File([buffer], webFile.name, {
+                        type: 'video/mp4',
                     });
+
+                    // 5. Replace the original file content in storage provider
+                    await this.fileService.replaceFileContent(fileId, processedWebFile);
+
+                    // 6. Update file metadata (size, mimeType) in database
+                    await this.fileService.updateFileMetadata(fileId, {
+                        size: processedWebFile.size,
+                        mimeType: 'video/mp4',
+                    });
+
+                    // 7. Cleanup temp files
+                    await this.ffmpegService.cleanup(fileId, namespace);
+
+                    // 8. Update video processing status in database
+                    await this.presentationRepository.updateVideoProcessingStatus("singleton", {
+                        isProcessed: true,
+                        processingProgress: 100,
+                        processingError: null,
+                    });
+
+                    this.logger.log(`Video processing completed for file: ${fileId}`);
+
+                    // Emit final completion event with metadata
+                    emit({
+                        progress: 100,
+                        message: "Processing complete",
+                        metadata: {
+                            duration: result.metadata.duration,
+                            width: result.metadata.width,
+                            height: result.metadata.height,
+                            codec: result.metadata.codec,
+                        },
+                        timestamp: new Date().toISOString(),
+                    });
+                } catch (error: unknown) {
+                    const err = error instanceof Error ? error : new Error(String(error));
+
+                    // Always cleanup temp files on error
+                    await this.ffmpegService.cleanup(fileId, namespace).catch((cleanupErr: unknown) => {
+                        this.logger.warn(`Failed to cleanup temp files for fileId ${fileId}: ${String(cleanupErr)}`);
+                    });
+
+                    // Check if this was an abort
+                    if (abortSignal?.aborted || err.message.includes("aborted")) {
+                        this.logger.warn(`Video processing aborted for presentation video: ${err.message}`);
+                        return; // Don't mark as error in DB for aborts
+                    }
+
+                    // FAILURE: Update database with error
+                    await this.presentationRepository.updateVideoProcessingStatus("singleton", {
+                        isProcessed: false,
+                        processingError: err.message,
+                    });
+
+                    this.logger.error(`Video processing failed for presentation video: ${err.message}`);
+                }
             })
             .catch((error: unknown) => {
                 // This catches errors in the abort strategy wrapper itself
@@ -121,9 +164,18 @@ export class PresentationService {
                 this.logger.error(`Event processing wrapper failed: ${err.message}`);
             });
 
+        // Get the complete video data with joined file and video metadata
+        const result = await this.presentationRepository.findCurrent();
+        
+        if (!result) {
+            throw new Error('Failed to retrieve uploaded video');
+        }
+
         return {
-            ...video,
-            url: fileData.url,
+            ...result.presentation,
+            file: result.file,
+            video: result.video,
+            url: `/api/presentation/video/stream`, // Stream endpoint
         };
     }
 
@@ -131,28 +183,37 @@ export class PresentationService {
      * Trigger video processing for current presentation video
      */
     async triggerProcessing(): Promise<void> {
-        const video = await this.presentationRepository.findCurrent();
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             throw new NotFoundException("No presentation video found");
         }
+
+        const { file: fileRecord, video } = result;
+        const fileId = fileRecord.id;
 
         if (video.isProcessed) {
             throw new Error("Video is already processed");
         }
 
-        // Get absolute file path
-        const absolutePath = this.fileStorageService.getAbsolutePath(video.filePath);
+        const namespace = [...PRESENTATION_VIDEO_NAMESPACE];
 
         // Start processing in background with abort strategy (don't await)
         this.presentationEventService
-            .startProcessing("videoProcessing", { videoId: "singleton" }, ({ abortSignal, emit }) => {
-                // Call video processing service and handle result with .then()
-                return this.videoProcessingService
-                    .processVideo(
-                        absolutePath,
+            .startProcessing("videoProcessing", { videoId: "singleton" }, async ({ abortSignal, emit }) => {
+                try {
+                    // 1. Get the file as a Web File from storage provider
+                    const webFile = await this.fileService.getFileAsWebFile(fileId);
+                    if (!webFile) {
+                        throw new Error(`Failed to retrieve file ${fileId} from storage provider`);
+                    }
+                    const input = { id: fileId, file: webFile };
+
+                    // 2. Process the video with FFmpeg (namespace-based temp storage)
+                    const processingResult = await this.videoProcessingService.processVideoFromFile(
+                        input,
+                        namespace,
                         (progress, message) => {
-                            // Emit progress updates using the emit helper
                             emit({
                                 progress,
                                 message,
@@ -160,66 +221,80 @@ export class PresentationService {
                             });
                         },
                         abortSignal
-                    )
-                    .then(async (metadata) => {
-                        // SUCCESS: Update database to mark as processed
-                        // If conversion happened and file path changed, update it
-                        const updates: Parameters<typeof this.presentationRepository.updateVideoProcessingStatus>[1] = {
-                            isProcessed: true,
-                            processingProgress: 100,
-                            processingError: null,
-                        };
+                    );
 
-                        // Update file path if it changed during conversion
-                        if (metadata.newFilePath) {
-                            // Extract relative path from absolute path
-                            const uploadsIndex = metadata.newFilePath.indexOf("uploads/");
-                            const relativePath = uploadsIndex >= 0 ? metadata.newFilePath.substring(uploadsIndex) : metadata.newFilePath;
+                    // 3. Get the processed file stream from temp storage
+                    const processedFileContent = await this.ffmpegService.getProcessedFile(fileId, namespace);
 
-                            await this.presentationRepository.upsert({
-                                filePath: relativePath,
-                                filename: relativePath.split("/").pop() ?? "",
-                                mimeType: "video/mp4",
-                                size: video.size, // Keep original size
-                                ...updates,
-                            });
-                        } else {
-                            await this.presentationRepository.updateVideoProcessingStatus("singleton", updates);
-                        }
-
-                        // Emit final completion event with metadata
-                        emit({
-                            progress: 100,
-                            message: "Processing complete",
-                            metadata: {
-                                duration: metadata.duration,
-                                width: metadata.width,
-                                height: metadata.height,
-                                codec: metadata.codec,
-                            },
-                            timestamp: new Date().toISOString(),
-                        });
-                    })
-                    .catch(async (error: unknown) => {
-                        const err = error instanceof Error ? error : new Error(String(error));
-
-                        // Check if this was an abort
-                        if (abortSignal?.aborted || err.message.includes("aborted")) {
-                            this.logger.warn(`Video processing aborted for presentation video: ${err.message}`);
-                            return; // Don't mark as error in DB for aborts
-                        }
-
-                        // FAILURE: Update database with error
-                        await this.presentationRepository.updateVideoProcessingStatus("singleton", {
-                            isProcessed: false,
-                            processingError: err.message,
-                        });
-
-                        this.logger.error(`Video processing failed for presentation video: ${err.message}`);
-
-                        // Throw error to propagate to subscriber
-                        throw err;
+                    // 4. Convert stream to Web File
+                    const chunks: Uint8Array[] = [];
+                    for await (const chunk of processedFileContent.stream) {
+                        chunks.push(chunk as Uint8Array);
+                    }
+                    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+                    const buffer = new Uint8Array(totalLength);
+                    let chunkOffset = 0;
+                    for (const chunk of chunks) {
+                        buffer.set(chunk, chunkOffset);
+                        chunkOffset += chunk.length;
+                    }
+                    const processedWebFile = new File([buffer], webFile.name, {
+                        type: 'video/mp4',
                     });
+
+                    // 5. Replace the original file content in storage provider
+                    await this.fileService.replaceFileContent(fileId, processedWebFile);
+
+                    // 6. Update file metadata (size, mimeType) in database
+                    await this.fileService.updateFileMetadata(fileId, {
+                        size: processedWebFile.size,
+                        mimeType: 'video/mp4',
+                    });
+
+                    // 7. Cleanup temp files
+                    await this.ffmpegService.cleanup(fileId, namespace);
+
+                    // 8. Update video processing status in database
+                    await this.presentationRepository.updateVideoProcessingStatus("singleton", {
+                        isProcessed: true,
+                        processingProgress: 100,
+                        processingError: null as string | null,
+                    });
+
+                    // Emit final completion event with metadata
+                    emit({
+                        progress: 100,
+                        message: "Processing complete",
+                        metadata: {
+                            duration: processingResult.metadata.duration,
+                            width: processingResult.metadata.width,
+                            height: processingResult.metadata.height,
+                            codec: processingResult.metadata.codec,
+                        },
+                        timestamp: new Date().toISOString(),
+                    });
+                } catch (error: unknown) {
+                    const err = error instanceof Error ? error : new Error(String(error));
+
+                    // Always cleanup temp files on error
+                    await this.ffmpegService.cleanup(fileId, namespace).catch((cleanupErr: unknown) => {
+                        this.logger.warn(`Failed to cleanup temp files for fileId ${fileId}: ${String(cleanupErr)}`);
+                    });
+
+                    // Check if this was an abort
+                    if (abortSignal?.aborted || err.message.includes("aborted")) {
+                        this.logger.warn(`Video processing aborted for presentation video: ${err.message}`);
+                        return; // Don't mark as error in DB for aborts
+                    }
+
+                    // FAILURE: Update database with error
+                    await this.presentationRepository.updateVideoProcessingStatus("singleton", {
+                        isProcessed: false,
+                        processingError: err.message,
+                    });
+
+                    this.logger.error(`Video processing failed for presentation video: ${err.message}`);
+                }
             })
             .catch((error: unknown) => {
                 // This catches errors in the abort strategy wrapper itself
@@ -242,16 +317,19 @@ export class PresentationService {
         };
         timestamp: string;
     }> {
-        const video = await this.presentationRepository.findCurrent();
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             throw new NotFoundException("No presentation video found");
         }
+
+        // Extract video metadata from joined result
+        const { video } = result;
 
         // Subscribe to the event service for videoProcessing events
         const subscription = this.presentationEventService.subscribe("videoProcessing", { videoId: "singleton" });
 
-        // First, yield current state
+        // First, yield current state from videoFile table
         const currentProgress = video.processingProgress ?? 0;
         const currentIsProcessed = video.isProcessed;
         const currentError = video.processingError ?? null;
@@ -288,17 +366,20 @@ export class PresentationService {
 
     /**
      * Get current presentation video
+     * Returns presentation with file metadata from joined tables
      */
-    async getCurrentVideo(): Promise<(PresentationVideoRecord & { url: string }) | null> {
-        const video = await this.presentationRepository.findCurrent();
+    async getCurrentVideo() {
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             return null;
         }
 
         return {
-            ...video,
-            url: this.fileStorageService.getUrl(video.filePath),
+            ...result.presentation,
+            file: result.file,
+            video: result.video,
+            url: `/presentation/video`, // Stream endpoint (matches ORPC contract path)
         };
     }
 
@@ -306,29 +387,57 @@ export class PresentationService {
      * Delete presentation video
      */
     async deleteVideo() {
-        const video = await this.presentationRepository.findCurrent();
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             throw new NotFoundException("No presentation video found");
         }
 
-        // Delete file from storage
-        await this.storageService.deleteFile(video.filePath);
+        // Delete file from storage using FileService (by fileId)
+        await this.fileService.deleteFile(result.file.id);
 
-        // Delete from database
+        // Delete from database (cascade will handle file table)
         await this.presentationRepository.delete();
     }
 
     /**
-     * Get video stream path for serving
+     * Get video stream for serving
+     * Returns the file stream from FileService
      */
-    async getVideoPath(): Promise<string> {
-        const video = await this.presentationRepository.findCurrent();
+    async getVideoStream(): Promise<{
+        stream: ReadStream;
+        filename: string;
+        mimeType: string;
+        size: number;
+    }> {
+        const result = await this.presentationRepository.findCurrent();
 
-        if (!video) {
+        if (!result) {
             throw new NotFoundException("No presentation video found");
         }
 
-        return this.fileStorageService.getAbsolutePath(video.filePath);
+        // Get file stream from FileService using the fileId
+        return this.fileService.getFileStream(result.file.id);
+    }
+
+    /**
+     * Get absolute file path for the video file
+     */
+    async getAbsoluteFilePath(fileId: string): Promise<string> {
+        return this.fileService.getAbsoluteFilePath(fileId);
+    }
+
+    /**
+     * Find presentation by fileId (for crash recovery)
+     * Returns the presentation if it references this fileId
+     */
+    async findByFileId(fileId: string): Promise<{ fileId: string } | null> {
+        const result = await this.presentationRepository.findCurrent();
+        
+        if (result?.file.id !== fileId) {
+            return null;
+        }
+
+        return { fileId: result.file.id };
     }
 }

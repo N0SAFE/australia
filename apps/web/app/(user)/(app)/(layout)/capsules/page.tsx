@@ -1,4 +1,4 @@
-import { getCapsulesByMonth } from '@/hooks/useCapsules';
+import { getCapsulesByMonth } from '@/hooks/capsules/queries';
 import { CapsuleCard } from '@/components/capsule';
 import { Capsule } from '@/types/capsule';
 import dayjs from 'dayjs';

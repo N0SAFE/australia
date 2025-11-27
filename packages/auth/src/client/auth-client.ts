@@ -3,6 +3,7 @@ import type { BetterAuthClientOptions, BetterAuthClientPlugin } from 'better-aut
 import masterTokenClient from './plugins/masterToken'
 import { loginAsClientPlugin } from './plugins/loginAs'
 import { inviteClient } from './plugins/invite'
+import { passkeyClient } from '@better-auth/passkey/client'
 
 export interface CreateAuthClientFactoryOptions {
   /**

@@ -6,9 +6,6 @@ export type Auth = ReturnType<typeof createBetterAuth>["auth"];
 export const auth = createBetterAuth(null, {
   DEV_AUTH_KEY: process.env.DEV_AUTH_KEY,
   NODE_ENV: process.env.NODE_ENV ?? 'development',
-  PASSKEY_ORIGIN: process.env.PASSKEY_ORIGIN ?? '',
-  PASSKEY_RPID: process.env.PASSKEY_RPID ?? '',
-  PASSKEY_RPNAME: process.env.PASSKEY_RPNAME ?? '',
   BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET,
   BASE_URL: process.env.NEXT_PUBLIC_API_URL,
   APP_URL: process.env.APP_URL,

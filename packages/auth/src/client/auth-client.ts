@@ -45,7 +45,6 @@ export const createAuthClientFactory = (options: CreateAuthClientFactoryOptions)
     baseURL,
     fetchOptions,
     plugins: [
-      passkeyClient(),
       masterTokenClient(),
       loginAsClientPlugin(),
       inviteClient(),

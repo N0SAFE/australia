@@ -5,6 +5,9 @@ import { ReactNode } from "react";
 import { Toaster } from "@repo/ui/components/shadcn/sonner";
 import ReactQueryProviders from "@/utils/providers/ReactQueryProviders";
 import { DynamicTanstackDevTools } from "@/components/devtools/DynamicTanstackDevTools";
+import { SerwistProvider } from "@/lib/serwist-client";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { UpdateNotification } from "@/components/pwa/UpdateNotification";
 
 const PontanoSansFont = localFont({
   src: "../public/fonts/Pontano_Sans/PontanoSans-VariableFont_wght.ttf",
@@ -88,6 +91,19 @@ export const metadata: Metadata = {
     // yandex: "your-yandex-verification-code",
     // bing: "your-bing-verification-code",
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Gossip club",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "default",
+  },
 };
 
 export default async function RootLayout({
@@ -100,11 +116,16 @@ export default async function RootLayout({
       <body
         className={`${PontanoSansFont.variable} ${PinyonScriptFont.variable} antialiased`}
       >
-        <ReactQueryProviders>
-          {children}
+        <SerwistProvider swUrl="/serwist/sw.js">
+          <ReactQueryProviders>
+            {children}
 
-          <DynamicTanstackDevTools />
-        </ReactQueryProviders>
+            <DynamicTanstackDevTools />
+          </ReactQueryProviders>
+          <Toaster richColors position="top-center" />
+          <InstallPrompt />
+          <UpdateNotification />
+        </SerwistProvider>
         <Toaster theme="dark" richColors position="top-center" />
       </body>
     </html>

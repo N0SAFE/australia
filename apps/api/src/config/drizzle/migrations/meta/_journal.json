@@ -141,6 +141,13 @@
       "when": 1763991386704,
       "tag": "0019_bent_ultragirl",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1764201644522,
+      "tag": "0020_familiar_kang",
+      "breakpoints": true
     }
   ]
 }

@@ -25,6 +25,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
   
+  // Required for esbuild-wasm used by @serwist/turbopack
+  serverExternalPackages: ["esbuild-wasm"],
+  
   cacheComponents: true,
   
   // Image configuration for external images

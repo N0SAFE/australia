@@ -146,11 +146,6 @@ services:
       - DEV_AUTH_KEY=${DEV_AUTH_KEY:-dev-fallback-key}
       - TRUSTED_ORIGINS=${TRUSTED_ORIGINS:-}
       
-      # Passkey Configuration
-      - PASSKEY_RPID=${PASSKEY_RPID:-localhost}
-      - PASSKEY_RPNAME=${PASSKEY_RPNAME:-NestJS App}
-      - PASSKEY_ORIGIN=${PASSKEY_ORIGIN:-http://localhost:3000}
-      
       # Uploads directory path (absolute path in container)
       - UPLOADS_DIR=${UPLOADS_DIR:-/app/apps/api/uploads}
 

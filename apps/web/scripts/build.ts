@@ -5,7 +5,8 @@ import { spawn } from 'child_process'
 /**
  * Run generate and build commands sequentially
  * - Generate: bun generate (creates routes and OpenAPI docs)
- * - Build: node next build --turbopack (builds the Next.js app with Node.js for worker_threads support)
+ * - Build: node next build --turbopack (builds the Next.js app with Turbopack)
+ * Note: Now using @serwist/turbopack which supports Turbopack builds
  */
 async function runCommand(
   command: string,
@@ -53,6 +54,7 @@ async function build(): Promise<void> {
     await runCommand('bun', ['generate'], 'Generate routes and OpenAPI docs')
 
     // Then, build the Next.js app with Node.js (for worker_threads support)
+    // Using --turbopack with @serwist/turbopack for PWA support
     await runCommand(
       'node',
       ['--no-warnings', './node_modules/.bin/next', 'build', '--turbopack'],

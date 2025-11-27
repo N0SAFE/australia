@@ -54,11 +54,6 @@ services:
       - API_URL=http://${COMPOSE_PROJECT_NAME:-nextjs-nestjs}-api-prod:${API_PORT}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       
-      # Passkey Configuration (WebAuthn)
-      - PASSKEY_ORIGIN=${PASSKEY_ORIGIN}
-      - PASSKEY_RPID=${PASSKEY_RPID}
-      - PASSKEY_RPNAME=${PASSKEY_RPNAME}
-      
       # Authentication
       - AUTH_SECRET=${AUTH_SECRET}
       - BETTER_AUTH_SECRET=${AUTH_SECRET}

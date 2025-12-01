@@ -16,6 +16,7 @@ export default function UnlockPage() {
   const [isAnimatingUnlock, setIsAnimatingUnlock] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const startXRef = useRef(0)
+  const originalOverflowRef = useRef<string>('')
 
   const handleUnlock = async () => {
     // Set cookie with current timestamp
@@ -113,7 +114,7 @@ export default function UnlockPage() {
   useEffect(() => {
     if (isDragging) {
       // Preserve original body overflow and disable scroll while dragging
-      const originalOverflow = document.body.style.overflow
+      originalOverflowRef.current = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       
       window.addEventListener('mousemove', handleMouseMove)
@@ -123,7 +124,7 @@ export default function UnlockPage() {
 
       return () => {
         // Restore original body scroll when dragging ends
-        document.body.style.overflow = originalOverflow
+        document.body.style.overflow = originalOverflowRef.current
         
         window.removeEventListener('mousemove', handleMouseMove)
         window.removeEventListener('mouseup', handleMouseUp)

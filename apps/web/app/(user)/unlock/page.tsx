@@ -130,7 +130,7 @@ export default function UnlockPage() {
     : 0
 
   return (
-    <div className="h-dvh w-full flex flex-col items-center justify-between p-8 bg-linear-to-b from-pink-200 via-pink-300 to-pink-400 overflow-hidden">
+    <div className="h-dvh w-full flex flex-col items-center justify-between p-8 bg-linear-to-b from-pink-200 via-pink-300 to-pink-400 overflow-hidden overscroll-none">
       {/* Logo */}
       <Logo className="text-pink-dark mx-auto h-20 w-fit" ></Logo>
 
@@ -176,7 +176,7 @@ export default function UnlockPage() {
 
           {/* Draggable button */}
           <div
-            className="absolute top-1 left-1 w-14 h-14 bg-pink-500 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg z-10"
+            className="absolute top-1 left-1 w-14 h-14 bg-pink-500 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg z-10 touch-none"
             style={{
               transform: `translateX(${dragPosition}px)`,
               transition: isDragging ? 'none' : isAnimatingUnlock ? 'transform 0.5s ease-out, opacity 0.3s ease-out 0.5s' : 'transform 0.3s ease-out',

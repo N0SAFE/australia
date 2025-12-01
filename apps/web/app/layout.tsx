@@ -114,7 +114,7 @@ export default async function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="fr" className="dark" style={{ colorScheme: 'dark' }}>
+    <html lang="fr">
       <body
         className={`${PontanoSansFont.variable} ${PinyonScriptFont.variable} antialiased`}
       >

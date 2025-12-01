@@ -3,10 +3,12 @@
 import { Calendar } from '@/components/ui/calendar';
 import dayjs from 'dayjs';
 import { CalendarDay, Modifiers, UI } from 'react-day-picker';
-import { HTMLAttributes, JSX, TableHTMLAttributes, ThHTMLAttributes } from 'react';
+import { HTMLAttributes, JSX, TableHTMLAttributes, ThHTMLAttributes, useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Capsule } from '@/types/capsule';
+import { Button } from '@/components/ui/button';
+import { ChevronUp } from 'lucide-react';
 
 const CustomWeekday: (props: ThHTMLAttributes<HTMLTableCellElement>) => JSX.Element = (
   { children, 'aria-label': ariaLabel, className, ...props }
@@ -25,12 +27,15 @@ const CustomDayCell: (props: ({
 } & HTMLAttributes<HTMLDivElement>)) => JSX.Element = (
   { day, modifiers, className, ...props }
 ) => {
+  const isLocked = modifiers?.caps && dayjs().isBefore(day.date);
+  const isUnlocked = modifiers?.caps && dayjs().isAfter(day.date);
 
   return <td className={cn(
     className,
     'flex justify-center items-center',
     modifiers?.caps && 'bg-white/80 rounded-md',
-    (modifiers?.today || (modifiers?.caps && dayjs().isAfter(day.date))) && 'bg-pink-dark text-white font-bold cursor-pointer',
+    isLocked && 'text-pink-dark font-bold cursor-pointer',
+    (modifiers?.today || isUnlocked) && 'bg-pink-dark text-white font-bold cursor-pointer',
   )} {...props}>
     {modifiers?.caps ? <Link href={`/capsules/date/${dayjs(day.date).format('YYYY-MM-DD')}`} className="w-full h-full text-center flex justify-center items-center">
       {dayjs(day.date).format('D')}
@@ -57,12 +62,54 @@ export function CalendarPage({
 }: {
   data: Capsule[];
 }) {
-  const arr = new Array(12).fill(0).map((_, i) => {
-    return dayjs().add(i, 'month').toDate();
-  })
+  // Find the earliest capsule date
+  const earliestCapsuleDate = useMemo(() => {
+    if (data.length === 0) return null;
+    const firstCapsule = data[0];
+    if (!firstCapsule) return null;
+    return data.reduce((earliest, capsule) => {
+      const capsuleDate = dayjs(capsule.createdAt);
+      return capsuleDate.isBefore(earliest) ? capsuleDate : earliest;
+    }, dayjs(firstCapsule.createdAt));
+  }, [data]);
+
+  const [showAll, setShowAll] = useState(false);
+
+  const months = useMemo(() => {
+    if (showAll && earliestCapsuleDate) {
+      // Generate months from earliest capsule to 12 months from now
+      const monthsArray: Date[] = [];
+      let current = earliestCapsuleDate.startOf('month');
+      const end = dayjs().add(12, 'month').startOf('month');
+      
+      while (current.isBefore(end) || current.isSame(end, 'month')) {
+        monthsArray.push(current.toDate());
+        current = current.add(1, 'month');
+      }
+      return monthsArray;
+    }
+    
+    // Default: next 12 months
+    return new Array(12).fill(0).map((_, i) => {
+      return dayjs().add(i, 'month').toDate();
+    });
+  }, [showAll, earliestCapsuleDate]);
+
+  const canShowMore = earliestCapsuleDate && earliestCapsuleDate.isBefore(dayjs().startOf('month'));
 
   return <div className="flex flex-col gap-4 px-5">
-    {arr.map((month, idx) => {
+    {canShowMore && !showAll && (
+      <Button 
+        variant="outline" 
+        onClick={() => setShowAll(true)}
+        className="self-center bg-pink-light hover:bg-pink-dark hover:text-white border-pink-dark text-pink-dark"
+      >
+        <ChevronUp className="w-4 h-4 mr-2" />
+        Voir plus
+      </Button>
+    )}
+    
+    {months.map((month, idx) => {
       const monthDate = dayjs(month).format('YYYY-MM');
 
       const filteredCaps = data.reduce((acc, cur) => {

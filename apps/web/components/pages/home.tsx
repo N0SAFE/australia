@@ -19,11 +19,17 @@ export function HomePage({
 
     <h2 className="text-2xl font-bold mt-5">Les dernières capsules</h2>
 
-    <div className="gap-x-5 gap-y-4 flex flex-wrap justify-center px-4">
-      {data?.map((item) => {
-        return <CapsuleCard className="flex-1" data={item} key={item.id} />
-      })}
-    </div>
+    {data && data.length > 0 ? (
+      <div className="gap-x-5 gap-y-4 flex flex-wrap justify-center px-4">
+        {data.map((item) => {
+          return <CapsuleCard className="flex-1" data={item} key={item.id} />
+        })}
+      </div>
+    ) : (
+      <p className="text-center text-gray-500 px-4">
+        Aucune capsule pour le moment. Créez votre première capsule !
+      </p>
+    )}
 
     <Button asChild className="text-accent bg-white uppercase text-pink-dark" variant="secondary">
       <Link href="/capsules">

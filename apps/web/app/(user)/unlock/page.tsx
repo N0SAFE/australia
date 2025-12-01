@@ -112,7 +112,8 @@ export default function UnlockPage() {
   // Add/remove global event listeners
   useEffect(() => {
     if (isDragging) {
-      // Disable body scroll while dragging
+      // Preserve original body overflow and disable scroll while dragging
+      const originalOverflow = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       
       window.addEventListener('mousemove', handleMouseMove)
@@ -121,8 +122,8 @@ export default function UnlockPage() {
       window.addEventListener('touchend', handleTouchEnd)
 
       return () => {
-        // Re-enable body scroll when dragging ends
-        document.body.style.overflow = ''
+        // Restore original body scroll when dragging ends
+        document.body.style.overflow = originalOverflow
         
         window.removeEventListener('mousemove', handleMouseMove)
         window.removeEventListener('mouseup', handleMouseUp)

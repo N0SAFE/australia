@@ -199,7 +199,7 @@ export class RoleConfigCollection<TRoles extends Record<string, Record<string, r
    */
   getRole<K extends keyof TRoles>(key: K): RoleConfig<TRoles[K]> | undefined {
     const role = this._roles[key];
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+     
     return role !== undefined ? new RoleConfig(role) : undefined;
   }
 

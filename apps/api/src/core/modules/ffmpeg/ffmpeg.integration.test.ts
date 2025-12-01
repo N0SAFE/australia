@@ -11,7 +11,8 @@
  * Note: These tests are skipped by default. Remove .skip to run them.
  */
 
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { FfmpegService } from './services/ffmpeg.service';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { writeFileSync, unlinkSync, existsSync } from 'fs';

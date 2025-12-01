@@ -229,20 +229,20 @@ export const videoFile = pgTable("video_file", {
   
   // Subtitles and closed captions
   hasSubtitles: boolean("has_subtitles").notNull().default(false),
-  subtitleTracks: jsonb("subtitle_tracks").$type<Array<{
+  subtitleTracks: jsonb("subtitle_tracks").$type<{
     language: string;
     format: string; // SRT, VTT, etc.
     path: string;
     isDefault: boolean;
-  }>>(),
+  }[]>(),
   
   // Chapters
   hasChapters: boolean("has_chapters").notNull().default(false),
-  chapters: jsonb("chapters").$type<Array<{
+  chapters: jsonb("chapters").$type<{
     title: string;
     startTime: number; // Seconds
     endTime: number; // Seconds
-  }>>(),
+  }[]>(),
   
   // Streaming information
   isStreamable: boolean("is_streamable").notNull().default(false),
@@ -250,7 +250,7 @@ export const videoFile = pgTable("video_file", {
   dashManifestPath: text("dash_manifest_path"), // Path to DASH manifest
   
   // Video variants (different qualities/formats)
-  variants: jsonb("variants").$type<Array<{
+  variants: jsonb("variants").$type<{
     quality: string; // e.g., '720p', '1080p', '4K'
     path: string;
     width: number;
@@ -260,7 +260,7 @@ export const videoFile = pgTable("video_file", {
     audioCodec: string;
     audioBitrate: number;
     fileSize: number;
-  }>>(),
+  }[]>(),
   
   // Metadata
   title: text("title"),
@@ -278,11 +278,11 @@ export const videoFile = pgTable("video_file", {
   ageRestriction: integer("age_restriction"),
   
   // Analysis
-  sceneDetection: jsonb("scene_detection").$type<Array<{
+  sceneDetection: jsonb("scene_detection").$type<{
     timestamp: number; // Seconds
     sceneType: string;
     confidence: number;
-  }>>(),
+  }[]>(),
   
   // Timestamps
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -363,13 +363,13 @@ export const audioFile = pgTable("audio_file", {
   transcodingError: text("transcoding_error"),
   
   // Audio variants (different qualities/formats)
-  variants: jsonb("variants").$type<Array<{
+  variants: jsonb("variants").$type<{
     quality: string; // e.g., '128kbps', '320kbps', 'lossless'
     path: string;
     codec: string;
     bitrate: number;
     fileSize: number;
-  }>>(),
+  }[]>(),
   
   // Copyright and ISRC
   copyright: text("copyright"),
@@ -434,16 +434,16 @@ export const rawFile = pgTable("raw_file", {
   
   // Markdown-specific metadata
   isMarkdown: boolean("is_markdown"),
-  markdownHeadings: jsonb("markdown_headings").$type<Array<{
+  markdownHeadings: jsonb("markdown_headings").$type<{
     level: number;
     text: string;
     lineNumber: number;
-  }>>(),
-  markdownLinks: jsonb("markdown_links").$type<Array<{
+  }[]>(),
+  markdownLinks: jsonb("markdown_links").$type<{
     text: string;
     url: string;
     lineNumber: number;
-  }>>(),
+  }[]>(),
   
   // JSON-specific metadata
   isJSON: boolean("is_json"),
@@ -454,11 +454,11 @@ export const rawFile = pgTable("raw_file", {
   isCSV: boolean("is_csv"),
   csvDelimiter: text("csv_delimiter"),
   csvHeaderRow: boolean("csv_header_row"),
-  csvColumns: jsonb("csv_columns").$type<Array<{
+  csvColumns: jsonb("csv_columns").$type<{
     name: string;
     index: number;
     type: string; // string, number, date, etc.
-  }>>(),
+  }[]>(),
   csvRowCount: integer("csv_row_count"),
   
   // XML/HTML-specific metadata

@@ -182,7 +182,7 @@ export function createSchemas<
         // Handle both flat structure and nested structure with 'statements' wrapper
         const rolePermsRecord = ('statements' in rolePerms && typeof rolePerms.statements === 'object')
           ? rolePerms.statements as unknown as Record<string, readonly string[]>
-          : rolePerms as Record<string, readonly string[]>;
+          : rolePerms!;
 
         const actions = rolePermsRecord[resourceKey];
         if (actions.length === 0) return z.never() as unknown as z.ZodType<
@@ -214,7 +214,7 @@ export function createSchemas<
         // Handle both flat structure and nested structure with 'statements' wrapper
         const rolePermsRecord = ('statements' in rolePerms && typeof rolePerms.statements === 'object')
           ? rolePerms.statements as unknown as Record<string, readonly string[]>
-          : rolePerms as Record<string, readonly string[]>;
+          : rolePerms!;
         
         const allRoleActions = new Set<string>();
         for (const actions of Object.values(rolePermsRecord)) {

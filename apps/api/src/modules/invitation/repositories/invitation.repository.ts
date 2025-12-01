@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
+ 
+ 
+ 
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '@/core/modules/database/services/database.service';
 import { eq } from 'drizzle-orm';
@@ -39,7 +39,7 @@ export class InvitationRepository {
       .returning();
 
     const newInvitation = results[0];
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+     
     if (!newInvitation) {
       throw new Error('Failed to create invitation');
     }

@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+ 
+ 
 import { Injectable, ConflictException } from '@nestjs/common';
 import { InvitationRepository } from '../repositories/invitation.repository';
 import { UserRepository } from '@/modules/user/repositories/user.repository';
@@ -37,8 +37,8 @@ export class InvitationService {
 
     return {
       success: true,
-      token: invitation.token as string,
-      expiresAt: (invitation.expiresAt as Date).toISOString(),
+      token: invitation.token,
+      expiresAt: (invitation.expiresAt).toISOString(),
     };
   }
 
@@ -66,8 +66,8 @@ export class InvitationService {
 
     return {
       success: true as const,
-      email: invitation.email as string,
-      role: invitation.role as string,
+      email: invitation.email,
+      role: invitation.role,
     };
   }
 
@@ -94,7 +94,7 @@ export class InvitationService {
     }
 
     // Check if user with this email already exists
-    const existingUser = await this.userRepository.findByEmail(invitation.email as string);
+    const existingUser = await this.userRepository.findByEmail(invitation.email);
     if (existingUser) {
       return {
         success: false as const,
@@ -108,7 +108,7 @@ export class InvitationService {
       const userResult = await this.authService.api.createUser({
         body: {
           name,
-          email: invitation.email as string,
+          email: invitation.email,
           password,
           data: {
             emailVerified: true, // Email is verified through invitation

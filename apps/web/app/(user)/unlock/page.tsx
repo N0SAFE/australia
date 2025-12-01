@@ -16,7 +16,6 @@ export default function UnlockPage() {
   const [isAnimatingUnlock, setIsAnimatingUnlock] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const startXRef = useRef(0)
-  const originalOverflowRef = useRef<string>('')
 
   const handleUnlock = async () => {
     // Set cookie with current timestamp
@@ -101,7 +100,6 @@ export default function UnlockPage() {
 
   const handleTouchMove = (e: TouchEvent) => {
     if (e.touches.length > 0) {
-      e.preventDefault() // Prevent scroll while dragging
       handleMove(e.touches[0].clientX)
     }
   }
@@ -113,19 +111,12 @@ export default function UnlockPage() {
   // Add/remove global event listeners
   useEffect(() => {
     if (isDragging) {
-      // Preserve original body overflow and disable scroll while dragging
-      originalOverflowRef.current = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-      
       window.addEventListener('mousemove', handleMouseMove)
       window.addEventListener('mouseup', handleMouseUp)
-      window.addEventListener('touchmove', handleTouchMove, { passive: false })
+      window.addEventListener('touchmove', handleTouchMove)
       window.addEventListener('touchend', handleTouchEnd)
 
       return () => {
-        // Restore original body scroll when dragging ends
-        document.body.style.overflow = originalOverflowRef.current
-        
         window.removeEventListener('mousemove', handleMouseMove)
         window.removeEventListener('mouseup', handleMouseUp)
         window.removeEventListener('touchmove', handleTouchMove)
@@ -139,7 +130,7 @@ export default function UnlockPage() {
     : 0
 
   return (
-    <div className="h-dvh w-full flex flex-col items-center justify-between p-8 bg-linear-to-b from-pink-200 via-pink-300 to-pink-400 overflow-hidden">
+    <div className="h-dvh w-full flex flex-col items-center justify-between p-8 bg-linear-to-b from-pink-200 via-pink-300 to-pink-400 overflow-hidden overscroll-none">
       {/* Logo */}
       <Logo className="text-pink-dark mx-auto h-20 w-fit" ></Logo>
 

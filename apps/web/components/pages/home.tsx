@@ -22,7 +22,7 @@ export function HomePage({
     {data && data.length > 0 ? (
       <div className="gap-x-5 gap-y-4 flex flex-wrap justify-center px-4">
         {data.map((item) => {
-          return <CapsuleCard className="flex-1" data={item} key={item.id} />
+          return <CapsuleCard data={item} key={item.id} />
         })}
       </div>
     ) : (
@@ -31,7 +31,7 @@ export function HomePage({
       </p>
     )}
 
-    <Button asChild className="text-accent bg-white uppercase text-pink-dark" variant="secondary">
+    <Button asChild className="bg-white uppercase text-pink-dark" variant="secondary">
       <Link href="/capsules">
         voir les capsules du mois
       </Link>

@@ -6,8 +6,9 @@ import { useState, useEffect } from 'react';
 import { ContentRenderer } from '@/components/content/ContentRenderer';
 import { UnlockModal } from '@/components/unlock/UnlockModal';
 import { useSession } from '@/lib/auth';
-import { Shield } from 'lucide-react';
+import { Shield, Calendar } from 'lucide-react';
 import { useMarkCapsuleAsOpened } from '@/hooks/capsules/hooks';
+import dayjs from 'dayjs';
 
 /**
  * CapsuleContent - Pure content display without interactions
@@ -44,13 +45,17 @@ export function CapsuleDetails({
   // Check if user is admin
   const isAdmin = (session?.user as any)?.role === 'admin' || (session?.user as any)?.role?.includes('admin');
 
+  // Check if capsule is available (opening date has passed)
+  const isAvailable = !dayjs(data.openingDate).isAfter(dayjs());
+
   // Mark capsule as opened when component mounts (if not already opened)
   // Skip for admins to prevent state changes
+  // Skip for unavailable capsules
   useEffect(() => {
-    if (!data.openedAt && !isAdmin) {
+    if (!data.openedAt && !isAdmin && isAvailable) {
       markAsOpened({ id: data.id });
     }
-  }, [data.id, data.openedAt, isAdmin, markAsOpened]);
+  }, [data.id, data.openedAt, isAdmin, isAvailable, markAsOpened]);
 
   // For admins: allow bypassing locks to view content
   // For regular users: respect lock state
@@ -79,6 +84,16 @@ export function CapsuleDetails({
               Afficher le contenu verrouillé
             </button>
           )}
+        </div>
+      </div>
+    )}
+
+    {/* Unavailable capsule banner for admins */}
+    {isAdmin && !isAvailable && (
+      <div className="bg-blue-500 text-white px-4 py-2 shadow-md">
+        <div className="flex items-center justify-center gap-2 text-sm font-medium">
+          <Calendar className="h-4 w-4" />
+          <span>Capsule non disponible - Date d'ouverture: {dayjs(data.openingDate).format('DD/MM/YYYY')}</span>
         </div>
       </div>
     )}

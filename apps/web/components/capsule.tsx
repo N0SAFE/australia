@@ -67,151 +67,146 @@ export const CapsuleCard: FC<{
     router.push(`/capsules/${data.id}?preview=true`);
   };
 
-  // Unavailable capsule - show modal when clicked
-  if (!isAvailable) {
-    return (
-      <>
-        <div 
-          onClick={() => setShowUnavailableModal(true)}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          className={cn(
-            "w-46 aspect-square bg-pink-light rounded-2xl flex flex-col items-center justify-center p-4 cursor-pointer transition-all relative",
-            "hover:bg-pink-medium focus:bg-pink-medium",
-            className
-          )} 
-          {...props}
-        >
-          <div className="bg-white w-full flex py-3 px-4 gap-3 justify-center rounded-lg text-pink-dark">
-            <LockKeyhole />
-            <span>{capsuleDate.format('DD/MM/YYYY')}</span>
-          </div>
+  const handleClick = () => {
+    // Admin can access unavailable capsules directly
+    if (!isAvailable) {
+      if (isAdmin) {
+        router.push(`/capsules/${data.id}`);
+      } else {
+        setShowUnavailableModal(true);
+      }
+    } else if (isLocked) {
+      setShowLockModal(true);
+    }
+  };
+
+  const cardContent = (
+    <>
+      {/* Admin dropdown for locked or unavailable capsules */}
+      {(isLocked || !isAvailable) && isAdmin && (isHovered || dropdownOpen) && (
+        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+          <DropdownMenuTrigger 
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+            className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white rounded-full p-1.5 shadow-md transition-all"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+            {/* Show response option only for locked capsules */}
+            {isLocked && (
+              <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleShowResponse(); setDropdownOpen(false); }}>
+                <Eye className="w-4 h-4 mr-2" />
+                Afficher la réponse
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleOpenWithoutResponse(); setDropdownOpen(false); }}>
+              <EyeOff className="w-4 h-4 mr-2" />
+              {!isAvailable ? 'Ouvrir (admin)' : 'Ouvrir sans réponse'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      {/* Notification badge for unlocked but not opened */}
+      {isUnlockedButNotOpened && (
+        <div className="absolute top-3 right-3">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-pink-500"></span>
+          </span>
         </div>
+      )}
 
-        <Dialog open={showUnavailableModal} onOpenChange={setShowUnavailableModal}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-center">PAS DISPO POUR LE MOMENT...</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4"> {/**create a customizable and accessible modal for unavailable capsules using funny messages registered in the database from the admin panel */}
-              <p className="text-center text-muted-foreground">
-                Ce portefolio n'a pas encore été enchainé.
-              </p>
-              <div className="text-center text-sm text-muted-foreground">
-                📅 {capsuleDate.format('DD/MM/YYYY')}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+      {/* Date badge */}
+      <div className={cn(
+        "w-full flex py-3 px-4 gap-3 justify-center rounded-lg",
+        !isAvailable && "bg-white text-pink-dark",
+        isLocked && "bg-gray-600 text-white",
+        !isLocked && isAvailable && "bg-pink-dark text-white"
+      )}>
+        {!isAvailable && <LockKeyhole className="w-5 h-5" />}
+        {isLocked && <Lock className="w-5 h-5" />}
+        {!isLocked && isAvailable && <LockKeyholeOpen className="w-5 h-5" />}
+        <span>{capsuleDate.format('DD/MM/YYYY')}</span>
+      </div>
 
-        <ResponseModal 
-          open={showResponseModal}
-          onOpenChange={setShowResponseModal}
-          capsule={responseCapsule}
-          isLoading={isLoadingResponse}
-        />
-      </>
-    );
-  }
-
-  // Available but locked capsule - show lock modal when clicked
-  if (isLocked) {
-    return (
-      <>
-        <div
-          onClick={() => setShowLockModal(true)}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          className={cn(
-            "w-46 aspect-square bg-pink-light rounded-2xl flex flex-col items-center justify-center p-4 transition-all cursor-pointer relative",
-            "hover:bg-pink-medium focus:bg-pink-medium opacity-75",
-            className
-          )}
-          suppressHydrationWarning
-          {...props}
-        >
-          {isAdmin && (isHovered || dropdownOpen) && (
-            <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-              <DropdownMenuTrigger 
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-white rounded-full p-1.5 shadow-md transition-all"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleShowResponse(); setDropdownOpen(false); }}>
-                  <Eye className="w-4 h-4 mr-2" />
-                  Afficher la réponse
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleOpenWithoutResponse(); setDropdownOpen(false); }}>
-                  <EyeOff className="w-4 h-4 mr-2" />
-                  Ouvrir sans réponse
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          
-          <div className="bg-gray-600 w-full flex py-3 px-4 gap-3 justify-center text-white rounded-lg">
-            <Lock className="w-5 h-5" />
-            <span>{capsuleDate.format('DD/MM/YYYY')}</span>
-          </div>
-
-          {data.lockType && (
-            <div className="mt-1 text-xs text-gray-500">
-              {data.lockType === 'code' && '🔢 Code'}
-              {data.lockType === 'voice' && '🎤 Voix'}
-              {(data.lockType === 'device_shake' || data.lockType === 'device_tilt' || data.lockType === 'device_tap') && '📱 Geste'}
-              {data.lockType === 'time_based' && '⏰ Temps'}
-              {data.lockType === 'api' && '🔗 API'}
-            </div>
-          )}
+      {/* Lock type indicator for locked capsules */}
+      {isLocked && data.lockType && (
+        <div className="mt-1 text-xs text-gray-500">
+          {data.lockType === 'code' && '🔢 Code'}
+          {data.lockType === 'voice' && '🎤 Voix'}
+          {(data.lockType === 'device_shake' || data.lockType === 'device_tilt' || data.lockType === 'device_tap') && '📱 Geste'}
+          {data.lockType === 'time_based' && '⏰ Temps'}
+          {data.lockType === 'api' && '🔗 API'}
         </div>
+      )}
+    </>
+  );
 
-        <CapsuleLockModal
-          capsule={data}
-          open={showLockModal}
-          onOpenChange={setShowLockModal}
-        />
-
-        <ResponseModal 
-          open={showResponseModal}
-          onOpenChange={setShowResponseModal}
-          capsule={responseCapsule}
-          isLoading={isLoadingResponse}
-        />
-      </>
-    );
-  }
-
-  // Available and unlocked AND opened - regular link
   return (
-    <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={cn("relative", className)}
-      {...props}
-    >
-      <Link
-        href={`/capsules/${data.id}`}
-        tabIndex={0}
-        className={cn(
-          "w-46 aspect-square bg-pink-light rounded-2xl flex flex-col items-center justify-center p-4 transition-all",
-          "hover:bg-pink-medium focus:bg-pink-medium cursor-pointer"
-        )}
+    <>
+      <div
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={cn("relative", className)}
+        {...props}
       >
-        {isUnlockedButNotOpened && <div className="absolute top-3 right-3">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-pink-500"></span>
-            </span>
-          </div>}
-          
-        <div className="bg-pink-dark w-full flex py-3 px-4 gap-3 justify-center text-white rounded-lg">
-          <LockKeyholeOpen className="w-5 h-5" />
-          <span>{capsuleDate.format('DD/MM/YYYY')}</span>
-        </div>
-      </Link>
-    </div>
+        {!isAvailable || isLocked ? (
+          <div
+            onClick={handleClick}
+            className={cn(
+              "w-46 aspect-square bg-pink-light rounded-2xl flex flex-col items-center justify-center p-4 transition-all cursor-pointer relative",
+              "hover:bg-pink-medium focus:bg-pink-medium",
+              isLocked && "opacity-75"
+            )}
+            suppressHydrationWarning={isLocked}
+          >
+            {cardContent}
+          </div>
+        ) : (
+          <Link
+            href={`/capsules/${data.id}`}
+            tabIndex={0}
+            className={cn(
+              "w-46 aspect-square bg-pink-light rounded-2xl flex flex-col items-center justify-center p-4 transition-all cursor-pointer relative",
+              "hover:bg-pink-medium focus:bg-pink-medium"
+            )}
+          >
+            {cardContent}
+          </Link>
+        )}
+      </div>
+
+      {/* Modals */}
+      <Dialog open={showUnavailableModal} onOpenChange={setShowUnavailableModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">PAS DISPO POUR LE MOMENT...</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-center text-muted-foreground">
+              Ce portefolio n'a pas encore été enchainé.
+            </p>
+            <div className="text-center text-sm text-muted-foreground">
+              📅 {capsuleDate.format('DD/MM/YYYY')}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <CapsuleLockModal
+        capsule={data}
+        open={showLockModal}
+        onOpenChange={setShowLockModal}
+      />
+
+      <ResponseModal 
+        open={showResponseModal}
+        onOpenChange={setShowResponseModal}
+        capsule={responseCapsule}
+        isLoading={isLoadingResponse}
+      />
+    </>
   );
 }
 

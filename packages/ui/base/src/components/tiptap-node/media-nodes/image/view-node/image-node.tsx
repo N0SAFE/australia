@@ -12,8 +12,9 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/shadcn/context-menu"
-import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize } from "lucide-react"
+import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize, Download } from "lucide-react"
 import { type ImageStrategyResolver } from "@/lib/media-url-resolver"
+import { Button } from "@/components/shadcn/button"
 
 export function ImageNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
@@ -72,6 +73,32 @@ export function ImageNodeView(props: NodeViewProps) {
     }
   }
   
+  const handleDownload = () => {
+    if (!resolvedSrc) return
+    void (async () => {
+      try {
+        const response = await fetch(resolvedSrc, {
+          credentials: 'include', // Include cookies for authenticated requests
+        })
+        if (!response.ok) {
+          throw new Error(`HTTP ${String(response.status)}`)
+        }
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = (title as string) || (alt as string) || 'image'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      } catch {
+        // Fallback: open in new tab
+        window.open(resolvedSrc, '_blank')
+      }
+    })()
+  }
+
   const imageElement = (
     <div
       className="image-node group relative"
@@ -81,17 +108,30 @@ export function ImageNodeView(props: NodeViewProps) {
       }}
     >
       {resolvedSrc ? (
-        <img
-          src={resolvedSrc}
-          alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
-          title={(title as string | undefined) ?? (alt as string | undefined) ?? ""}
-          style={{
-            width: "100%",
-            height: "auto",
-            display: "block",
-          }}
-          className="rounded"
-        />
+        <>
+          <img
+            src={resolvedSrc}
+            alt={(alt as string | undefined) ?? (title as string | undefined) ?? ""}
+            title={(title as string | undefined) ?? (alt as string | undefined) ?? ""}
+            style={{
+              width: "100%",
+              height: "auto",
+              display: "block",
+            }}
+            className="rounded"
+          />
+          <div className="mt-2 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownload}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+          </div>
+        </>
       ) : (
         <div
           className="bg-muted rounded flex items-center justify-center"

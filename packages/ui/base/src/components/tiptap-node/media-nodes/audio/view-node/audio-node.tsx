@@ -12,8 +12,9 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/shadcn/context-menu"
-import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize } from "lucide-react"
+import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize, Download } from "lucide-react"
 import { type AudioStrategyResolver } from "@/lib/media-url-resolver"
+import { Button } from "@/components/shadcn/button"
 
 export function AudioNodeView(props: NodeViewProps) {
   const { node, getPos, editor } = props
@@ -72,6 +73,32 @@ export function AudioNodeView(props: NodeViewProps) {
     }
   }
   
+  const handleDownload = () => {
+    if (!resolvedSrc) return
+    void (async () => {
+      try {
+        const response = await fetch(resolvedSrc, {
+          credentials: 'include', // Include cookies for authenticated requests
+        })
+        if (!response.ok) {
+          throw new Error(`HTTP ${String(response.status)}`)
+        }
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = (title as string) || 'audio'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      } catch {
+        // Fallback: open in new tab
+        window.open(resolvedSrc, '_blank')
+      }
+    })()
+  }
+
   const audioElement = (
     <div 
       className="audio-node group relative inline-block"
@@ -81,19 +108,32 @@ export function AudioNodeView(props: NodeViewProps) {
       }}
     >
       {resolvedSrc ? (
-        <audio
-          {...(resolvedSrc ? { src: resolvedSrc } : {})}
-          title={(title as string | undefined) ?? "Audio"}
-          controls={controls as boolean}
-          style={{
-            width: "100%",
-            display: "block",
-          }}
-          className="rounded"
-        >
-          <track kind="captions" />
-          Your browser does not support the audio tag.
-        </audio>
+        <>
+          <audio
+            {...(resolvedSrc ? { src: resolvedSrc } : {})}
+            title={(title as string | undefined) ?? "Audio"}
+            controls={controls as boolean}
+            style={{
+              width: "100%",
+              display: "block",
+            }}
+            className="rounded"
+          >
+            <track kind="captions" />
+            Your browser does not support the audio tag.
+          </audio>
+          <div className="mt-2 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownload}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+          </div>
+        </>
       ) : (
         <div
           className="bg-muted rounded flex items-center justify-center py-8"

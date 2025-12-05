@@ -14,8 +14,9 @@ import {
 } from "@/components/shadcn/context-menu"
 import { Card } from "@/components/shadcn/card"
 import { Progress } from "@/components/shadcn/progress"
-import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize, Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react"
+import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize, Loader2, CheckCircle, XCircle, AlertCircle, Download } from "lucide-react"
 import { type VideoStrategyResolver } from "@/lib/media-url-resolver"
+import { Button } from "@/components/shadcn/button"
 import type { ProcessingProgress } from "./video-node-extension"
 
 export function VideoNodeView(props: NodeViewProps) {
@@ -129,6 +130,32 @@ export function VideoNodeView(props: NodeViewProps) {
     }
   }
   
+  const handleDownload = () => {
+    if (!resolvedSrc) return
+    void (async () => {
+      try {
+        const response = await fetch(resolvedSrc, {
+          credentials: 'include', // Include cookies for authenticated requests
+        })
+        if (!response.ok) {
+          throw new Error(`HTTP ${String(response.status)}`)
+        }
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = (title as string) || 'video'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      } catch {
+        // Fallback: open in new tab
+        window.open(resolvedSrc, '_blank')
+      }
+    })()
+  }
+
   const videoElement = (
     <div 
       className="video-node group relative inline-block"
@@ -183,6 +210,20 @@ export function VideoNodeView(props: NodeViewProps) {
           />
         )}
       </div>
+      {/* Download button */}
+      {resolvedSrc && (
+        <div className="mt-2 flex justify-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownload}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download
+          </Button>
+        </div>
+      )}
     </div>
   )
 

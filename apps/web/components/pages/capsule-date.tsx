@@ -13,7 +13,7 @@ export function CapsuleDatePage({
 
     <div className="gap-x-5 gap-y-4 flex flex-wrap justify-center px-4">
       {data.map(capsule => {
-        return <CapsuleCard className="flex-1 md:flex-0" key={capsule.id} data={capsule} />
+        return <CapsuleCard className="md:flex-0" key={capsule.id} data={capsule} />
       })}
     </div>
 

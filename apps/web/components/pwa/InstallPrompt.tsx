@@ -31,6 +31,22 @@ export function InstallPrompt() {
     }
   }, []);
 
+  // Helper to check if prompt was dismissed within 4 days
+  const isDismissedRecently = (): boolean => {
+    const dismissed = localStorage.getItem("pwa-install-dismissed");
+    if (dismissed) {
+      const dismissedTime = parseInt(dismissed, 10);
+      const fourDays = 4 * 24 * 60 * 60 * 1000;
+      if (Date.now() - dismissedTime < fourDays) {
+        return true;
+      } else {
+        // Clear old dismissal since 4 days have passed
+        localStorage.removeItem("pwa-install-dismissed");
+      }
+    }
+    return false;
+  };
+
   useEffect(() => {
     // Debug: Log that we're listening for the event
     console.log("[PWA Install] Setting up beforeinstallprompt listener...");
@@ -41,11 +57,23 @@ export function InstallPrompt() {
       e.preventDefault();
       // Stash the event so it can be triggered later
       setDeferredPrompt(e as BeforeInstallPromptEvent);
+      
+      // Check if user dismissed recently before showing
+      if (isDismissedRecently()) {
+        console.log("[PWA Install] Previously dismissed within 4 days, not showing");
+        return;
+      }
+      
       // Show the install prompt after a delay
       setTimeout(() => {
+        // Double-check dismissal status in case user dismissed during the delay
+        if (isDismissedRecently()) {
+          console.log("[PWA Install] Dismissed during delay, not showing");
+          return;
+        }
         console.log("[PWA Install] Showing custom install prompt");
         setShowInstallPrompt(true);
-      }, 3000); // Show after 3 seconds (reduced from 5)
+      }, 3000); // Show after 3 seconds
     };
 
     window.addEventListener("beforeinstallprompt", handler);
@@ -91,22 +119,10 @@ export function InstallPrompt() {
 
   const handleDismiss = () => {
     setShowInstallPrompt(false);
-    // Store dismissal in localStorage to not show again for a while
+    // Store dismissal in localStorage to not show again for 4 days
     localStorage.setItem("pwa-install-dismissed", Date.now().toString());
+    console.log("[PWA Install] User clicked 'Later', will not prompt for 4 days");
   };
-
-  // Don't show if already dismissed recently (within 7 days)
-  useEffect(() => {
-    const dismissed = localStorage.getItem("pwa-install-dismissed");
-    if (dismissed) {
-      const dismissedTime = parseInt(dismissed, 10);
-      const sevenDays = 7 * 24 * 60 * 60 * 1000;
-      if (Date.now() - dismissedTime < sevenDays) {
-        console.log("[PWA Install] Previously dismissed, not showing");
-        setShowInstallPrompt(false);
-      }
-    }
-  }, []);
 
   // Don't render if already installed or not ready
   if (isStandalone) return null;

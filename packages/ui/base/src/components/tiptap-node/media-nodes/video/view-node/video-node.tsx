@@ -15,7 +15,7 @@ import {
 import { Card } from "@/components/shadcn/card"
 import { Progress } from "@/components/shadcn/progress"
 import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize, Loader2, CheckCircle, XCircle, AlertCircle, Download } from "lucide-react"
-import { type VideoStrategyResolver } from "@/lib/media-url-resolver"
+import { type VideoStrategyResolver, type MediaDownloadHandler } from "@/lib/media-url-resolver"
 import { Button } from "@/components/shadcn/button"
 import type { ProcessingProgress } from "./video-node-extension"
 
@@ -30,9 +30,10 @@ export function VideoNodeView(props: NodeViewProps) {
   // State for download progress
   const [downloadProgress, setDownloadProgress] = useState(0)
   
-  // Get videoStrategy and VideoProgressComponent from extension options
+  // Get videoStrategy, downloadHandler, and VideoProgressComponent from extension options
   const extension = editor.extensionManager.extensions.find((ext) => ext.name === "video")
   const videoStrategy = extension?.options.videoStrategy as VideoStrategyResolver | undefined
+  const downloadHandler = extension?.options.downloadHandler as MediaDownloadHandler | undefined
   const VideoProgressComponent = extension?.options.VideoProgressComponent
   
   // Resolve the final URL using temp or strategy
@@ -135,62 +136,18 @@ export function VideoNodeView(props: NodeViewProps) {
   }
   
   const handleDownload = () => {
-    if (!resolvedSrc || isDownloading) return
+    if (!downloadHandler || !strategy || isDownloading) return
     void (async () => {
       setIsDownloading(true)
       setDownloadProgress(0)
       try {
-        const response = await fetch(resolvedSrc, {
-          credentials: 'include', // Include cookies for authenticated requests
-        })
-        if (!response.ok) {
-          throw new Error(`HTTP ${String(response.status)}`)
-        }
-        
-        // Get content length for progress tracking
-        const contentLength = response.headers.get('content-length')
-        const total = contentLength ? parseInt(contentLength, 10) : 0
-        
-        if (total && response.body) {
-          // Stream the response to track progress
-          const reader = response.body.getReader()
-          const chunks: BlobPart[] = []
-          let received = 0
-          
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            chunks.push(value)
-            received += value.length
-            setDownloadProgress(Math.round((received / total) * 100))
-          }
-          
-          // Combine chunks into a single blob
-          const blob = new Blob(chunks)
-          const url = window.URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = (title as string) || 'video'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-        } else {
-          // Fallback if no content-length header
-          const blob = await response.blob()
-          const url = window.URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = (title as string) || 'video'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-        }
-      } catch {
-        // Fallback: open in new tab
-        window.open(resolvedSrc, '_blank')
+        await downloadHandler(
+          strategy.meta,
+          (title as string) || 'video',
+          setDownloadProgress
+        )
+      } catch (error) {
+        console.error('Download failed:', error)
       } finally {
         setIsDownloading(false)
         setDownloadProgress(0)
@@ -252,8 +209,8 @@ export function VideoNodeView(props: NodeViewProps) {
           />
         )}
       </div>
-      {/* Download button */}
-      {resolvedSrc && (
+      {/* Download button - only show when downloadHandler is provided */}
+      {downloadHandler && strategy && (
         <div className="mt-2 flex justify-center">
           <Button
             variant="outline"

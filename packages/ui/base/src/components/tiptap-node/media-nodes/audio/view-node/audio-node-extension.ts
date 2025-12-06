@@ -1,7 +1,7 @@
 import { mergeAttributes, Node } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { AudioNodeView } from "./audio-node"
-import type { AudioStrategyResolver } from "@/lib/media-url-resolver"
+import type { AudioStrategyResolver, MediaDownloadHandler } from "@/lib/media-url-resolver"
 
 export interface AudioNodeOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -10,6 +10,11 @@ export interface AudioNodeOptions {
    * Audio URL strategy resolver that receives meta only
    */
   audioStrategy?: AudioStrategyResolver
+  /**
+   * Download handler for audio files
+   * If not provided, download button will be hidden
+   */
+  downloadHandler?: MediaDownloadHandler
 }
 
 declare module "@tiptap/core" {
@@ -33,6 +38,7 @@ export const AudioNode = Node.create<AudioNodeOptions>({
     return {
       HTMLAttributes: {},
       audioStrategy: undefined,
+      downloadHandler: undefined,
     }
   },
 

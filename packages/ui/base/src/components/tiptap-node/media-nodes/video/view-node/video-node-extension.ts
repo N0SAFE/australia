@@ -2,7 +2,7 @@ import { mergeAttributes, Node } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { VideoNodeView } from "./video-node"
 import type { ComponentType } from "react"
-import type { VideoStrategyResolver } from "@/lib/media-url-resolver"
+import type { VideoStrategyResolver, MediaDownloadHandler } from "@/lib/media-url-resolver"
 
 export interface ProcessingProgress {
   progress: number
@@ -52,6 +52,11 @@ export interface VideoNodeOptions {
    */
   videoStrategy?: VideoStrategyResolver
   /**
+   * Download handler for video files
+   * If not provided, download button will be hidden
+   */
+  downloadHandler?: MediaDownloadHandler
+  /**
    * Component responsible for fetching/subscribing to video processing progress
    * and rendering the progress bar. This component receives the video attrs with meta
    * and a renderProgress function to display the progress UI.
@@ -80,6 +85,7 @@ export const VideoNode = Node.create<VideoNodeOptions>({
     return {
       HTMLAttributes: {},
       videoStrategy: undefined,
+      downloadHandler: undefined,
       VideoProgressComponent: undefined,
     }
   },

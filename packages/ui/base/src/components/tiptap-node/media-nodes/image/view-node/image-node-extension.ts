@@ -1,7 +1,7 @@
 import { mergeAttributes, Node } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { ImageNodeView } from "./image-node"
-import type { ImageStrategyResolver } from "@/lib/media-url-resolver"
+import type { ImageStrategyResolver, MediaDownloadHandler } from "@/lib/media-url-resolver"
 
 export interface ImageNodeOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,6 +20,11 @@ export interface ImageNodeOptions {
    * Image URL strategy resolver that receives meta only
    */
   imageStrategy?: ImageStrategyResolver
+  /**
+   * Download handler for image files
+   * If not provided, download button will be hidden
+   */
+  downloadHandler?: MediaDownloadHandler
 }
 
 declare module "@tiptap/core" {
@@ -52,6 +57,7 @@ export const ImageNode = Node.create<ImageNodeOptions>({
       allowBase64: false,
       inline: false,
       imageStrategy: undefined,
+      downloadHandler: undefined,
     }
   },
 

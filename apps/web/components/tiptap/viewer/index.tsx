@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { EditorContent, useEditor, type JSONContent } from "@repo/ui/tiptap-exports/react"
 import { useSharedTipTapExtensions } from "../common"
+import type { MediaDownloadHandler } from "@repo/ui/lib/media-url-resolver"
 
 // --- Styles ---
 import "@repo/ui/components/tiptap-node/blockquote-node/blockquote-node.scss"
@@ -31,6 +32,14 @@ export interface SimpleViewerProps {
    * Component to render video processing progress
    */
   VideoProgressComponent?: import("react").ComponentType<any>
+  /**
+   * Download handlers for media files
+   * Used to download media files with progress tracking
+   */
+  videoDownloadHandler?: MediaDownloadHandler
+  imageDownloadHandler?: MediaDownloadHandler
+  audioDownloadHandler?: MediaDownloadHandler
+  fileDownloadHandler?: MediaDownloadHandler
 }
 
 /**
@@ -46,6 +55,10 @@ export function SimpleViewer({
   audioStrategy,
   fileStrategy,
   VideoProgressComponent,
+  videoDownloadHandler,
+  imageDownloadHandler,
+  audioDownloadHandler,
+  fileDownloadHandler,
 }: SimpleViewerProps) {
   console.log('🔵 [SimpleViewer] Initializing with:', {
     hasValue: !!value,
@@ -57,6 +70,10 @@ export function SimpleViewer({
     hasAudioStrategy: !!audioStrategy,
     hasFileStrategy: !!fileStrategy,
     hasVideoProgressComponent: !!VideoProgressComponent,
+    hasVideoDownloadHandler: !!videoDownloadHandler,
+    hasImageDownloadHandler: !!imageDownloadHandler,
+    hasAudioDownloadHandler: !!audioDownloadHandler,
+    hasFileDownloadHandler: !!fileDownloadHandler,
   })
 
   const sharedExtensions = useSharedTipTapExtensions({
@@ -66,6 +83,10 @@ export function SimpleViewer({
     audioStrategy,
     fileStrategy,
     VideoProgressComponent,
+    imageDownloadHandler,
+    videoDownloadHandler,
+    audioDownloadHandler,
+    fileDownloadHandler,
   })
 
   console.log('🔵 [SimpleViewer] Shared extensions:', {

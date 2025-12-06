@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react"
 import { FileIcon, DownloadIcon, AlignLeft, AlignCenter, AlignRight, Maximize, Minimize, Loader2 } from "lucide-react"
 import { formatBytes } from "@/lib/tiptap-utils"
-import { resolveMediaUrl, type FileStrategyResolver } from "@/lib/media-url-resolver"
+import { resolveMediaUrl, type FileStrategyResolver, type MediaDownloadHandler } from "@/lib/media-url-resolver"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -27,9 +27,10 @@ export function FileNodeView(props: NodeViewProps) {
   // State for download progress
   const [downloadProgress, setDownloadProgress] = useState(0)
   
-  // Get fileStrategy from extension options
+  // Get fileStrategy and downloadHandler from extension options
   const extension = editor.extensionManager.extensions.find(ext => ext.name === 'file')
   const fileStrategy = extension?.options.fileStrategy as FileStrategyResolver | undefined
+  const downloadHandler = extension?.options.downloadHandler as MediaDownloadHandler | undefined
   
   // Resolve the final URL asynchronously using strategy with meta only
   useEffect(() => {
@@ -47,62 +48,18 @@ export function FileNodeView(props: NodeViewProps) {
   const handleDownload = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!resolvedSrc || isDownloading) return
+    if (!downloadHandler || !meta || isDownloading) return
     void (async () => {
       setIsDownloading(true)
       setDownloadProgress(0)
       try {
-        const response = await fetch(resolvedSrc, {
-          credentials: 'include', // Include cookies for authenticated requests
-        })
-        if (!response.ok) {
-          throw new Error(`HTTP ${String(response.status)}`)
-        }
-        
-        // Get content length for progress tracking
-        const contentLength = response.headers.get('content-length')
-        const total = contentLength ? parseInt(contentLength, 10) : 0
-        
-        if (total && response.body) {
-          // Stream the response to track progress
-          const reader = response.body.getReader()
-          const chunks: BlobPart[] = []
-          let received = 0
-          
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            chunks.push(value)
-            received += value.length
-            setDownloadProgress(Math.round((received / total) * 100))
-          }
-          
-          // Combine chunks into a single blob
-          const blob = new Blob(chunks)
-          const url = window.URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = (name as string) || 'file'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-        } else {
-          // Fallback if no content-length header
-          const blob = await response.blob()
-          const url = window.URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = (name as string) || 'file'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-        }
-      } catch {
-        // Fallback: open in new tab
-        window.open(resolvedSrc, '_blank')
+        await downloadHandler(
+          meta,
+          (name as string) || 'file',
+          setDownloadProgress
+        )
+      } catch (error) {
+        console.error('Download failed:', error)
       } finally {
         setIsDownloading(false)
         setDownloadProgress(0)
@@ -131,6 +88,9 @@ export function FileNodeView(props: NodeViewProps) {
     }
   }
 
+  // Determine if file is downloadable
+  const canDownload = !!downloadHandler && !!meta
+  
   const fileElement = (
     <div className="group relative"
       style={{
@@ -139,15 +99,15 @@ export function FileNodeView(props: NodeViewProps) {
       }}
     >
       <div
-        className="file-node cursor-pointer rounded border bg-card p-4 hover:bg-accent/50 transition-colors"
-        onClick={handleDownload}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
+        className={`file-node rounded border bg-card p-4 transition-colors ${canDownload ? 'cursor-pointer hover:bg-accent/50' : ''}`}
+        onClick={canDownload ? handleDownload : undefined}
+        role={canDownload ? "button" : undefined}
+        tabIndex={canDownload ? 0 : undefined}
+        onKeyDown={canDownload ? (e) => {
           if (e.key === "Enter" || e.key === " ") {
             handleDownload(e)
           }
-        }}
+        } : undefined}
       >
         <div className="flex items-center gap-3">
           <div className="file-node-icon flex-shrink-0">
@@ -161,16 +121,18 @@ export function FileNodeView(props: NodeViewProps) {
               {(type as string | undefined) ?? ""}
             </div>
           </div>
-          <div className="file-node-action flex-shrink-0 min-w-[40px] flex items-center justify-end">
-            {isDownloading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                <span className="text-xs">{String(downloadProgress)}%</span>
-              </>
-            ) : (
-              <DownloadIcon className="h-4 w-4" />
-            )}
-          </div>
+          {canDownload && (
+            <div className="file-node-action flex-shrink-0 min-w-[40px] flex items-center justify-end">
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  <span className="text-xs">{String(downloadProgress)}%</span>
+                </>
+              ) : (
+                <DownloadIcon className="h-4 w-4" />
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

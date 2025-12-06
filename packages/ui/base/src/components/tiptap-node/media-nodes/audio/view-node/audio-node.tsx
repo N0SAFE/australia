@@ -13,7 +13,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/shadcn/context-menu"
 import { AlignLeft, AlignCenter, AlignRight, Maximize, Minimize, Download, Loader2 } from "lucide-react"
-import { type AudioStrategyResolver } from "@/lib/media-url-resolver"
+import { type AudioStrategyResolver, type MediaDownloadHandler } from "@/lib/media-url-resolver"
 import { Button } from "@/components/shadcn/button"
 
 export function AudioNodeView(props: NodeViewProps) {
@@ -27,9 +27,10 @@ export function AudioNodeView(props: NodeViewProps) {
   // State for download progress
   const [downloadProgress, setDownloadProgress] = useState(0)
   
-  // Get audioStrategy from extension options
+  // Get audioStrategy and downloadHandler from extension options
   const extension = editor.extensionManager.extensions.find(ext => ext.name === 'audio')
   const audioStrategy = extension?.options.audioStrategy as AudioStrategyResolver | undefined
+  const downloadHandler = extension?.options.downloadHandler as MediaDownloadHandler | undefined
   
   // Resolve the final URL using temp or strategy
   useEffect(() => {
@@ -78,62 +79,18 @@ export function AudioNodeView(props: NodeViewProps) {
   }
   
   const handleDownload = () => {
-    if (!resolvedSrc || isDownloading) return
+    if (!downloadHandler || !strategy || isDownloading) return
     void (async () => {
       setIsDownloading(true)
       setDownloadProgress(0)
       try {
-        const response = await fetch(resolvedSrc, {
-          credentials: 'include', // Include cookies for authenticated requests
-        })
-        if (!response.ok) {
-          throw new Error(`HTTP ${String(response.status)}`)
-        }
-        
-        // Get content length for progress tracking
-        const contentLength = response.headers.get('content-length')
-        const total = contentLength ? parseInt(contentLength, 10) : 0
-        
-        if (total && response.body) {
-          // Stream the response to track progress
-          const reader = response.body.getReader()
-          const chunks: BlobPart[] = []
-          let received = 0
-          
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            chunks.push(value)
-            received += value.length
-            setDownloadProgress(Math.round((received / total) * 100))
-          }
-          
-          // Combine chunks into a single blob
-          const blob = new Blob(chunks)
-          const url = window.URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = (title as string) || 'audio'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-        } else {
-          // Fallback if no content-length header
-          const blob = await response.blob()
-          const url = window.URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = (title as string) || 'audio'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          window.URL.revokeObjectURL(url)
-        }
-      } catch {
-        // Fallback: open in new tab
-        window.open(resolvedSrc, '_blank')
+        await downloadHandler(
+          strategy.meta,
+          (title as string) || 'audio',
+          setDownloadProgress
+        )
+      } catch (error) {
+        console.error('Download failed:', error)
       } finally {
         setIsDownloading(false)
         setDownloadProgress(0)
@@ -164,22 +121,24 @@ export function AudioNodeView(props: NodeViewProps) {
             <track kind="captions" />
             Your browser does not support the audio tag.
           </audio>
-          <div className="mt-2 flex justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownload}
-              disabled={isDownloading}
-              className="gap-2"
-            >
-              {isDownloading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              {isDownloading ? `Downloading... ${String(downloadProgress)}%` : 'Download'}
-            </Button>
-          </div>
+          {downloadHandler && strategy && (
+            <div className="mt-2 flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="gap-2"
+              >
+                {isDownloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {isDownloading ? `Downloading... ${String(downloadProgress)}%` : 'Download'}
+              </Button>
+            </div>
+          )}
         </>
       ) : (
         <div

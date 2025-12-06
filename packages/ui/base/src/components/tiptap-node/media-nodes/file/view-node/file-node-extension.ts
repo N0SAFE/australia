@@ -1,7 +1,7 @@
 import { mergeAttributes, Node } from "@tiptap/core"
 import { ReactNodeViewRenderer } from "@tiptap/react"
 import { FileNodeView } from "./file-node"
-import type { FileStrategyResolver } from "@/lib/media-url-resolver"
+import type { FileStrategyResolver, MediaDownloadHandler } from "@/lib/media-url-resolver"
 
 export interface FileNodeOptions {
   HTMLAttributes: Record<string, any>
@@ -9,6 +9,11 @@ export interface FileNodeOptions {
    * File URL strategy resolver that receives meta only
    */
   fileStrategy?: FileStrategyResolver
+  /**
+   * Download handler for files
+   * If not provided, download button will be hidden
+   */
+  downloadHandler?: MediaDownloadHandler
 }
 
 declare module "@tiptap/core" {
@@ -32,6 +37,7 @@ export const FileNode = Node.create<FileNodeOptions>({
     return {
       HTMLAttributes: {},
       fileStrategy: undefined,
+      downloadHandler: undefined,
     }
   },
 

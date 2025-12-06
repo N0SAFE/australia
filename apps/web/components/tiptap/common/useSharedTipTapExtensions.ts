@@ -20,6 +20,7 @@ import {
 } from "@repo/ui/components/tiptap-node/index"
 import { HorizontalRule } from "@repo/ui/components/tiptap-node/horizontal-rule-node/horizontal-rule-node-extension"
 import { NodeBackground } from "@repo/ui/components/tiptap-extension/node-background-extension"
+import type { MediaDownloadHandler } from "@repo/ui/lib/media-url-resolver"
 
 interface SharedExtensionsConfig {
   placeholder?: string
@@ -29,6 +30,10 @@ interface SharedExtensionsConfig {
   audioStrategy?: (meta: unknown) => Promise<string> | string
   fileStrategy?: (meta: unknown) => Promise<string> | string
   VideoProgressComponent?: import("react").ComponentType<any>
+  imageDownloadHandler?: MediaDownloadHandler
+  videoDownloadHandler?: MediaDownloadHandler
+  audioDownloadHandler?: MediaDownloadHandler
+  fileDownloadHandler?: MediaDownloadHandler
 }
 
 /**
@@ -43,6 +48,10 @@ export function useSharedTipTapExtensions({
   audioStrategy,
   fileStrategy,
   VideoProgressComponent,
+  imageDownloadHandler,
+  videoDownloadHandler,
+  audioDownloadHandler,
+  fileDownloadHandler,
 }: SharedExtensionsConfig) {
   return useMemo(() => {
     console.log('🔵 [useSharedTipTapExtensions] Creating extensions with config:', {
@@ -51,7 +60,11 @@ export function useSharedTipTapExtensions({
       hasVideoStrategy: !!videoStrategy,
       hasAudioStrategy: !!audioStrategy,
       hasFileStrategy: !!fileStrategy,
-      hasVideoProgressComponent: !!VideoProgressComponent
+      hasVideoProgressComponent: !!VideoProgressComponent,
+      hasImageDownloadHandler: !!imageDownloadHandler,
+      hasVideoDownloadHandler: !!videoDownloadHandler,
+      hasAudioDownloadHandler: !!audioDownloadHandler,
+      hasFileDownloadHandler: !!fileDownloadHandler,
     })
     
     const extensions = [
@@ -76,16 +89,20 @@ export function useSharedTipTapExtensions({
       // Display nodes for media
       ImageNode.configure({
         imageStrategy,
+        downloadHandler: imageDownloadHandler,
       }),
       VideoNode.configure({
         videoStrategy,
         VideoProgressComponent,
+        downloadHandler: videoDownloadHandler,
       }),
       AudioNode.configure({
         audioStrategy,
+        downloadHandler: audioDownloadHandler,
       }),
       FileNode.configure({
         fileStrategy,
+        downloadHandler: fileDownloadHandler,
       }),
     ]
     
@@ -130,5 +147,9 @@ export function useSharedTipTapExtensions({
     audioStrategy,
     fileStrategy,
     VideoProgressComponent,
+    imageDownloadHandler,
+    videoDownloadHandler,
+    audioDownloadHandler,
+    fileDownloadHandler,
   ])
 }

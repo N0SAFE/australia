@@ -17,6 +17,26 @@ export type AudioStrategyResolver = (meta: unknown) => Promise<string> | string
 export type FileStrategyResolver = (meta: unknown) => Promise<string> | string
 
 /**
+ * Progress callback for download operations
+ * @param progress - Download progress percentage (0-100)
+ */
+export type DownloadProgressCallback = (progress: number) => void
+
+/**
+ * Type definition for media download handler
+ * Handles the download of a media file with progress tracking
+ * @param meta - The meta object containing contentMediaId and other metadata
+ * @param filename - Suggested filename for the download
+ * @param onProgress - Callback to report download progress (0-100)
+ * @returns Promise that resolves when download completes
+ */
+export type MediaDownloadHandler = (
+  meta: unknown,
+  filename: string,
+  onProgress: DownloadProgressCallback
+) => Promise<void>
+
+/**
  * Resolves media URL using a strategy function (new pattern)
  * @param meta - Meta object with contentMediaId and strategy info
  * @param strategy - Strategy resolver function that takes meta and returns URL

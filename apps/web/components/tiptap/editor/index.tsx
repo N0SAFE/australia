@@ -67,6 +67,7 @@ import { useCursorVisibility } from "@repo/ui/hooks/use-cursor-visibility"
 // --- Lib ---
 import { MAX_FILE_SIZE } from "@repo/ui/lib/tiptap-utils"
 import type { UploadFunction } from "@repo/ui/components/tiptap-node/media-nodes/image/upload-node/image-upload-node-extension"
+import type { MediaDownloadHandler } from "@repo/ui/lib/media-url-resolver"
 
 // --- Styles ---
 import "./style.scss"
@@ -276,6 +277,14 @@ export interface SimpleEditorProps {
    * Component that handles fetching and rendering video processing progress
    */
   VideoProgressComponent?: import("react").ComponentType<any>
+  /**
+   * Download handlers for media files
+   * Used to download media files with progress tracking
+   */
+  videoDownloadHandler?: MediaDownloadHandler
+  imageDownloadHandler?: MediaDownloadHandler
+  audioDownloadHandler?: MediaDownloadHandler
+  fileDownloadHandler?: MediaDownloadHandler
 }
 
 export function SimpleEditor({
@@ -290,6 +299,10 @@ export function SimpleEditor({
   audioStrategy,
   fileStrategy,
   VideoProgressComponent,
+  videoDownloadHandler,
+  imageDownloadHandler,
+  audioDownloadHandler,
+  fileDownloadHandler,
 }: SimpleEditorProps) {
   const isMobile = useIsBreakpoint()
   const { height } = useWindowSize()
@@ -314,6 +327,10 @@ export function SimpleEditor({
     audioStrategy,
     fileStrategy,
     VideoProgressComponent,
+    imageDownloadHandler,
+    videoDownloadHandler,
+    audioDownloadHandler,
+    fileDownloadHandler,
   })
 
   // Build extensions array: shared base + editor-specific extensions

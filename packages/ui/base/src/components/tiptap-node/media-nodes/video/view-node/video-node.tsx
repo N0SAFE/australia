@@ -25,6 +25,10 @@ export function VideoNodeView(props: NodeViewProps) {
   
   // State for resolved URL
   const [resolvedSrc, setResolvedSrc] = useState<string>("")
+  // State for download loading
+  const [isDownloading, setIsDownloading] = useState(false)
+  // State for download progress
+  const [downloadProgress, setDownloadProgress] = useState(0)
   
   // Get videoStrategy and VideoProgressComponent from extension options
   const extension = editor.extensionManager.extensions.find((ext) => ext.name === "video")
@@ -131,8 +135,10 @@ export function VideoNodeView(props: NodeViewProps) {
   }
   
   const handleDownload = () => {
-    if (!resolvedSrc) return
+    if (!resolvedSrc || isDownloading) return
     void (async () => {
+      setIsDownloading(true)
+      setDownloadProgress(0)
       try {
         const response = await fetch(resolvedSrc, {
           credentials: 'include', // Include cookies for authenticated requests
@@ -140,18 +146,54 @@ export function VideoNodeView(props: NodeViewProps) {
         if (!response.ok) {
           throw new Error(`HTTP ${String(response.status)}`)
         }
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = (title as string) || 'video'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
+        
+        // Get content length for progress tracking
+        const contentLength = response.headers.get('content-length')
+        const total = contentLength ? parseInt(contentLength, 10) : 0
+        
+        if (total && response.body) {
+          // Stream the response to track progress
+          const reader = response.body.getReader()
+          const chunks: BlobPart[] = []
+          let received = 0
+          
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            chunks.push(value)
+            received += value.length
+            setDownloadProgress(Math.round((received / total) * 100))
+          }
+          
+          // Combine chunks into a single blob
+          const blob = new Blob(chunks)
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = (title as string) || 'video'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+        } else {
+          // Fallback if no content-length header
+          const blob = await response.blob()
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = (title as string) || 'video'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+        }
       } catch {
         // Fallback: open in new tab
         window.open(resolvedSrc, '_blank')
+      } finally {
+        setIsDownloading(false)
+        setDownloadProgress(0)
       }
     })()
   }
@@ -217,10 +259,15 @@ export function VideoNodeView(props: NodeViewProps) {
             variant="outline"
             size="sm"
             onClick={handleDownload}
+            disabled={isDownloading}
             className="gap-2"
           >
-            <Download className="h-4 w-4" />
-            Download
+            {isDownloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {isDownloading ? `Downloading... ${String(downloadProgress)}%` : 'Download'}
           </Button>
         </div>
       )}

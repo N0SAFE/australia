@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { NodeViewWrapper, type NodeViewProps } from "@tiptap/react"
-import { FileIcon, DownloadIcon, AlignLeft, AlignCenter, AlignRight, Maximize, Minimize } from "lucide-react"
+import { FileIcon, DownloadIcon, AlignLeft, AlignCenter, AlignRight, Maximize, Minimize, Loader2 } from "lucide-react"
 import { formatBytes } from "@/lib/tiptap-utils"
 import { resolveMediaUrl, type FileStrategyResolver } from "@/lib/media-url-resolver"
 import {
@@ -22,6 +22,10 @@ export function FileNodeView(props: NodeViewProps) {
   
   // State for resolved URL
   const [resolvedSrc, setResolvedSrc] = useState<string>("")
+  // State for download loading
+  const [isDownloading, setIsDownloading] = useState(false)
+  // State for download progress
+  const [downloadProgress, setDownloadProgress] = useState(0)
   
   // Get fileStrategy from extension options
   const extension = editor.extensionManager.extensions.find(ext => ext.name === 'file')
@@ -43,9 +47,67 @@ export function FileNodeView(props: NodeViewProps) {
   const handleDownload = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (resolvedSrc) {
-      window.open(resolvedSrc, "_blank")
-    }
+    if (!resolvedSrc || isDownloading) return
+    void (async () => {
+      setIsDownloading(true)
+      setDownloadProgress(0)
+      try {
+        const response = await fetch(resolvedSrc, {
+          credentials: 'include', // Include cookies for authenticated requests
+        })
+        if (!response.ok) {
+          throw new Error(`HTTP ${String(response.status)}`)
+        }
+        
+        // Get content length for progress tracking
+        const contentLength = response.headers.get('content-length')
+        const total = contentLength ? parseInt(contentLength, 10) : 0
+        
+        if (total && response.body) {
+          // Stream the response to track progress
+          const reader = response.body.getReader()
+          const chunks: BlobPart[] = []
+          let received = 0
+          
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            chunks.push(value)
+            received += value.length
+            setDownloadProgress(Math.round((received / total) * 100))
+          }
+          
+          // Combine chunks into a single blob
+          const blob = new Blob(chunks)
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = (name as string) || 'file'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+        } else {
+          // Fallback if no content-length header
+          const blob = await response.blob()
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = (name as string) || 'file'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+        }
+      } catch {
+        // Fallback: open in new tab
+        window.open(resolvedSrc, '_blank')
+      } finally {
+        setIsDownloading(false)
+        setDownloadProgress(0)
+      }
+    })()
   }
 
   const alignmentStyles = {
@@ -99,8 +161,15 @@ export function FileNodeView(props: NodeViewProps) {
               {(type as string | undefined) ?? ""}
             </div>
           </div>
-          <div className="file-node-action flex-shrink-0">
-            <DownloadIcon className="h-4 w-4" />
+          <div className="file-node-action flex-shrink-0 min-w-[40px] flex items-center justify-end">
+            {isDownloading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                <span className="text-xs">{String(downloadProgress)}%</span>
+              </>
+            ) : (
+              <DownloadIcon className="h-4 w-4" />
+            )}
           </div>
         </div>
       </div>

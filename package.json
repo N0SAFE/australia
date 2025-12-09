@@ -10,8 +10,8 @@
             "build": {
                 "typescript": "^5.8.3",
                 "rimraf": "^6.0.1",
-                "@types/node": "^24.9.2",
-                "vite": "^7.2.2",
+                "@types/node": "^24.10.2",
+                "vite": "^7.2.7",
                 "chokidar": "^4.0.3",
                 "@parcel/watcher": "^2.5.0"
             },
@@ -26,14 +26,14 @@
             },
             "linting": {
                 "eslint": "^9",
-                "@eslint/eslintrc": "^3.1.0",
+                "@eslint/eslintrc": "^3.3.3",
                 "@eslint/js": "^9.7.0",
                 "prettier": "^3.3.3",
-                "prettier-plugin-tailwindcss": "^0.7.1"
+                "prettier-plugin-tailwindcss": "^0.7.2"
             },
             "next": {
-                "next": "^16.0.1",
-                "eslint-config-next": "^16.0.1",
+                "next": "16.0.8",
+                "eslint-config-next": "^16.0.8",
                 "@next/bundle-analyzer": "^16.0.1",
                 "next-sitemap": "^4.2.3",
                 "next-themes": "^0.4.6",
@@ -41,24 +41,24 @@
                 "declarative-routing": "^0.1.20"
             },
             "auth": {
-                "@better-fetch/fetch": "^1.1.18",
-                "better-auth": "^1.3.4",
+                "@better-fetch/fetch": "^1.1.19",
+                "better-auth": "^1.4.6",
                 "@thallesp/nestjs-better-auth": "^2.1.0"
             },
             "react": {
-                "react": "^19.2.0",
-                "react-dom": "^19.2.0",
-                "@types/react": "^19.2.0",
-                "@types/react-dom": "^19.2.0",
-                "react-hook-form": "^7.53.0",
+                "react": "19.2.1",
+                "react-dom": "19.2.1",
+                "@types/react": "19.2.0",
+                "@types/react-dom": "19.2.0",
+                "react-hook-form": "^7.68.0",
                 "react-use": "^17.6.0"
             },
             "react-compiler": {
                 "babel-plugin-react-compiler": "^1.0.0"
             },
             "tanstack": {
-                "@tanstack/react-devtools": "^0.8.1",
-                "@tanstack/react-query": "^5.90.7",
+                "@tanstack/react-devtools": "^0.8.4",
+                "@tanstack/react-query": "^5.90.12",
                 "@tanstack/react-query-devtools": "^5.81.5",
                 "@tanstack/eslint-plugin-query": "^5.81.5"
             },
@@ -72,18 +72,18 @@
                 "clsx": "^2.0.0"
             },
             "testing": {
-                "vitest": "^4.0.8",
-                "@vitest/ui": "^4.0.8",
-                "@vitest/coverage-v8": "^4.0.8",
+                "vitest": "^4.0.15",
+                "@vitest/ui": "^4.0.15",
+                "@vitest/coverage-v8": "^4.0.15",
                 "@testing-library/jest-dom": "^6.6.3",
                 "@testing-library/react": "^16.1.0",
                 "@testing-library/user-event": "^14.5.2",
                 "jsdom": "^27.0.1",
-                "@vitejs/plugin-react": "^5.1.0",
-                "@vitest/coverage-istanbul": "^4.0.8"
+                "@vitejs/plugin-react": "^5.1.2",
+                "@vitest/coverage-istanbul": "^4.0.15"
             },
             "ui": {
-                "lucide-react": "^0.553.0",
+                "lucide-react": "^0.556.0",
                 "@radix-ui/react-alert-dialog": "^1.1.1",
                 "@radix-ui/react-collapsible": "^1.1.12",
                 "@radix-ui/react-dialog": "^1.1.2",
@@ -105,7 +105,7 @@
                 "@zxcvbn-ts/core": "^3.0.4",
                 "@zxcvbn-ts/language-common": "^3.0.4",
                 "@zxcvbn-ts/language-en": "^3.0.2",
-                "framer-motion": "^12.23.24",
+                "framer-motion": "^12.23.25",
                 "class-variance-authority": "^0.7.0",
                 "date-fns": "^4.1.0",
                 "react-day-picker": "^9.11.1",
@@ -128,25 +128,25 @@
                 "@types/prompts": "^2.4.2",
                 "@types/circular-json": "^0.4.0",
                 "circular-json": "^0.5.9",
-                "yaml": "^2.8.0",
-                "@asteasolutions/zod-to-openapi": "^8.0.0",
+                "yaml": "^2.8.2",
+                "@asteasolutions/zod-to-openapi": "^8.2.0",
                 "@n0safe/envcli": "^1.0.2",
-                "@antfu/ni": "^27.0.1",
+                "@antfu/ni": "^28.0.0",
                 "diff": "^8.0.2",
                 "@types/diff": "^8.0.0",
-                "execa": "^9.6.0",
+                "execa": "^9.6.1",
                 "fs-extra": "^11.2.0",
                 "@types/fs-extra": "^11.0.4",
-                "glob": "^11.0.3",
+                "glob": "^13.0.0",
                 "handlebars": "^4.7.8",
                 "kleur": "^4.1.5",
                 "log-symbols": "^7.0.1",
                 "magicast": "^0.5.1",
-                "type-fest": "^5.2.0"
+                "type-fest": "^5.3.1"
             },
             "database": {
-                "drizzle-orm": "^0.44.7",
-                "drizzle-kit": "^0.31.6",
+                "drizzle-orm": "^0.45.0",
+                "drizzle-kit": "^0.31.8",
                 "drizzle-zod": "^0.5.1",
                 "postgres": "^3.4.4",
                 "nanoid": "^5.1.6",
@@ -154,18 +154,18 @@
                 "@types/bcrypt": "^6.0.0"
             },
             "orpc": {
-                "@orpc/openapi-client": "next",
-                "@orpc/client": "next",
-                "@orpc/contract": "next",
-                "@orpc/tanstack-query": "next",
-                "@orpc/nest": "next",
-                "@orpc/openapi": "next",
-                "@orpc/server": "next",
-                "@orpc/shared": "next",
-                "@orpc/zod": "next"
+                "@orpc/openapi-client": "0.0.0-next.059b949",
+                "@orpc/client": "0.0.0-next.059b949",
+                "@orpc/contract": "0.0.0-next.059b949",
+                "@orpc/tanstack-query": "0.0.0-next.059b949",
+                "@orpc/nest": "0.0.0-next.059b949",
+                "@orpc/openapi": "0.0.0-next.059b949",
+                "@orpc/server": "0.0.0-next.059b949",
+                "@orpc/shared": "0.0.0-next.059b949",
+                "@orpc/zod": "0.0.0-next.059b949"
             },
             "api:nest": {
-                "@nestjs/cli": "^11.0.10",
+                "@nestjs/cli": "^11.0.14",
                 "@nestjs/schematics": "^11.0.9",
                 "@nestjs/testing": "^11.1.8",
                 "@nestjs/core": "^11.1.8",
@@ -175,9 +175,9 @@
                 "@nestjs/swagger": "^8.0.9",
                 "reflect-metadata": "^0.2.2",
                 "rxjs": "^7.8.1",
-                "@types/express": "^5.0.5",
-                "@scalar/nestjs-api-reference": "^1.0.7",
-                "express": "^5.1.0",
+                "@types/express": "^5.0.6",
+                "@scalar/nestjs-api-reference": "^1.0.10",
+                "express": "^5.2.1",
                 "express-list-routes": "^1.3.1",
                 "nest-commander": "^3.19.1",
                 "nestjs-flub": "^0.1.2",
@@ -187,7 +187,7 @@
                 "ts-loader": "^9.4.3",
                 "ts-node": "^10.9.1",
                 "tsconfig-paths": "4.2.0",
-                "tsx": "^4.16.2"
+                "tsx": "^4.21.0"
             },
             "web": {
                 "@million/lint": "^1.0.14",
@@ -201,9 +201,9 @@
                 "@types/mdx": "^2.0.13"
             },
             "platejs": {
-                "platejs": "^51.0.0",
-                "@platejs/basic-nodes": "^51.0.0",
-                "@platejs/media": "^51.0.0"
+                "platejs": "^52.0.8",
+                "@platejs/basic-nodes": "^52.0.1",
+                "@platejs/media": "^52.0.1"
             }
         }
     },
@@ -299,13 +299,13 @@
         "@n0safe/trycli": "^1.0.4",
         "@repo/env": "*",
         "@repo-configs/vitest": "*",
-        "@types/bun": "latest",
+        "@types/bun": "1.3.4",
         "@vitest/coverage-v8": "catalog:testing",
         "concurrently": "catalog:dev",
         "dotenv-cli": "catalog:dev",
         "nyc": "^17.1.0",
         "rimraf": "catalog:build",
-        "turbo": "2.6.1-canary.1",
+        "turbo": "2.6.3",
         "vite": "catalog:build",
         "vitest": "catalog:testing"
     },

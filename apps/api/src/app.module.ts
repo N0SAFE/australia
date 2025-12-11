@@ -23,6 +23,7 @@ import { StorageModule } from "./modules/storage/storage.module";
 import { PresentationModule } from "./modules/presentation/presentation.module";
 import { FfmpegModule } from "./core/modules/ffmpeg/ffmpeg.module";
 import { EventsModule } from "./core/modules/events/events.module";
+import { MinioModule } from "./core/modules/minio";
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { EventsModule } from "./core/modules/events/events.module";
     DatabaseModule,
     EventsModule,
     FfmpegModule,
+    MinioModule,
     AuthModule.forRootAsync({
       imports: [DatabaseModule, EnvModule],
       useFactory: createBetterAuth,

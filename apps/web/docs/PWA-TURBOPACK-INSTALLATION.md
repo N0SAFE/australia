@@ -548,6 +548,13 @@ import { UpdateNotification } from "@/components/pwa/UpdateNotification";
 bun run build
 # or
 next build --turbopack
+
+## 11. Server Actions + Serwist Hardening
+
+- Avoid caching Server Actions responses: configure `app/sw.ts` runtime caching with `NetworkOnly` for all `POST` requests.
+- Keep Next.js data fresh: use `NetworkFirst` for `/_next/data/*.json` to prevent "previous build" Server Action errors.
+- When receiving `SKIP_WAITING`, clear runtime caches so users don’t hit stale assets while the new service worker takes control.
+- Set `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (base64, 32 bytes — e.g., `openssl rand -base64 32`) in your env files for both development and production.
 ```
 
 ### Expected Output

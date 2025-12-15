@@ -37,6 +37,19 @@ print_header() {
     echo ""
 }
 
+# Helper to upsert a key/value pair in an env-style file
+set_env_var() {
+    local env_file="$1"
+    local key="$2"
+    local value="$3"
+
+    if grep -q "^${key}=" "$env_file" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${value}|g" "$env_file"
+    else
+        echo "${key}=${value}" >> "$env_file"
+    fi
+}
+
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then 
     print_error "Please run as root (use sudo)"
@@ -202,6 +215,7 @@ generate_secrets() {
     DB_NAME="gossip_club"
     DB_PASSWORD=$(openssl rand -hex 32)
     AUTH_SECRET=$(openssl rand -hex 32)
+    NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$(openssl rand -base64 32)
     DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@host.docker.internal:5432/${DB_NAME}"
     
     # Save secrets to file
@@ -215,6 +229,7 @@ DB_PASSWORD=$DB_PASSWORD
 DATABASE_URL=$DATABASE_URL
 AUTH_SECRET=$AUTH_SECRET
 BETTER_AUTH_SECRET=$AUTH_SECRET
+NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
 EOF
     
     chmod 600 "$PROJECT_DIR/.secrets.txt"
@@ -255,6 +270,28 @@ else
     source "$PROJECT_DIR/.secrets.txt"
 fi
 
+# Ensure the Server Actions encryption key exists exactly once
+ensure_server_actions_key() {
+    local secrets_file="$PROJECT_DIR/.secrets.txt"
+
+    if [ -z "$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" ]; then
+        print_info "Generating NEXT_SERVER_ACTIONS_ENCRYPTION_KEY (one-time)..."
+        NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$(openssl rand -base64 32)
+
+        if grep -q "^NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=" "$secrets_file" 2>/dev/null; then
+            sed -i "s|^NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=.*|NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}|g" "$secrets_file"
+        else
+            echo "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}" >> "$secrets_file"
+        fi
+
+        chmod 600 "$secrets_file"
+        chown "$ACTUAL_USER:$ACTUAL_USER" "$secrets_file"
+        print_success "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY generated and stored in .secrets.txt"
+    fi
+}
+
+ensure_server_actions_key
+
 # Ensure .env.prod exists
 if [ ! -f "$PROJECT_DIR/.env.prod" ]; then
     print_warning ".env.prod not found. Creating from example..."
@@ -270,10 +307,10 @@ fi
 
 # Always update .env.prod with secrets from .secrets.txt (source of truth)
 print_info "Updating .env.prod with secrets from .secrets.txt..."
-
-sed -i "s|DATABASE_URL=.*|DATABASE_URL=${DATABASE_URL}|g" "$PROJECT_DIR/.env.prod"
-sed -i "s|AUTH_SECRET=.*|AUTH_SECRET=${AUTH_SECRET}|g" "$PROJECT_DIR/.env.prod"
-sed -i "s|BETTER_AUTH_SECRET=.*|BETTER_AUTH_SECRET=${AUTH_SECRET}|g" "$PROJECT_DIR/.env.prod"
+set_env_var "$PROJECT_DIR/.env.prod" "DATABASE_URL" "$DATABASE_URL"
+set_env_var "$PROJECT_DIR/.env.prod" "AUTH_SECRET" "$AUTH_SECRET"
+set_env_var "$PROJECT_DIR/.env.prod" "BETTER_AUTH_SECRET" "$AUTH_SECRET"
+set_env_var "$PROJECT_DIR/.env.prod" "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY" "$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY"
 
 print_success "✓ .env.prod updated with secrets from .secrets.txt"
 print_info "  Database URL: postgresql://$DB_USER:****@host.docker.internal:5432/$DB_NAME"

@@ -8,6 +8,7 @@ import { DynamicTanstackDevTools } from "@/components/devtools/DynamicTanstackDe
 import { SerwistProvider } from "@/lib/serwist-client";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { UpdateNotification } from "@/components/pwa/UpdateNotification";
+import { ServiceWorkerUpdateBridge } from "@/components/pwa/ServiceWorkerUpdateBridge";
 
 const PontanoSansFont = localFont({
   src: "../public/fonts/Pontano_Sans/PontanoSans-VariableFont_wght.ttf",
@@ -126,6 +127,7 @@ export default async function RootLayout({
           </ReactQueryProviders>
           <Toaster richColors position="top-center" />
           <InstallPrompt />
+          <ServiceWorkerUpdateBridge />
           <UpdateNotification />
         </SerwistProvider>
         <Toaster theme="dark" richColors position="top-center" />

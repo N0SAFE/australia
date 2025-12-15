@@ -84,7 +84,7 @@
     "lodash": "^4.17.21",
     "lodash.snakecase": "catalog:utils",
     "lucide-react": "^0.556.0",
-    "next": "16.0.8",
+    "next": "16.0.10",
     "next-pwa": "^5.6.0",
     "nprogress": "catalog:web",
     "platejs": "catalog:platejs",

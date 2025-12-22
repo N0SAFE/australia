@@ -123,7 +123,7 @@
     "@vitest/ui": "catalog:testing",
     "declarative-routing": "catalog:next",
     "eslint": "^9",
-    "eslint-config-next": "16.0.8",
+    "eslint-config-next": "16.1.0",
     "estree-walker": "^3.0.3",
     "jsdom": "catalog:testing",
     "next-sitemap": "catalog:next",

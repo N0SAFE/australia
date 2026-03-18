@@ -126,7 +126,14 @@ RUN --mount=type=bind,from=installer,source=/app,target=/mnt/installer \
         cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=root --group=root; \
     done
 
-COPY --parents --chmod=a+w .turbo/ **/.turbo/ ./
+RUN --mount=type=bind,source=.,target=/mnt/source \
+    mkdir -p .turbo && chmod a+w .turbo && \
+    if [ -d /mnt/source/.turbo ]; then cp -r /mnt/source/.turbo/. .turbo/; fi && \
+    find /mnt/source -mindepth 2 -name ".turbo" -type d | while read dir; do \
+        reldir=$(echo "$dir" | sed 's|/mnt/source/||'); \
+        mkdir -p "$reldir" && chmod a+w "$reldir"; \
+        cp -r "$dir/." "$reldir/" 2>/dev/null || true; \
+    done
 
 RUN --mount=type=cache,target=/root/.bun --mount=type=cache,target=/root/.cache \
   bun turbo run generate --filter=web... --remote-only
@@ -171,7 +178,7 @@ ENV PORT=${NEXT_PUBLIC_APP_PORT}
 
 # Health check for deployment platforms
 HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider ${NEXT_PUBLIC_APP_URL} || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${NEXT_PUBLIC_APP_PORT:-3000} || exit 1
 
 WORKDIR /app
 ENTRYPOINT ["dumb-init", "--"]

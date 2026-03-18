@@ -34,6 +34,8 @@ services:
       - "${API_PORT}:${API_PORT}"
     networks:
       - app_network_prod
+      - sebille_traefik_network
+      - sebille_db_network
     # Allow container to reach host services (PostgreSQL) via host.docker.internal
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -85,6 +87,10 @@ networks:
   app_network_prod:
     name: ${COMPOSE_PROJECT_NAME:-nextjs-nestjs}_app_network_prod
     driver: bridge
+  sebille_traefik_network:
+    external: true
+  sebille_db_network:
+    external: true
 
 volumes:
   bun_cache_prod:

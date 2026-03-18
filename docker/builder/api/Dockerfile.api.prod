@@ -98,7 +98,14 @@ RUN --mount=type=bind,from=installer,source=/app,target=/mnt/installer \
         cd /mnt/installer && tar cf - "$(echo "$dir" | sed 's|/mnt/installer/||')" | tar xf - -C /app --owner=root --group=root; \
     done
 
-COPY --parents --chmod=a+w .turbo/ **/.turbo/ ./
+RUN --mount=type=bind,source=.,target=/mnt/source \
+    mkdir -p .turbo && chmod a+w .turbo && \
+    if [ -d /mnt/source/.turbo ]; then cp -r /mnt/source/.turbo/. .turbo/; fi && \
+    find /mnt/source -mindepth 2 -name ".turbo" -type d | while read dir; do \
+        reldir=$(echo "$dir" | sed 's|/mnt/source/||'); \
+        mkdir -p "$reldir" && chmod a+w "$reldir"; \
+        cp -r "$dir/." "$reldir/" 2>/dev/null || true; \
+    done
 
 # Copy seed assets for fast seeding (images, videos, audio)
 # These files are pre-downloaded and stored in the seed/assets directory

@@ -39,6 +39,7 @@ services:
       - DEV_AUTH_KEY=${DEV_AUTH_KEY}
     networks:
       - app_network_prod
+      - sebille_traefik_network
     volumes:
       # Cache directories to speed rebuilds (only useful if containers are recreated frequently on same host)
       - bun_cache_prod:/root/.bun/install/cache
@@ -48,6 +49,8 @@ networks:
   app_network_prod:
     name: ${COMPOSE_PROJECT_NAME:-nextjs-nestjs}_app_network_prod
     driver: bridge
+  sebille_traefik_network:
+    external: true
 
 volumes:
   bun_cache_prod:

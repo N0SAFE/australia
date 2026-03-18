@@ -27,7 +27,8 @@
         "CHOKIDAR_USEPOLLING",
         "UPLOADS_DIR",
         "TRUSTED_ORIGINS",
-        "AUTH_BASE_DOMAIN"
+        "AUTH_BASE_DOMAIN",
+        "BETTER_AUTH_API_KEY"
     ],
     "tasks": {
         "dev": {

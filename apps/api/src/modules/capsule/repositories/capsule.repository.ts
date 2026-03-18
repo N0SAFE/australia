@@ -412,8 +412,8 @@ export class CapsuleRepository {
         let orderByCondition: SQL;
 
         if (!validInput.sort) {
-            // Default sorting by opening date ascending
-            orderByCondition = asc(capsule.openingDate);
+            // Default sorting by created date descending (most recent first)
+            orderByCondition = desc(capsule.createdAt);
         } else {
             switch (validInput.sort.field) {
                 case "openingDate":

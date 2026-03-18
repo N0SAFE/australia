@@ -23,15 +23,22 @@ export function useCapsules(options?: {
   const pageSize = options?.pagination?.pageSize || 20
   const page = options?.pagination?.page || 1
   
-  const params = {
+  const params: {
+    pagination: { limit: number; offset: number }
+    sort?: { field: 'openingDate' | 'createdAt'; direction: 'asc' | 'desc' }
+  } = {
     pagination: {
       limit: pageSize,
       offset: (page - 1) * pageSize,
     },
-    sort: {
-      field: (options?.sort?.field || 'openingDate') as 'openingDate' | 'createdAt',
-      direction: options?.sort?.direction || 'asc' as const,
-    },
+  }
+
+  // Only include sort if explicitly provided
+  if (options?.sort) {
+    params.sort = {
+      field: options.sort.field || 'openingDate',
+      direction: options.sort.direction || 'asc',
+    }
   }
 
   return useQuery(orpc.capsule.list.queryOptions({
